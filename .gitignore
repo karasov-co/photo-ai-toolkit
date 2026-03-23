@@ -1,0 +1,8 @@
+.env
+__pycache__/
+results/
+*.pyc
+photos/
+results/
+stories_picks/
+.venv/
