@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import rawpy
-from PIL import Image
+from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ def _preview_standard(path: Path, out_path: Path) -> Path:
     try:
         with Image.open(path) as img:
             img = _ensure_rgb(img)
+            img = ImageOps.exif_transpose(img)
             img.thumbnail((PREVIEW_MAX_PX, PREVIEW_MAX_PX), Image.LANCZOS)
             img.save(out_path, "JPEG", quality=PREVIEW_QUALITY)
         return out_path

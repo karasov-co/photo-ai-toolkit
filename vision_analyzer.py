@@ -10,14 +10,37 @@ import openai
 logger = logging.getLogger(__name__)
 
 VISION_PROMPT = (
-    'You are an elite photography curator selecting the best shots for Instagram Stories. '
-    'Score each photo on a 1-1000 scale where: 1-200 = technical failure or boring, '
-    '201-400 = mediocre, 401-600 = decent but not post-worthy, 601-800 = good, would engage followers, '
-    '801-1000 = exceptional, must post immediately. '
-    'Evaluate: composition, lighting, color harmony, emotional impact, storytelling, Instagram appeal. '
-    'Be very discriminating - spread scores widely, avoid clustering. '
-    'Respond ONLY in valid JSON: {"description": "...", "tags": [...], '
-    '"quality_score": 750, "quality_reasoning": "..."}'
+    "You are a senior photo editor reviewing a photographer's archive to identify their strongest work. "
+    "Evaluate this single photograph on its photographic merit alone.\n\n"
+
+    "Score from 1 to 1000 based on how the image performs across these dimensions, weighted equally:\n"
+    "- Composition: framing, balance, use of space, leading lines, subject placement\n"
+    "- Light: quality, direction, contrast, exposure, dynamic range handling\n"
+    "- Color: harmony, palette, white balance, mood\n"
+    "- Subject and storytelling: clarity of intent, emotional weight, narrative\n"
+    "- Technical execution: focus, sharpness, noise control, artifacts\n"
+    "- Originality: visual interest, scroll-stopping quality, memorability\n\n"
+
+    "Scoring anchors:\n"
+    "1-200: technical failure (severe blur, total miss-focus, unrecoverable exposure) or visually empty\n"
+    "201-400: weak — multiple significant problems, no redeeming qualities\n"
+    "401-600: competent but unremarkable — looks fine, no reason to keep\n"
+    "601-750: strong — clearly above average, worth keeping in a portfolio\n"
+    "751-900: excellent — would publish, share, or print\n"
+    "901-1000: exceptional — career-defining, gallery-grade work\n\n"
+
+    "Critical rules:\n"
+    "- Aspect ratio and orientation (portrait, landscape, square) are creative choices. "
+    "Do NOT lower the score because of orientation, format, or fitness for any specific platform like Instagram.\n"
+    "- Be discriminating. Spread scores across the full range. Most photos in a typical archive land in 400-650. "
+    "Reserve 750+ for genuinely strong work and 850+ for outstanding shots only.\n"
+    "- Judge each photo on its own, not relative to others.\n\n"
+
+    "Respond with valid JSON only, no preamble or markdown:\n"
+    '{"description": "one sentence describing what is in the frame", '
+    '"tags": ["5-10 lowercase keywords"], '
+    '"quality_score": <integer 1-1000>, '
+    '"quality_reasoning": "2-4 sentences explaining the score, naming concrete strengths and weaknesses"}'
 )
 
 MAX_RETRIES = 3
@@ -55,9 +78,8 @@ def _encode_image_base64(image_path: Path) -> str:
 
 def _call_vision_api(encoded: str, client: openai.OpenAI) -> str:
     response = client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         max_completion_tokens=500,
-        temperature=0,
         messages=[
             {
                 "role": "user",

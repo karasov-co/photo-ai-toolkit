@@ -172,7 +172,7 @@ def print_summary(records: list[dict]) -> None:
             key=lambda r: r.get("quality_score") or 0,
             reverse=True,
         )
-        print("\nRECOMMENDED FOR STORIES (score 700+):")
+        print("\nTOP PICKS (score 700+):")
         if stories:
             for r in stories:
                 print(f"  [{r['quality_score']}/1000] {r['filename']}")
