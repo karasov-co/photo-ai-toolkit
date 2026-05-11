@@ -1,6 +1,6 @@
 # photo-ai-toolkit
 
-AI-powered CLI tool that analyzes, tags, and scores your photos using GPT-5.4 Vision.
+AI-powered CLI tool that analyzes, tags, and scores your photos using GPT-5.5 Vision.
 
 ---
 
@@ -64,7 +64,7 @@ python main.py --input ./photos --output ./results
 1. **Scan** — finds all supported image files in the input folder
 2. **EXIF** — extracts camera metadata using Pillow (JPEG/TIFF) or rawpy (RAW)
 3. **Preview** — generates a 512px JPEG thumbnail for each file
-4. **Analyze** — sends the preview to GPT-5.4 Vision with a photography critic prompt
+4. **Analyze** — sends the preview to GPT-5.5 Vision with a photography critic prompt
 5. **Parse** — extracts structured JSON: description, tags, score (1–1000), reasoning
 6. **Export** — appends results to `results.csv` and `results.json`
 7. **Summary** — prints top photos and Stories recommendations to the terminal
@@ -86,13 +86,13 @@ python main.py --input ./photos --output ./results
 
 ## Cost Estimate
 
-Using GPT-5.4 with low-detail vision mode:
+Using GPT-5.5 with low-detail vision mode:
 
 | Photos | Estimated Cost |
 |--------|---------------|
-| 1      | ~$0.004        |
-| 100    | ~$0.40         |
-| 1 000  | ~$4.00         |
+| 1      | ~$0.001       |
+| 100    | ~$1.00         |
+| 1 000  | ~$10.00         |
 
 ---
 
