@@ -72,7 +72,7 @@ calls, and `--force` to re-analyze files that are already in `results.csv`.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 161 tests, no network, no API key needed
+pytest          # 197 tests, no network, no API key needed
 ruff check .
 ```
 
@@ -84,16 +84,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup, and
 ## How It Works
 
 1. **Scan** — finds all supported image files in the input folder
-2. **EXIF** — extracts camera metadata using Pillow (JPEG/TIFF)[^1]
+2. **EXIF** — extracts camera metadata using Pillow (JPEG/TIFF) or exifread with a LibRaw fallback (RAW)
 3. **Preview** — generates a 512px JPEG thumbnail for each file
 4. **Analyze** — sends the preview to GPT-5.5 Vision with a photography critic prompt
 5. **Parse** — extracts structured JSON: description, tags, score (1–1000), reasoning
 6. **Export** — appends results to `results.csv` and `results.json`
 7. **Summary** — prints top photos and Stories recommendations to the terminal
-
-[^1]: RAW files currently return empty EXIF — Pillow has no decoder for `.RW2`,
-`.ARW`, `.CR3` or `.NEF`. Previews are unaffected, since those go through rawpy.
-See [known limitations](CONTRIBUTING.md#known-limitations).
 
 ---
 

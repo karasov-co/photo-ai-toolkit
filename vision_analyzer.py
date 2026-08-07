@@ -56,7 +56,9 @@ RETRY_BACKOFF_BASE = 2
 DRY_RUN_STUB = {
     "description": "DRY RUN: A sample scene description for testing purposes.",
     "tags": ["dry-run", "test", "sample"],
-    "quality_score": 5,
+    # Mid-scale on the 1-1000 range the real prompt uses. It was 5, which made
+    # every dry run report an average of 5/1000 and an empty top-picks list.
+    "quality_score": 500,
     "quality_reasoning": "DRY RUN: No actual analysis performed.",
 }
 

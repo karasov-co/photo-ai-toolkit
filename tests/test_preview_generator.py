@@ -1,5 +1,6 @@
 import hashlib
 from contextlib import contextmanager
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -7,7 +8,12 @@ from conftest import CORRUPT_EXIF, NO_EXIF, TRUNCATED_RAW, WITH_EXIF
 from PIL import Image
 
 import preview_generator
-from preview_generator import PREVIEW_MAX_PX, PreviewGenerationError, generate_preview
+from preview_generator import (
+    PREVIEW_MAX_PX,
+    PreviewGenerationError,
+    generate_preview,
+    preview_name,
+)
 
 
 def _sha256(path):
@@ -29,8 +35,53 @@ def test_output_is_jpeg_regardless_of_input(tmp_path):
         assert img.mode == "RGB"
 
 
-def test_output_is_named_after_the_source_stem(tmp_path):
-    assert generate_preview(WITH_EXIF, "JPEG", tmp_path).name == "sample_with_exif.jpg"
+def test_output_name_includes_the_source_extension(tmp_path):
+    assert generate_preview(WITH_EXIF, "JPEG", tmp_path).name == "sample_with_exif_jpg.jpg"
+
+
+# --- regression: RAW+JPEG pairs used to overwrite each other's preview -------
+
+
+def test_same_stem_different_extensions_do_not_collide(tmp_path):
+    raw = tmp_path / "P1042675.RW2"
+    jpeg = tmp_path / "P1042675.JPG"
+    assert preview_name(raw) != preview_name(jpeg)
+
+
+def test_raw_and_jpeg_siblings_both_keep_their_preview(fake_rawpy, tmp_path):
+    """Shooting RAW+JPEG yields P1042675.RW2 and P1042675.JPG side by side."""
+    src = tmp_path / "src"
+    src.mkdir()
+    jpeg = src / "P1042675.JPG"
+    Image.new("RGB", (800, 600), (10, 120, 60)).save(jpeg, "JPEG")
+    raw = src / "P1042675.RW2"
+    raw.write_bytes(TRUNCATED_RAW.read_bytes())
+
+    out = tmp_path / "previews"
+    jpeg_preview = generate_preview(jpeg, "JPEG", out)
+    raw_preview = generate_preview(raw, "RAW", out)
+
+    assert jpeg_preview != raw_preview
+    assert jpeg_preview.exists() and raw_preview.exists()
+    assert len(list(out.iterdir())) == 2
+    # The JPEG's preview must still be its own image, not the RAW's.
+    assert Image.open(jpeg_preview).size == (512, 384)
+    assert Image.open(raw_preview).size == (512, 384)
+    assert jpeg_preview.read_bytes() != raw_preview.read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("P1042675.RW2", "P1042675_rw2.jpg"),
+        ("P1042675.JPG", "P1042675_jpg.jpg"),
+        ("DSC04821.ARW", "DSC04821_arw.jpg"),
+        ("photo.tar.gz", "photo.tar_gz.jpg"),
+        ("Улица-Мира.RW2", "Улица-Мира_rw2.jpg"),
+    ],
+)
+def test_preview_name_is_deterministic(filename, expected):
+    assert preview_name(Path(filename)) == expected
 
 
 def test_landscape_aspect_ratio_is_preserved(tmp_path):

@@ -14,9 +14,20 @@ class PreviewGenerationError(Exception):
     pass
 
 
+def preview_name(path: Path) -> str:
+    """Preview filename for a source file.
+
+    The source extension is part of the name because shooting RAW+JPEG gives
+    two files with the same stem (P1042675.RW2 and P1042675.JPG). Naming both
+    previews after the stem alone made the second overwrite the first, so one
+    of the two photos was scored against the other's image.
+    """
+    return f"{path.stem}_{path.suffix.lstrip('.').lower()}.jpg"
+
+
 def generate_preview(path: Path, file_type: str, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / (path.stem + ".jpg")
+    out_path = output_dir / preview_name(path)
 
     try:
         if file_type == "RAW":

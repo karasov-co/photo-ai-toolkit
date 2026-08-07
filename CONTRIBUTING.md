@@ -49,6 +49,16 @@ python tests/generate_fixtures.py
 
 Regenerate and commit them only when a fixture actually needs to change.
 
+One exception: `raw_header.rw2` is the first 5 KB of a real Panasonic RW2,
+because exifread has to parse a genuine IFD. It stops short of the embedded
+JPEG preview (offset 6144) so it holds no image data, and the camera serial
+number is zeroed. Source RAWs are ~34 MB and are not in the repository — pass
+one in to regenerate it:
+
+```bash
+python tests/generate_fixtures.py path/to/photo.RW2
+```
+
 ## Linting
 
 ```bash
@@ -81,13 +91,17 @@ returned by `_parse_vision_response` are what the resume-on-rerun logic reads.
 Adding a column is fine; renaming or removing one is a breaking change and
 belongs in a major release.
 
-## Known limitations
+## How RAW metadata is read
 
-Worth knowing before you file a bug for one of these:
+`_extract_raw` tries exifread first and fills any gaps from LibRaw. The split
+matters:
 
-- **EXIF is not extracted from RAW files.** `_extract_raw` delegates to Pillow,
-  which has no decoder for `.RW2`, `.ARW`, `.CR3` or `.NEF`, so every RAW file
-  returns empty metadata. Previews still work, because those go through rawpy.
-  Wiring the RAW branch up to rawpy or exifread would fix it.
-- **Previews are always written as `<stem>.jpg`.** Two source files with the
-  same stem but different extensions overwrite each other's preview.
+- **exifread** parses the TIFF-based formats (`.RW2`, `.ARW`, `.NEF`) and is the
+  only one of the two that reports make, model and GPS.
+- **LibRaw** (via rawpy) covers containers exifread cannot parse — `.CR3` is
+  ISO BMFF, not TIFF — but exposes only ISO, shutter, aperture, focal length,
+  timestamp and lens.
+
+The fallback never overwrites a field exifread already found. Pillow is not in
+this path at all; it has no RAW decoder, and routing RAW through it was the
+reason RAW files returned empty metadata for so long.

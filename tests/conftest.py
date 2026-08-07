@@ -15,6 +15,22 @@ WITH_EXIF = FIXTURES / "sample_with_exif.jpg"
 NO_EXIF = FIXTURES / "sample_no_exif.jpg"
 CORRUPT_EXIF = FIXTURES / "corrupt_exif.jpg"
 TRUNCATED_RAW = FIXTURES / "truncated.rw2"
+RAW_EXIF = FIXTURES / "raw_header.rw2"
+
+# What raw_header.rw2 carries. This camera does not geotag, so GPS stays None;
+# the GPS mapping is covered separately with a stubbed exifread.
+EXPECTED_RAW_EXIF = {
+    "camera_make": "Panasonic",
+    "camera_model": "DC-S5M2",
+    "lens": "LUMIX S 20-60/F3.5-5.6",
+    "iso": 640,
+    "shutter_speed": "1/60",
+    "aperture": 11.0,
+    "focal_length": 33.0,
+    "date_shot": "2026-03-16T15:44:16",
+    "gps_lat": None,
+    "gps_lon": None,
+}
 
 # What sample_with_exif.jpg was generated with. See tests/generate_fixtures.py.
 EXPECTED_EXIF = {

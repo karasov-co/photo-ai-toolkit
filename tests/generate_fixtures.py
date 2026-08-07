@@ -6,6 +6,7 @@ Everything here is synthetic — no real photographs are stored in the repo.
     python tests/generate_fixtures.py
 """
 
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -17,6 +18,10 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # Panasonic RW2 magic. LibRaw recognises the signature, then fails on the
 # truncated body -- which is the RAW failure path we want to exercise.
 RW2_MAGIC = b"IIU\x00\x18\x00\x00\x00"
+
+# Enough of a real RW2 to carry the EXIF IFD, and stopping short of the
+# embedded JPEG preview that begins at offset 6144.
+RAW_HEADER_BYTES = 5120
 
 
 def _gradient(width: int, height: int) -> Image.Image:
@@ -74,12 +79,42 @@ def make_truncated_raw() -> None:
     (FIXTURES / "truncated.rw2").write_bytes(RW2_MAGIC + b"\x00" * 2040)
 
 
+def make_raw_header(source: Path) -> None:
+    """The EXIF header of a real RW2, with nothing else in it.
+
+    This is the one fixture that cannot be synthesised: exifread parses a real
+    Panasonic IFD, so the test needs real bytes. Only the first 5 KB is kept --
+    the embedded JPEG preview starts at offset 6144, so no image data is
+    included -- and the camera serial number is overwritten with zeroes.
+
+    The source RAW is not in the repository (they run ~34 MB). Pass one in to
+    regenerate:  python tests/generate_fixtures.py path/to/photo.RW2
+    """
+    data = bytearray(source.read_bytes()[:RAW_HEADER_BYTES])
+
+    serial_start = data.find(b"WJ4JB")
+    if serial_start != -1:
+        end = data.find(b"\x00", serial_start)
+        data[serial_start:end] = b"0" * (end - serial_start)
+
+    if b"\xff\xd8\xff" in data:  # pragma: no cover - guard, not expected to fire
+        raise RuntimeError("refusing to write a fixture containing JPEG image data")
+
+    (FIXTURES / "raw_header.rw2").write_bytes(bytes(data))
+
+
 def main() -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
     make_with_exif()
     make_without_exif()
     make_corrupt_exif()
     make_truncated_raw()
+
+    if len(sys.argv) > 1:
+        make_raw_header(Path(sys.argv[1]))
+    else:
+        print("(skipping raw_header.rw2 -- pass a source .RW2 path to regenerate it)\n")
+
     for f in sorted(FIXTURES.iterdir()):
         print(f"{f.name:24s} {f.stat().st_size:>8,} bytes")
 

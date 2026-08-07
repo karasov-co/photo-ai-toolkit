@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+import exifread
 from PIL import Image
 from PIL.ExifTags import GPSTAGS, TAGS
 
@@ -72,11 +73,92 @@ def _extract_pillow(path: Path) -> dict:
 
 
 def _extract_raw(path: Path) -> dict:
+    """Read EXIF from a RAW file.
+
+    Pillow has no decoder for .RW2/.ARW/.CR3/.NEF, so this reads the EXIF
+    directory directly with exifread, then fills any gaps from LibRaw. exifread
+    covers the TIFF-based formats and is the only one of the two that reports
+    make, model and GPS; LibRaw covers containers exifread cannot parse (CR3).
+    """
+    result = dict(EXIF_EMPTY)
+
     try:
-        return _extract_pillow(path)
+        result.update(_read_raw_exifread(path))
     except Exception as e:
-        logger.warning("RAW EXIF extraction failed for %s: %s", path.name, e)
-        return dict(EXIF_EMPTY)
+        logger.warning("exifread failed for %s: %s", path.name, e)
+
+    if any(result[key] is None for key in _RAWPY_FILLABLE):
+        try:
+            _fill_from_rawpy(path, result)
+        except Exception as e:
+            logger.warning("LibRaw metadata unavailable for %s: %s", path.name, e)
+
+    return result
+
+
+_RAWPY_FILLABLE = ("lens", "iso", "shutter_speed", "aperture", "focal_length", "date_shot")
+
+
+def _read_raw_exifread(path: Path) -> dict:
+    with open(path, "rb") as f:
+        tags = exifread.process_file(f, details=False)
+
+    if not tags:
+        return {}
+
+    result = {
+        "camera_make": _str_or_none(_tag(tags, "Image Make")),
+        "camera_model": _str_or_none(_tag(tags, "Image Model")),
+        "lens": _str_or_none(_tag(tags, "EXIF LensModel", "MakerNote LensType")),
+        "iso": _int_or_none(_tag(tags, "EXIF ISOSpeedRatings", "EXIF PhotographicSensitivity")),
+        "aperture": _parse_rational(_tag(tags, "EXIF FNumber")),
+        "focal_length": _parse_rational(_tag(tags, "EXIF FocalLength")),
+        "shutter_speed": _parse_shutter(_tag(tags, "EXIF ExposureTime")),
+        "date_shot": _parse_date(_str_or_none(_tag(tags, "EXIF DateTimeOriginal", "Image DateTime"))),
+    }
+
+    named_gps = {
+        key.removeprefix("GPS "): _tag(tags, key) for key in tags if key.startswith("GPS GPS")
+    }
+    if named_gps:
+        result["gps_lat"], result["gps_lon"] = _parse_gps(named_gps)
+
+    return result
+
+
+def _tag(tags: dict, *names: str):
+    """First present tag among `names`, unwrapped to a scalar or tuple."""
+    for name in names:
+        tag = tags.get(name)
+        if tag is None:
+            continue
+        values = getattr(tag, "values", tag)
+        if isinstance(values, (list, tuple)):
+            if not values:
+                continue
+            return tuple(values) if len(values) > 1 else values[0]
+        return values
+    return None
+
+
+def _fill_from_rawpy(path: Path, result: dict) -> None:
+    """Fill still-missing fields from LibRaw. Imported lazily — this is a fallback."""
+    import rawpy
+
+    with rawpy.imread(str(path)) as raw:
+        other = raw.other
+        candidates = {
+            "iso": _int_or_none(other.iso_speed),
+            "shutter_speed": _parse_shutter(other.shutter_speed),
+            "aperture": _parse_rational(other.aperture),
+            "focal_length": _parse_rational(other.focal_length),
+            "date_shot": other.timestamp.isoformat() if other.timestamp else None,
+            "lens": _str_or_none(getattr(raw.lens, "model", None)),
+        }
+
+    for key, value in candidates.items():
+        if result.get(key) is None and value is not None:
+            result[key] = value
 
 
 def _parse_rational(value) -> float | None:

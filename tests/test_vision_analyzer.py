@@ -79,6 +79,14 @@ def test_dry_run_returns_the_stub_without_calling_the_api():
     assert client.calls == []
 
 
+def test_dry_run_stub_matches_the_real_output_schema():
+    """It scored 5 on a 1-1000 scale, so every dry run averaged 5/1000."""
+    assert set(DRY_RUN_STUB) == {"description", "tags", "quality_score", "quality_reasoning"}
+    assert 1 <= DRY_RUN_STUB["quality_score"] <= 1000
+    assert isinstance(DRY_RUN_STUB["quality_score"], int)
+    assert len(DRY_RUN_STUB["tags"]) <= 10
+
+
 def test_dry_run_returns_a_copy_the_caller_cannot_corrupt():
     result = analyze_photo(WITH_EXIF, FakeClient(), dry_run=True)
     result["description"] = "mutated"

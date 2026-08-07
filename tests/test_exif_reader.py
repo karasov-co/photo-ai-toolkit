@@ -1,6 +1,17 @@
-import pytest
-from conftest import CORRUPT_EXIF, EXPECTED_EXIF, NO_EXIF, TRUNCATED_RAW, WITH_EXIF
+from types import SimpleNamespace
 
+import pytest
+from conftest import (
+    CORRUPT_EXIF,
+    EXPECTED_EXIF,
+    EXPECTED_RAW_EXIF,
+    NO_EXIF,
+    RAW_EXIF,
+    TRUNCATED_RAW,
+    WITH_EXIF,
+)
+
+import exif_reader
 from exif_reader import (
     EXIF_EMPTY,
     _dms_to_decimal,
@@ -10,6 +21,7 @@ from exif_reader import (
     _parse_rational,
     _parse_shutter,
     _str_or_none,
+    _tag,
     extract_exif,
 )
 
@@ -46,10 +58,104 @@ def test_non_image_bytes_return_empty(tmp_path):
     assert extract_exif(junk, "JPEG") == EXIF_EMPTY
 
 
-def test_raw_file_pillow_cannot_open_returns_empty():
-    # Pillow has no RW2 decoder, so the RAW branch degrades to empty metadata
-    # rather than raising. See the known-limitations note in CONTRIBUTING.md.
+def test_undecodable_raw_returns_empty_without_raising():
+    # Neither exifread nor LibRaw can read it; both failures must be swallowed.
     assert extract_exif(TRUNCATED_RAW, "RAW") == EXIF_EMPTY
+
+
+def test_missing_raw_file_returns_empty(tmp_path):
+    assert extract_exif(tmp_path / "absent.rw2", "RAW") == EXIF_EMPTY
+
+
+# --- RAW metadata (regression: this returned all-None for every RAW file) ----
+
+
+@pytest.mark.parametrize(("field", "expected"), sorted(EXPECTED_RAW_EXIF.items()))
+def test_reads_every_field_from_raw(field, expected):
+    assert extract_exif(RAW_EXIF, "RAW")[field] == expected
+
+
+def test_raw_metadata_is_not_empty():
+    result = extract_exif(RAW_EXIF, "RAW")
+    assert result != EXIF_EMPTY
+    assert sum(v is not None for v in result.values()) == 8
+
+
+def test_raw_returns_exactly_the_documented_keys():
+    assert set(extract_exif(RAW_EXIF, "RAW")) == set(EXIF_EMPTY)
+
+
+def test_pillow_is_not_used_for_raw(monkeypatch):
+    # Pillow cannot decode RW2 at all; routing RAW through it was the bug.
+    def explode(*args, **kwargs):
+        raise AssertionError("RAW must not be routed through Pillow")
+
+    monkeypatch.setattr(exif_reader.Image, "open", explode)
+    assert extract_exif(RAW_EXIF, "RAW")["camera_make"] == "Panasonic"
+
+
+def test_gps_tags_are_mapped_from_raw(monkeypatch):
+    """This camera does not geotag, so stub exifread to cover the GPS branch."""
+    tags = {
+        "Image Make": SimpleNamespace(values="Nikon"),
+        "GPS GPSLatitude": SimpleNamespace(values=[(33, 1), (52, 1), (0, 1)]),
+        "GPS GPSLatitudeRef": SimpleNamespace(values="S"),
+        "GPS GPSLongitude": SimpleNamespace(values=[(151, 1), (12, 1), (0, 1)]),
+        "GPS GPSLongitudeRef": SimpleNamespace(values="E"),
+    }
+    monkeypatch.setattr(exif_reader.exifread, "process_file", lambda f, **kw: tags)
+    result = extract_exif(RAW_EXIF, "RAW")
+    assert (round(result["gps_lat"], 4), round(result["gps_lon"], 4)) == (-33.8667, 151.2)
+
+
+def test_libraw_fills_fields_exifread_could_not_read(monkeypatch):
+    """Covers containers exifread cannot parse, e.g. CR3."""
+    monkeypatch.setattr(exif_reader.exifread, "process_file", lambda f, **kw: {})
+
+    def fake_fill(path, result):
+        result["iso"] = 3200
+        result["lens"] = "RF 50mm F1.2 L USM"
+
+    monkeypatch.setattr(exif_reader, "_fill_from_rawpy", fake_fill)
+    result = extract_exif(RAW_EXIF, "RAW")
+    assert result["iso"] == 3200
+    assert result["lens"] == "RF 50mm F1.2 L USM"
+
+
+def test_libraw_does_not_overwrite_what_exifread_found(monkeypatch):
+    def clobber(path, result):
+        result["camera_make"] = "SHOULD NOT WIN"
+
+    monkeypatch.setattr(exif_reader, "_fill_from_rawpy", clobber)
+    # exifread supplies camera_make, so the fallback must leave it alone.
+    assert extract_exif(RAW_EXIF, "RAW")["camera_make"] == "Panasonic"
+
+
+def test_libraw_failure_does_not_break_exifread_results(monkeypatch):
+    def explode(path, result):
+        raise OSError("LibRaw exploded")
+
+    monkeypatch.setattr(exif_reader, "_fill_from_rawpy", explode)
+    assert extract_exif(RAW_EXIF, "RAW")["camera_model"] == "DC-S5M2"
+
+
+# --- the tag unwrapper ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("tags", "names", "expected"),
+    [
+        ({"A": SimpleNamespace(values="x")}, ("A",), "x"),
+        ({"A": SimpleNamespace(values=[7])}, ("A",), 7),
+        ({"A": SimpleNamespace(values=[1, 2, 3])}, ("A",), (1, 2, 3)),
+        ({"B": SimpleNamespace(values="y")}, ("A", "B"), "y"),
+        ({"A": SimpleNamespace(values=[])}, ("A",), None),
+        ({}, ("A",), None),
+    ],
+    ids=["scalar", "single-item-list", "multi-item-list", "falls-through", "empty", "absent"],
+)
+def test_tag_unwraps_exifread_values(tags, names, expected):
+    assert _tag(tags, *names) == expected
 
 
 def test_result_is_a_copy_not_the_shared_empty_dict():

@@ -114,6 +114,53 @@ def test_unreadable_json_is_replaced_rather_than_crashing(writer, sample_record)
     assert len(read_json(writer)) == 1
 
 
+def test_a_json_file_holding_a_non_list_is_not_appended_to(writer, sample_record):
+    writer.json_path.write_text('{"not": "a list"}', encoding="utf-8")
+    writer.append_record(sample_record)
+    assert read_json(writer) == [
+        {k: v for k, v in sample_record.items() if k != "tags_str"}
+    ]
+
+
+# --- regression: a partial write used to wipe every previous result ----------
+
+
+def test_corrupt_json_is_preserved_not_silently_discarded(writer, sample_record):
+    writer.json_path.write_text('[{"filename": "earlier.RW2"}', encoding="utf-8")  # truncated
+    writer.append_record(sample_record)
+
+    salvage = writer.json_path.with_name(writer.json_path.name + ".corrupt")
+    assert salvage.exists(), "the unparseable file must be kept, not dropped"
+    assert "earlier.RW2" in salvage.read_text(encoding="utf-8")
+
+
+def test_json_is_never_left_truncated_by_a_failed_write(writer, sample_record, monkeypatch):
+    """The old code truncated results.json in place, so an interrupt lost everything."""
+    writer.append_record(sample_record)
+    writer.append_record({**sample_record, "filename": "second.RW2"})
+    good = writer.json_path.read_text(encoding="utf-8")
+
+    real_dump = json.dump
+
+    def die_midway(obj, fp, **kwargs):
+        real_dump(obj[:1], fp, **kwargs)
+        raise KeyboardInterrupt("killed mid-write")
+
+    monkeypatch.setattr(json, "dump", die_midway)
+    with pytest.raises(KeyboardInterrupt):
+        writer.append_record({**sample_record, "filename": "third.RW2"})
+
+    # The real file is untouched and still parses.
+    assert writer.json_path.read_text(encoding="utf-8") == good
+    assert [r["filename"] for r in read_json(writer)] == ["P1042675.RW2", "second.RW2"]
+
+
+def test_no_temp_file_is_left_behind(writer, sample_record):
+    writer.append_record(sample_record)
+    leftovers = [p.name for p in writer.output_dir.iterdir() if p.name.endswith(".tmp")]
+    assert leftovers == []
+
+
 # --- unicode ----------------------------------------------------------------
 
 
