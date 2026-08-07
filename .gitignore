@@ -1,8 +1,31 @@
+# Secrets
 .env
+
+# Python
 __pycache__/
-results/
 *.pyc
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+
+# Local photo libraries and run output
 photos/
 results/
+test_results/
 stories_picks/
-.venv/
+
+# Large media that must never enter git history (GitHub rejects blobs >100 MB)
+*.MOV
+*.mov
+*.RW2
+*.ARW
+*.CR3
+*.NEF
+
+# ...but the generated test fixtures are committed on purpose
+!tests/fixtures/**
+
+# OS noise
+.DS_Store
