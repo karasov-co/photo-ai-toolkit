@@ -1,12 +1,12 @@
 import argparse
 import logging
+import os
 import sys
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
 import openai
-import os
+from dotenv import load_dotenv
 from tqdm import tqdm
 
 from exif_reader import extract_exif

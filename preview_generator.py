@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 
-import numpy as np
 import rawpy
 from PIL import Image, ImageOps
 

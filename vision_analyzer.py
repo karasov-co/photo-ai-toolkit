@@ -1,4 +1,5 @@
 import base64
+import contextlib
 import json
 import logging
 import re
@@ -43,6 +44,12 @@ VISION_PROMPT = (
     '"quality_reasoning": "2-4 sentences explaining the score, naming concrete strengths and weaknesses"}'
 )
 
+MODEL = "gpt-5.5"
+
+# GPT-5.x spends part of its output budget on reasoning tokens before it emits
+# any text, so this ceiling has to cover reasoning + the JSON payload.
+MAX_OUTPUT_TOKENS = 2000
+
 MAX_RETRIES = 3
 RETRY_BACKOFF_BASE = 2
 
@@ -77,29 +84,35 @@ def _encode_image_base64(image_path: Path) -> str:
 
 
 def _call_vision_api(encoded: str, client: openai.OpenAI) -> str:
-    response = client.chat.completions.create(
-        model="gpt-5.5",
-        max_completion_tokens=500,
-        messages=[
+    response = client.responses.create(
+        model=MODEL,
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+        reasoning={"effort": "low"},
+        input=[
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{encoded}",
-                            "detail": "low",
-                        },
+                        "type": "input_image",
+                        "image_url": f"data:image/jpeg;base64,{encoded}",
+                        "detail": "low",
                     },
                     {
-                        "type": "text",
+                        "type": "input_text",
                         "text": VISION_PROMPT,
                     },
                 ],
             }
         ],
     )
-    return response.choices[0].message.content or ""
+
+    text = response.output_text or ""
+    if not text.strip():
+        reason = getattr(getattr(response, "incomplete_details", None), "reason", None)
+        raise VisionParseError(
+            f"Model returned no text (status={getattr(response, 'status', '?')}, reason={reason})"
+        )
+    return text
 
 
 def _parse_vision_response(raw: str) -> dict:
@@ -110,12 +123,10 @@ def _parse_vision_response(raw: str) -> dict:
     except json.JSONDecodeError:
         match = re.search(r"\{[\s\S]*\}", raw)
         if match:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 data = json.loads(match.group(0))
-            except json.JSONDecodeError:
-                pass
 
-    if not data:
+    if not isinstance(data, dict) or not data:
         raise VisionParseError(f"Could not extract JSON from API response: {raw[:200]}")
 
     required = {"description", "tags", "quality_score", "quality_reasoning"}

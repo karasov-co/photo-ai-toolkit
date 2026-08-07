@@ -39,7 +39,7 @@ def _extract_pillow(path: Path) -> dict:
             if raw_exif is None:
                 try:
                     exif_data = img.getexif()
-                    raw_exif = {k: v for k, v in exif_data.items()} if exif_data else None
+                    raw_exif = dict(exif_data) if exif_data else None
                 except Exception:
                     pass
             if not raw_exif:
