@@ -412,14 +412,14 @@ def semantic_pass(
         client = openai.OpenAI()
 
     photo_names = [
-        a.filename
+        a.key
         for a in assets
-        if a.kind is media.MediaKind.PHOTO and measurements.get(a.filename, Measurement()).preview_path
+        if a.kind is media.MediaKind.PHOTO and measurements.get(a.key, Measurement()).preview_path
     ]
     if not photo_names:
         return {}
 
-    by_name = {a.filename: a for a in assets}
+    by_name = {a.key: a for a in assets}
     groups = aggregate.build_groups(photo_names, size=group_size)
     parsed_groups: list[list[dict]] = []
     per_frame: dict[str, dict] = {}
@@ -452,10 +452,20 @@ def semantic_pass(
             logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
             continue
 
+        problems = batch_runner.validate_group_ranks(items, len(group))
+        if problems:
+            # Not a ranking. Feeding it to Bradley-Terry would manufacture a
+            # confident order out of a malformed reply, so the group is dropped
+            # and its frames simply go unranked -- which lowers their
+            # confidence and sends them to review, the safe direction.
+            logger.warning("Group %d rejected: %s", index, "; ".join(problems))
+            continue
+
         placed = batch_runner.attach_filenames(items, group)
         parsed_groups.append(placed)
         for item in placed:
             per_frame.setdefault(item["filename"], item)
+            item["_group_size"] = len(group)
 
     scores = aggregate.aggregate_all_axes(parsed_groups)
 
@@ -466,7 +476,7 @@ def semantic_pass(
         except routing.AssessmentParseError as e:
             logger.warning("Unusable model output for %s: %s", name, e)
             continue
-        semantic = scoring.semantic_from_assessment(assessment)
+        semantic = scoring.semantic_from_assessment(assessment, group_size=item.get("_group_size"))
         # Replace the within-group rank with the stitched global percentile.
         semantic.axis_a = scores["axis_a"].get(name, semantic.axis_a)
         semantic.axis_b = scores["axis_b"].get(name, semantic.axis_b)
@@ -494,7 +504,15 @@ def run(
     previews_dir = options.output_dir / PREVIEW_DIRNAME
     cache = AnalysisCache(options.output_dir / CACHE_NAME)
 
-    assets = media.discover(options.input_dir, follow_symlinks=options.follow_symlinks)
+    # The output tree holds previews, reports and a symlink farm. Pointed
+    # inside the input, a second run would otherwise treat its own 512px
+    # previews as new photographs and route them -- and a preview routed to
+    # trash is a proposal to delete a file the tool itself made.
+    assets = media.discover(
+        options.input_dir,
+        follow_symlinks=options.follow_symlinks,
+        exclude=media.excluded_roots(options.output_dir, options.resolved_quarantine()),
+    )
     if not options.include_video:
         assets = [a for a in assets if a.kind is not media.MediaKind.VIDEO]
     if options.limit:
@@ -525,7 +543,7 @@ def run(
             else:
                 measurement = measure_photo(asset, previews_dir)
             cache.put(asset.checksum, measurement.to_dict())
-        measurements[asset.filename] = measurement
+        measurements[asset.key] = measurement
 
     cache.save()
 
@@ -539,8 +557,8 @@ def run(
         recoverable_bytes=sum(
             a.size_bytes
             for a in assets
-            if _record_for(result.records, a.filename)
-            and _record_for(result.records, a.filename).route_class == RouteClass.TRASH.value
+            if _record_for(result.records, a.key)
+            and _record_for(result.records, a.key).route_class == RouteClass.TRASH.value
         ),
     )
     return result
@@ -560,13 +578,13 @@ def _cluster(assets, measurements) -> dict[str, tuple[str, int, bool, float, flo
     """filename -> (cluster_id, size, is_best, mean_similarity, quality_margin)."""
     items = [
         duplicates.DupItem(
-            key=asset.filename,
-            phash=measurements[asset.filename].phash,
-            date_shot=measurements[asset.filename].exif.get("date_shot"),
-            quality=measurements[asset.filename].quality,
+            key=asset.key,
+            phash=measurements[asset.key].phash,
+            date_shot=measurements[asset.key].exif.get("date_shot"),
+            quality=measurements[asset.key].quality,
         )
         for asset in assets
-        if asset.kind is media.MediaKind.PHOTO and measurements[asset.filename].phash
+        if asset.kind is media.MediaKind.PHOTO and measurements[asset.key].phash
     ]
     out: dict[str, tuple[str, int, bool, float, float]] = {}
     for cluster in duplicates.cluster_items(items):
@@ -582,7 +600,7 @@ def _cluster(assets, measurements) -> dict[str, tuple[str, int, bool, float, flo
                 round(best_quality - item.quality, 2),
             )
     for asset in assets:
-        out.setdefault(asset.filename, (asset.filename, 1, True, 0.0, 0.0))
+        out.setdefault(asset.key, (asset.key, 1, True, 0.0, 0.0))
     return out
 
 
@@ -591,11 +609,11 @@ def _score_all(assets, measurements, clusters, semantics, calibration, options) 
     prepared: list[tuple[media.Asset, Measurement, ScoreInput, object]] = []
 
     for asset in assets:
-        measurement = measurements[asset.filename]
+        measurement = measurements[asset.key]
         found = issues_for(asset, measurement)
-        cluster_id, size, is_best, similarity, margin = clusters[asset.filename]
+        cluster_id, size, is_best, similarity, margin = clusters[asset.key]
 
-        semantic = semantics.get(asset.filename, Semantic())
+        semantic = semantics.get(asset.key, Semantic())
         kind = "video" if asset.kind is media.MediaKind.VIDEO else "photo"
         profile = calibration.for_kind(kind)
 
@@ -640,7 +658,7 @@ def _score_all(assets, measurements, clusters, semantics, calibration, options) 
     for asset, measurement, inp, scores in prepared:
         profile = calibration.for_kind(inp.kind)
         scored = scoring.classify(
-            inp, scores, profile, flagship_selected=asset.filename in flagship
+            inp, scores, profile, flagship_selected=asset.key in flagship
         )
         records.append(
             _build_record(asset, measurement, inp, scored, clusters, calibration, options)
@@ -665,10 +683,10 @@ def _select_flagship(prepared, measurements, clusters, calibration) -> set[str]:
             continue
         candidates.append(
             duplicates.Candidate(
-                key=asset.filename,
+                key=asset.key,
                 relevance=scores.portfolio_potential,
                 item=duplicates.DupItem(
-                    key=asset.filename,
+                    key=asset.key,
                     phash=measurement.phash,
                     date_shot=measurement.exif.get("date_shot"),
                     quality=measurement.quality,
@@ -697,8 +715,8 @@ def _select_flagship(prepared, measurements, clusters, calibration) -> set[str]:
 
 
 def _build_record(asset, measurement, inp, scored, clusters, calibration, options) -> AssetRecord:
-    cluster_id, size, is_best, _, _ = clusters[asset.filename]
-    record = provenance_module.from_metadata(measurement.exif)
+    cluster_id, size, is_best, _, _ = clusters[asset.key]
+    record = provenance_module.read_provenance(asset.path, measurement.exif)
 
     facts = marketplaces.TechnicalFacts(
         kind=inp.kind,
@@ -707,7 +725,7 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         height=measurement.height,
         duration=measurement.duration,
         container=measurement.container,
-        file_format="JPEG" if inp.kind == "photo" else "",
+        file_format=asset.format.value if inp.kind == "photo" else "",
     )
     # Metadata is generated first so that eligibility can take its completeness
     # into account: "export ready" must mean the CSV would actually validate,
@@ -737,6 +755,10 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         asset_id=asset.asset_id,
         source_path=str(asset.path),
         filename=asset.filename,
+        asset_key=asset.key,
+        all_files=[str(p) for p in asset.all_files],
+        file_states=_file_states(asset),
+        evidence=_evidence(inp.issues),
         media_type=inp.kind,
         checksum=asset.checksum,
         width=measurement.width,
@@ -767,8 +789,8 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         cluster_id=cluster_id,
         cluster_size=size,
         best_in_cluster=is_best,
-        cluster_similarity=clusters[asset.filename][3],
-        cluster_margin=clusters[asset.filename][4],
+        cluster_similarity=clusters[asset.key][3],
+        cluster_margin=clusters[asset.key][4],
         phash=measurement.phash,
         semantic_present=inp.semantic.present,
         video=measurement.video,
@@ -779,17 +801,40 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
     )
 
 
+def _file_states(asset) -> dict:
+    """Snapshot every file of the asset, so a later move can verify it."""
+    states = {}
+    for path in asset.all_files:
+        try:
+            states[str(path)] = media.FileState.of(path).to_dict()
+        except OSError as e:
+            logger.warning("Could not snapshot %s: %s", path, e)
+    return states
+
+
+def _evidence(found) -> str:
+    """The machine-readable grounds, used only by the purge gate.
+
+    Built from the unrecoverable issue *codes* rather than from prose, so that
+    `quarantine.is_purgeable_evidence` decides on a closed vocabulary instead of
+    pattern-matching an English sentence.
+    """
+    return ",".join(sorted({i.code.value for i in found.unrecoverable}))
+
+
 def _proposed_action(route_class: RouteClass) -> str:
     if route_class is RouteClass.TRASH:
         return "quarantine"
     if route_class is RouteClass.REVIEW:
         return "hold_for_review"
+    if route_class is RouteClass.ARCHIVE_ONLY:
+        return "keep_in_place"
     return "keep_in_place"
 
 
 def _plan_operations(assets, records, options: PipelineOptions) -> list:
     """A quarantine plan for the trash class. Written, not executed."""
-    by_name = {a.filename: a for a in assets}
+    by_key = {a.key: a for a in assets}
     quarantine = quarantine_module.Quarantine(
         options.resolved_quarantine(), source_roots=[options.input_dir]
     )
@@ -797,7 +842,7 @@ def _plan_operations(assets, records, options: PipelineOptions) -> list:
     for record in records:
         if record.route_class != RouteClass.TRASH.value:
             continue
-        asset = by_name.get(record.filename)
+        asset = by_key.get(record.asset_key)
         if asset is None:
             continue
         moves.append(
@@ -808,13 +853,15 @@ def _plan_operations(assets, records, options: PipelineOptions) -> list:
                 reason="; ".join(record.reasons) or "below every threshold",
                 route_class=record.route_class,
                 scores=record.scores,
+                states=record.file_states,
+                evidence=record.evidence,
             )
         )
     return quarantine.plan(moves)
 
 
-def _record_for(records, filename):
-    return next((r for r in records if r.filename == filename), None)
+def _record_for(records, key):
+    return next((r for r in records if r.asset_key == key), None)
 
 
 # --- re-running routing without re-analysing --------------------------------

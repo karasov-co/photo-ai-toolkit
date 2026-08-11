@@ -137,11 +137,87 @@ def from_metadata(metadata: dict | None) -> ProvenanceRecord:
         evidence.append(
             f"camera EXIF present ({metadata.get('camera_make')} {metadata.get('camera_model')})".strip()
         )
-        return ProvenanceRecord(
-            value=Provenance.CAMERA_ORIGINAL, declared_by="metadata", evidence=evidence
-        )
+        # Camera EXIF is *consistent with* a camera original and proves nothing.
+        # Every generator can write a Make/Model, and every export pipeline
+        # preserves one. `scanned` records whether anybody actually looked for
+        # AI markers; without that scan the honest answer is "unknown", and
+        # claiming `camera_original` here would launder exactly the files the
+        # marketplaces care about.
+        if metadata.get("provenance_scanned"):
+            return ProvenanceRecord(
+                value=Provenance.CAMERA_ORIGINAL, declared_by="metadata+scan", evidence=evidence
+            )
+        evidence.append("no AI-marker scan was performed; provenance not established")
+        return ProvenanceRecord(declared_by="metadata", evidence=evidence)
 
     return ProvenanceRecord(evidence=evidence)
+
+
+# --- actually reading the markers off the file ------------------------------
+
+XMP_START = b"<x:xmpmeta"
+XMP_END = b"</x:xmpmeta>"
+C2PA_MARKERS = (b"c2pa", b"jumbf", b"urn:uuid:c2pa", b"contentauth")
+SCAN_BYTES = 512 * 1024
+
+
+def read_markers(path) -> dict:
+    """Scan the file's header for an XMP packet and C2PA markers.
+
+    Deliberately a byte scan rather than a parse. XMP is embedded the same way
+    in JPEG, TIFF, HEIF and most RAW containers, and the only fields that matter
+    here -- `DigitalSourceType`, `CreatorTool`, `Software` -- are short and
+    unambiguous in the packet. A full XMP parser would add a dependency and a
+    surface area for no extra certainty.
+
+    Returns `provenance_scanned: True` so the caller can tell "we looked and
+    found nothing" apart from "nobody looked". Those are different states and
+    the difference decides whether a file may be called a camera original.
+    """
+    out: dict = {"provenance_scanned": True}
+    try:
+        with open(path, "rb") as f:
+            head = f.read(SCAN_BYTES)
+    except OSError:
+        return {"provenance_scanned": False}
+
+    lowered = head.lower()
+    if any(marker in lowered for marker in C2PA_MARKERS):
+        out["c2pa"] = True
+
+    start = head.find(XMP_START)
+    if start >= 0:
+        end = head.find(XMP_END, start)
+        packet = head[start : end + len(XMP_END) if end > 0 else len(head)]
+        text = packet.decode("utf-8", "replace")
+        out["xmp"] = True
+        for field_name, key in (
+            ("DigitalSourceType", "digital_source_type"),
+            ("CreatorTool", "creator_tool"),
+            ("Software", "software"),
+        ):
+            value = _xmp_value(text, field_name)
+            if value:
+                out[key] = value
+    return out
+
+
+def _xmp_value(text: str, field_name: str) -> str:
+    """Pull one XMP field, whether written as an attribute or an element."""
+    import re
+
+    attribute = re.search(rf'\b\w+:{field_name}\s*=\s*"([^"]*)"', text)
+    if attribute:
+        return attribute.group(1)
+    element = re.search(rf"<\w+:{field_name}[^>]*>([^<]*)<", text)
+    return element.group(1).strip() if element else ""
+
+
+def read_provenance(path, exif: dict | None = None) -> ProvenanceRecord:
+    """The honest end-to-end read: EXIF plus a real marker scan of the file."""
+    combined = dict(exif or {})
+    combined.update(read_markers(path))
+    return from_metadata(combined)
 
 
 @dataclass

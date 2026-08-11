@@ -200,6 +200,40 @@ def parse_group_json(text: str) -> list[dict]:
     return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
 
 
+AXES = ("axis_a", "axis_b", "axis_c")
+
+
+def validate_group_ranks(items: list[dict], expected: int) -> list[str]:
+    """Check the reply is a strict ranking. Returns the problems found.
+
+    Stage 2 is told each axis must use every rank from 1 to N exactly once. A
+    reply that repeats a rank, skips one, or covers only half the frames is not
+    a ranking, and feeding it to Bradley-Terry produces a confident ordering out
+    of nothing. A group that fails this is re-run or sent to review -- it is
+    never silently accepted.
+    """
+    problems: list[str] = []
+    if len(items) != expected:
+        problems.append(f"expected {expected} objects, got {len(items)}")
+
+    indices = [item.get("n") for item in items]
+    if len(set(map(str, indices))) != len(indices):
+        problems.append(f"duplicate or missing 'n': {indices}")
+
+    for axis in AXES:
+        values = []
+        for item in items:
+            try:
+                values.append(int(item[axis]))
+            except (KeyError, TypeError, ValueError):
+                problems.append(f"{axis}: missing or non-numeric on at least one frame")
+                break
+        else:
+            if sorted(values) != list(range(1, len(values) + 1)):
+                problems.append(f"{axis}: not a permutation of 1..{len(values)}: {sorted(values)}")
+    return problems
+
+
 def attach_filenames(items: list[dict], group: list[str]) -> list[dict]:
     """Map each returned object back onto a filename via its 1-based `n`.
 

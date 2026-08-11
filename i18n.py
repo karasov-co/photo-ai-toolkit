@@ -40,6 +40,7 @@ STRINGS: dict[str, dict[str, str]] = {
         # classes
         "class.trash": "Trash / reject",
         "class.review": "Needs manual review",
+        "class.archive_only": "Keep in the archive",
         "class.stock_standard": "Usable stock",
         "class.stock_strong": "Strong stock",
         "class.flagship": "Flagship / portfolio",
@@ -108,6 +109,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "summary.marketplace_ready": "Готово к загрузке на сток",
         "class.trash": "Брак / в отказ",
         "class.review": "Нужен ручной просмотр",
+        "class.archive_only": "Оставить в архиве",
         "class.stock_standard": "Пригодно для стока",
         "class.stock_strong": "Сильный сток",
         "class.flagship": "Флагман / портфолио",

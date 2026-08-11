@@ -92,6 +92,22 @@ class AssetRecord:
     media_type: str
     checksum: str
 
+    # Unique within a run: the path relative to the scan root. `filename` is a
+    # label and is NOT unique -- two memory cards both hold P1000001.RW2, and
+    # keying anything by it merges two different photographs.
+    asset_key: str = ""
+    # The exact files belonging to this asset, captured at analysis time. Any
+    # later filesystem operation uses this list verbatim -- never a glob over
+    # `stem.*`, which would sweep up unrelated files that happen to share a
+    # stem and would miss anything named differently.
+    all_files: list[str] = field(default_factory=list)
+    # size / mtime / checksum per file, so a move can prove the file is still
+    # the one that was analysed.
+    file_states: dict = field(default_factory=dict)
+    # Machine-readable grounds, for the purge gate. Aesthetic judgements are
+    # deliberately not representable here.
+    evidence: str = ""
+
     width: int = 0
     height: int = 0
     megapixels: float = 0.0
@@ -335,6 +351,7 @@ def format_summary(summary: dict, language: str = "en") -> str:
 CLASS_COLORS = {
     "trash": "#7a2e2e",
     "review": "#7a682e",
+    "archive_only": "#4a4a4a",
     "stock_standard": "#2e5a7a",
     "stock_strong": "#2e7a55",
     "flagship": "#6b2e7a",

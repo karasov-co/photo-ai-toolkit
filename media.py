@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -34,10 +33,25 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
+# HEIC/HEIF is what every recent iPhone shoots, and Pillow cannot decode it on
+# its own. The extension was previously listed as supported with no decoder
+# behind it, so every .heic in an archive failed to open and -- because an
+# unreadable file is a corrupt file -- was routed to trash. Registering the
+# opener is what makes the claim true; if the package is missing the format is
+# removed from the supported set rather than being advertised and then failing.
+try:  # pragma: no cover - exercised by whichever branch the environment has
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+    HEIF_AVAILABLE = True
+except Exception:  # pragma: no cover
+    HEIF_AVAILABLE = False
+    logger.info("pillow-heif is not installed; HEIC/HEIF files will be skipped")
+
 RAW_EXTENSIONS = {".rw2", ".arw", ".cr3", ".cr2", ".nef", ".dng", ".orf", ".raf", ".pef"}
 TIFF_EXTENSIONS = {".tif", ".tiff"}
 JPEG_EXTENSIONS = {".jpg", ".jpeg"}
-HEIC_EXTENSIONS = {".heic", ".heif"}
+HEIC_EXTENSIONS = {".heic", ".heif"} if HEIF_AVAILABLE else set()
 PHOTO_EXTENSIONS = RAW_EXTENSIONS | TIFF_EXTENSIONS | JPEG_EXTENSIONS | HEIC_EXTENSIONS | {".png", ".webp"}
 
 VIDEO_EXTENSIONS = {".mov", ".mp4", ".m4v", ".avi", ".mts", ".m2ts", ".mxf", ".mkv", ".webm"}
@@ -51,10 +65,22 @@ SIDECAR_EXTENSIONS = {".xmp", ".pp3", ".dop", ".aae", ".on1", ".acr"}
 MAX_PIXELS = 400_000_000
 
 CHECKSUM_CHUNK = 1024 * 1024
-# Hashing 5500 RAW files end to end is minutes of pure I/O for no extra
-# discrimination. Head + tail + size collides only for files that are identical
-# at both ends and the same length, which for camera originals means identical.
-FAST_CHECKSUM_BYTES = 4 * 1024 * 1024
+
+# There used to be a "fast" head+tail+size checksum here, on the theory that
+# hashing 5500 RAW files end to end was minutes of I/O for no extra
+# discrimination. Both halves of that were wrong.
+#
+# It collided: two files of equal length differing only in the middle produced
+# the same digest, and therefore the same `asset_id`. That id keys manual
+# overrides and the quarantine manifest, so a collision misidentifies a file
+# inside a destructive operation -- the one place where being wrong is
+# unrecoverable.
+#
+# And it bought nothing. Measured on this archive, SHA-256 runs at 2.3 GB/s
+# (hardware accelerated): 0.24s versus 0.14s for 554 MB, about 67 seconds for
+# a 5500-frame archive against a pipeline that takes over two hours to decode
+# it. The optimisation saved 0.7% of the runtime in exchange for a correctness
+# hole in the destructive path.
 
 
 class MediaKind(StrEnum):
@@ -118,11 +144,28 @@ class Asset:
     size_bytes: int
     siblings: list[Path] = field(default_factory=list)
     sidecars: list[Path] = field(default_factory=list)
+    relpath: str = ""
 
     @property
     def asset_id(self) -> str:
         """Stable across renames, different after an edit."""
         return self.checksum[:16]
+
+    @property
+    def key(self) -> str:
+        """The identity every in-run mapping must use. Never the basename.
+
+        Cameras restart their numbering, and two memory cards routinely both
+        contain `P1000001.RW2`. Keying a run's measurements or clusters by
+        filename silently merges them: on a real reproduction, a good frame
+        (quality 49) inherited a black frame's measurement (quality 0) and was
+        routed to trash. The relative path is unique by construction within a
+        scan and costs nothing.
+
+        `asset_id` is the *cross-run* identity, used for overrides and the
+        quarantine manifest, and survives renames. This one does not need to.
+        """
+        return self.relpath or self.path.name
 
     @property
     def filename(self) -> str:
@@ -142,42 +185,96 @@ class Asset:
         return [self.path, *self.siblings, *self.sidecars]
 
 
-def checksum_file(path: Path, *, full: bool = False) -> str:
-    """SHA-256 of the file, or of its ends plus its length.
+def checksum_file(path: Path, *, full: bool = True) -> str:
+    """Full SHA-256 of the file contents.
 
-    The fast form is the default because it is what the analysis cache needs --
-    "is this the same file I already analyzed" -- and it reads 8 MB instead of
-    50 MB per RAW. Pass ``full=True`` where the answer has to be a real content
-    hash, which in this codebase means the quarantine manifest: that checksum is
-    what a restore verifies against.
+    `full` is accepted and ignored; it exists so that call sites written against
+    the old two-mode API keep working and keep meaning the safe thing.
     """
+    del full
     digest = hashlib.sha256()
-    size = path.stat().st_size
     with open(path, "rb") as f:
-        if full or size <= 2 * FAST_CHECKSUM_BYTES:
-            while chunk := f.read(CHECKSUM_CHUNK):
-                digest.update(chunk)
-        else:
-            digest.update(f.read(FAST_CHECKSUM_BYTES))
-            f.seek(-FAST_CHECKSUM_BYTES, os.SEEK_END)
-            digest.update(f.read(FAST_CHECKSUM_BYTES))
-            digest.update(str(size).encode())
+        while chunk := f.read(CHECKSUM_CHUNK):
+            digest.update(chunk)
     return digest.hexdigest()
 
 
-def discover(root: Path, *, follow_symlinks: bool = False) -> list[Asset]:
+@dataclass(frozen=True)
+class FileState:
+    """What a file looked like at analysis time, for verifying it before a move.
+
+    Size and mtime are the cheap screen; the checksum is the proof. All three
+    are stored because a file edited in place between analysis and quarantine
+    can keep its size, and a file touched by a backup tool can change mtime
+    without changing content -- neither on its own is a reliable answer.
+    """
+
+    size: int
+    mtime_ns: int
+    checksum: str
+
+    @classmethod
+    def of(cls, path: Path) -> FileState:
+        stat = path.stat()
+        return cls(size=stat.st_size, mtime_ns=stat.st_mtime_ns, checksum=checksum_file(path))
+
+    def to_dict(self) -> dict:
+        return {"size": self.size, "mtime_ns": self.mtime_ns, "checksum": self.checksum}
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> FileState:
+        return cls(
+            size=int(payload.get("size", 0)),
+            mtime_ns=int(payload.get("mtime_ns", 0)),
+            checksum=str(payload.get("checksum", "")),
+        )
+
+    def matches(self, path: Path) -> tuple[bool, str]:
+        """Whether `path` is still the file this state describes, and why not."""
+        try:
+            stat = path.stat()
+        except OSError as e:
+            return False, f"cannot stat: {e}"
+        if stat.st_size != self.size:
+            return False, f"size changed {self.size} -> {stat.st_size}"
+        if stat.st_mtime_ns != self.mtime_ns:
+            # Not fatal on its own -- fall through to the checksum, which is the
+            # question actually being asked.
+            if checksum_file(path) != self.checksum:
+                return False, "contents changed since analysis"
+            return True, "mtime changed but contents are identical"
+        if self.checksum and checksum_file(path) != self.checksum:
+            return False, "contents changed since analysis"
+        return True, ""
+
+
+def discover(
+    root: Path,
+    *,
+    follow_symlinks: bool = False,
+    exclude: list[Path] | None = None,
+) -> list[Asset]:
     """Find every photo and video under `root`, grouped with its sidecars.
 
     Symlinks are not followed by default. The tool's own output is a farm of
     symlinks pointing back into the archive, so pointing a run at a directory
     containing a previous run's output would otherwise walk in a circle and
     analyze everything twice.
+
+    `exclude` keeps the run's own output and quarantine out of its own input.
+    Without it, pointing `--output` inside `--input` makes the second run treat
+    the first run's 512px previews as new photographs, score them, and route
+    them -- and a preview routed to trash is a proposal to delete a file the
+    tool itself created, sitting next to real ones.
     """
+    excluded = [Path(p).resolve() for p in (exclude or [])]
     by_stem: dict[tuple[Path, str], list[Path]] = {}
     for path in sorted(root.rglob("*")):
         if path.is_symlink() and not follow_symlinks:
             continue
         if not path.is_file():
+            continue
+        if excluded and is_inside(path, excluded):
             continue
         by_stem.setdefault((path.parent, path.stem), []).append(path)
 
@@ -198,11 +295,32 @@ def discover(root: Path, *, follow_symlinks: bool = False) -> list[Asset]:
                     size_bytes=primary.stat().st_size,
                     siblings=siblings,
                     sidecars=sidecars,
+                    relpath=_relative(primary, root),
                 )
             )
         except OSError as e:
             logger.warning("Could not stat %s: %s", primary, e)
     return assets
+
+
+def _relative(path: Path, root: Path) -> str:
+    """POSIX-style path under the scan root, so keys are stable across platforms."""
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
+# --- keeping a run's own output out of its own input ------------------------
+
+
+def excluded_roots(*directories: Path | None) -> list[Path]:
+    return [Path(d).resolve() for d in directories if d]
+
+
+def is_inside(path: Path, roots: list[Path]) -> bool:
+    resolved = path.resolve()
+    return any(resolved == root or resolved.is_relative_to(root) for root in roots)
 
 
 def _preferred_primary(paths: list[Path]) -> Path:

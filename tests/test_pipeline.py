@@ -373,13 +373,81 @@ def test_the_analyze_command_writes_every_report(archive, tmp_path, capsys):
     assert (out / "reports" / "delete.sh").exists()
 
 
-def test_the_delete_script_moves_to_the_trash_rather_than_running_rm(archive, tmp_path):
-    """Everything on that list was proposed by code that has been wrong before."""
+def test_the_delete_script_contains_no_filenames_at_all(archive, tmp_path):
+    """The only dependable defence against filename injection is not to interpolate.
+
+    A previous version quoted paths with shlex.quote but wrote one bare
+    `echo 'already gone: {name}'`, and a file named `it's a photo'; rm -rf $HOME`
+    closed the quote and left an executable command in a script the user is told
+    to run by hand.
+    """
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
     script = (out / "reports" / "delete.sh").read_text(encoding="utf-8")
-    assert "$HOME/.Trash" in script
+
     assert "rm -" not in script and "rm " not in script
+    for record in _load(out):
+        assert record["filename"] not in script
+        assert record["source_path"] not in script
+    assert "delete_plan.json" in script
+
+
+def _load(out):
+    rows, _ = pipeline.reports.read_json(out / "reports" / "analysis.json")
+    return rows
+
+
+def test_a_hostile_filename_never_reaches_the_shell(tmp_path):
+    """The list is data in JSON; Python carries it out."""
+    import layout
+
+    class Record:
+        route_class = "trash"
+        filename = "x.jpg"
+        checksum = "c" * 64
+        asset_key = "a/x.jpg"
+        source_path = "/archive/it's a photo'; rm -rf $HOME; echo '.jpg"
+        reasons = ["corrupt_file: unreadable"]
+        all_files = [source_path]
+        evidence = "corrupt_file"
+
+    written = layout.write_record_delete_candidates([Record()], tmp_path)
+    script = written["script"].read_text(encoding="utf-8")
+    assert "rm -rf" not in script
+    assert "$HOME; echo" not in script
+
+    plan = json.loads(written["plan"].read_text(encoding="utf-8"))
+    assert plan["candidates"][0]["source_path"] == Record.source_path
+
+
+def test_the_trash_command_is_a_dry_run_by_default(tmp_path, capsys):
+    """It moves to the Trash, and only when explicitly told to."""
+    import layout
+
+    victim = tmp_path / "archive" / "doomed.jpg"
+    victim.parent.mkdir(parents=True)
+    victim.write_bytes(b"jpeg")
+
+    class Record:
+        route_class = "trash"
+        filename = "doomed.jpg"
+        checksum = "c" * 64
+        asset_key = "doomed.jpg"
+        source_path = str(victim)
+        reasons = ["corrupt_file"]
+        all_files = [str(victim)]
+        evidence = "corrupt_file"
+
+    written = layout.write_record_delete_candidates([Record()], tmp_path / "reports")
+    bin_dir = tmp_path / "Trash"
+
+    cli.main(["trash", "--plan", str(written["plan"]), "--trash", str(bin_dir)])
+    assert victim.exists()
+    assert "Nothing has been moved" in capsys.readouterr().out
+
+    cli.main(["trash", "--plan", str(written["plan"]), "--trash", str(bin_dir), "--apply"])
+    assert not victim.exists()
+    assert (bin_dir / "doomed.jpg").exists()
 
 
 def test_the_analyze_command_builds_a_symlink_farm_without_copying(archive, tmp_path):

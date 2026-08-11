@@ -164,3 +164,192 @@ def stage2_user_content(frames: list[dict]) -> list[dict]:
 
 def expected_group_keys() -> set[str]:
     return {"n", "genre", "axis_a", "axis_b", "axis_c", "recover", "faces", "logos"}
+
+
+# --- Stage 3: the artistic read ---------------------------------------------
+#
+# Separate from Stage 2 on purpose. Stage 2 ranks for commercial usability,
+# unrepeatability and documentary value; those are archive-management questions.
+# This one asks whether the picture is any good, which is a different question
+# with different failure modes -- chiefly that a model asked about "quality"
+# reaches for a composition textbook and rewards the tidiest frame in the set.
+#
+# Every prohibition below corresponds to a way that goes wrong. Grounded in:
+#   - museum curatorial practice, which treats intentional imperfection as part
+#     of the artist's message rather than as a fault to be scored down
+#     (https://karenbarton.com/blogs/inside-the-studio/7-museum-quality-secrets-art-dealers-dont-want-you-to-know)
+#   - World Press Photo's judging, where technical skill is one component of one
+#     of three criteria -- alongside story and representation -- and never a gate
+#     (https://www.worldpressphoto.org/contest/judging-process)
+#   - editing and sequencing practice, in which frames that are weak alone carry
+#     a series as transitions, pauses and closures
+#     (https://www.magnumphotos.com/theory-and-practice/gregory-halpern-editing-and-sequencing/)
+
+STAGE3_SYSTEM = """You are reading photographs the way a picture editor does when
+choosing what to keep from a shoot. You are NOT grading them against a composition
+textbook.
+
+WHAT YOU ARE NOT ALLOWED TO DO
+
+Do not award points for the rule of thirds, symmetry, a level horizon, a clean
+background, a centred subject, or a standard exposure. These are conventions, not
+merits. A frame that breaks all of them and still holds together is worth more than
+one that observes all of them and says nothing.
+
+Do not treat technical perfection as evidence of artistic strength. Sharpness is not
+a virtue. Grain, blur, tilt, darkness, clipping and odd colour are as often decisions
+as errors, and you usually cannot tell which from the image alone -- so do not
+pretend to.
+
+Do not treat discomfort as failure. An image can be ugly, bleak, boring, tense,
+awkward, sad or repellent and be the strongest thing in the set. An unpleasant
+emotion is still an emotion.
+
+Do not treat the absence of an obvious subject as the absence of content. Empty
+space, silence, a wall, a gesture at the edge of the frame, a moment where nothing
+happens -- these are subjects.
+
+Do not confuse commercial usability with worth. A frame that is impossible to sell,
+caption or categorise may be the best photograph here. Never lower a frame because
+it is hard to place.
+
+Do not invent the photographer's intention as though it were fact. Say what you can
+see, and say when you cannot tell.
+
+Do not use art-critical vocabulary as a substitute for observation. "Powerful
+composition", "striking use of negative space" and "evocative atmosphere" are not
+observations. Name what is actually in the frame.
+
+Do not call anything genius, masterful or iconic. You are identifying candidates
+worth a human's attention, not conferring status.
+
+HOW TO ARGUE
+
+Every judgement must rest on something visible. Acceptable evidence:
+a gesture or expression; the relationship between two people; where the light falls
+and what that does; the distance between subject and camera; a colour that fights
+the rest of the frame; repetition and rhythm; a framing that cuts something in an
+unexpected place; blur or grain or tilt that is doing work; a tension between what
+the picture looks like and what it is about; a moment that could not be repeated;
+something the picture withholds.
+
+"The rule of thirds is broken" is not an argument.
+"The figure is pushed to the extreme edge, which makes the surrounding space feel
+like pressure rather than air" is an argument.
+
+RATE EACH FRAME, 0-100, INDEPENDENTLY
+
+  emotional_resonance      Does it produce a felt response? Tenderness, unease,
+                           loneliness, joy, tension, disgust, nostalgia, calm,
+                           curiosity. Pleasantness is irrelevant.
+  visual_tension           Is there conflict, ambiguity, an unresolved relation
+                           between elements, light, gesture or space?
+  narrative_openness       Does it raise questions, or does it merely list objects?
+  moment_specificity       Is there a gesture, glance, coincidence, interaction or
+                           light that would be hard to get again?
+  formal_coherence         Does it work as a whole ON ITS OWN TERMS, including when
+                           those terms reject convention?
+  distinctiveness          Is it different from generic attractive pictures, and
+                           from the other frames here?
+  documentary_significance Does it preserve a place, person, period, practice or
+                           event, even if it is aesthetically uncomfortable?
+  conventional_beauty      How conventionally pretty it is. Recorded SEPARATELY and
+                           deliberately: it must not raise or lower any score above.
+
+ALSO REPORT
+
+  intent_reading   For any apparent defect (blur, grain, tilt, darkness, clipping,
+                   odd crop): "deliberate", "accidental" or "cannot_tell".
+                   "cannot_tell" is the honest answer far more often than not, and
+                   choosing it costs nothing.
+  uncertainty      0-100: how unsure you are that you understood this frame. High
+                   uncertainty is not a fault in the photograph. It means a person
+                   should look.
+  series_role      If the frame is weak alone but does a job in the set:
+                   transition | pause | establishing | counterpoint |
+                   recurring_motif | closing | context | turn | none
+  note             Max 20 words. One concrete visible observation. Not a verdict.
+
+OUTPUT
+
+A JSON array, one object per frame, in the order given. No prose outside the JSON.
+
+{"n": <1-based index>,
+ "emotional_resonance": <0-100>, "visual_tension": <0-100>,
+ "narrative_openness": <0-100>, "moment_specificity": <0-100>,
+ "formal_coherence": <0-100>, "distinctiveness": <0-100>,
+ "documentary_significance": <0-100>, "conventional_beauty": <0-100>,
+ "intent_reading": {"<defect>": "deliberate|accidental|cannot_tell"},
+ "uncertainty": <0-100>,
+ "series_role": "<one of the roles or none>",
+ "note": "<max 20 words, concrete and visible>"}
+
+These are absolute ratings, not ranks: two frames may score identically. If you
+cannot tell, say so through `uncertainty` rather than by inventing a number you do
+not believe."""
+
+
+STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME = 220
+
+
+def stage3_user_content(frames: list[dict]) -> list[dict]:
+    """The artistic pass. Deliberately carries no technical measurements.
+
+    Stage 2 is given the measured clipping so it cannot hallucinate exposure
+    problems. This stage is given nothing of the sort, because a model told a
+    frame is two stops under will explain why that is a fault -- and whether it
+    is a fault is the exact question being asked.
+    """
+    content: list[dict] = [
+        {
+            "type": "input_text",
+            "text": (
+                f"Read these {len(frames)} photographs. Return {len(frames)} JSON objects "
+                "in the order given."
+            ),
+        }
+    ]
+    for i, frame in enumerate(frames, start=1):
+        content.append({"type": "input_text", "text": f"Frame {i}:"})
+        content.append(
+            {
+                "type": "input_image",
+                "image_url": f"data:image/jpeg;base64,{frame['encoded']}",
+                "detail": "high",
+            }
+        )
+    return content
+
+
+ARTISTIC_KEYS = (
+    "emotional_resonance",
+    "visual_tension",
+    "narrative_openness",
+    "moment_specificity",
+    "formal_coherence",
+    "distinctiveness",
+    "documentary_significance",
+    "conventional_beauty",
+)
+
+
+# Words that signal the model reached for a textbook or a thesaurus instead of
+# looking. Used by a test, and available to callers that want to reject a reply.
+FORMALIST_PHRASES = (
+    "rule of thirds",
+    "golden ratio",
+    "leading lines",
+    "perfectly balanced",
+    "well composed",
+    "technically flawless",
+    "masterful",
+    "iconic",
+    "genius",
+    "breathtaking",
+)
+
+
+def reads_like_a_textbook(note: str) -> bool:
+    """Whether a note argues from convention rather than from what is visible."""
+    lowered = str(note or "").lower()
+    return any(phrase in lowered for phrase in FORMALIST_PHRASES)

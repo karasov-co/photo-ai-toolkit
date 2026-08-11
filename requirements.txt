@@ -5,3 +5,4 @@ exifread==3.5.1
 imagehash==4.3.2
 python-dotenv==1.2.2
 tqdm==4.70.0
+pillow-heif==1.5.0
