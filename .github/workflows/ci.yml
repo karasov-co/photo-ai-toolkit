@@ -23,6 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Video support is optional at runtime, but the suite has integration
+      # tests that decode a generated clip. Without FFmpeg they skip silently,
+      # which is exactly how a broken video path reaches main unnoticed.
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
