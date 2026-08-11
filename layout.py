@@ -228,6 +228,171 @@ def build_contact_sheet(
     return out_path
 
 
+# --- the class-based output tree --------------------------------------------
+#
+# Everything below works on `reports.AssetRecord` and lays out the five route
+# classes rather than the six folder destinations above. Both layouts coexist
+# because they answer different questions: `Destination` is where a frame goes in
+# the archive, `RouteClass` is what the frame is.
+
+CLASS_TREE = {
+    "trash": "trash_quarantine",
+    "review": "manual_review",
+    "stock_standard": "stock/standard",
+    "stock_strong": "stock/strong",
+    "flagship": "portfolio/flagship",
+}
+
+
+def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
+    """Symlinks by class, then by genre, then per eligible marketplace.
+
+    Three views of the same files, none of which copies or moves anything. The
+    genre and marketplace views exist because that is how the work is actually
+    used: you export a marketplace batch, and you build a portfolio page from a
+    genre.
+    """
+    counts: dict[str, int] = {}
+    extra = ("stock/editorial", "stock/by_genre", "portfolio/by_genre",
+             "stock/marketplace_packages", "archive")
+    for folder in (*CLASS_TREE.values(), *extra):
+        target = out_dir / folder
+        target.mkdir(parents=True, exist_ok=True)
+        _clear_symlinks_recursive(target)
+
+    for record in records:
+        source = Path(record.source_path)
+        folder = CLASS_TREE.get(record.route_class)
+        if folder is None:
+            continue
+
+        _relink(out_dir / folder / record.filename, source)
+        counts[record.route_class] = counts.get(record.route_class, 0) + 1
+
+        if record.route == "editorial" and record.route_class.startswith("stock"):
+            _relink(out_dir / "stock/editorial" / record.filename, source)
+
+        genre = (record.genre or "other").replace("/", "-")
+        if record.route_class in ("stock_standard", "stock_strong"):
+            (out_dir / "stock/by_genre" / genre).mkdir(parents=True, exist_ok=True)
+            _relink(out_dir / "stock/by_genre" / genre / record.filename, source)
+        if record.route_class == "flagship":
+            (out_dir / "portfolio/by_genre" / genre).mkdir(parents=True, exist_ok=True)
+            _relink(out_dir / "portfolio/by_genre" / genre / record.filename, source)
+        if record.route_class == "review":
+            _relink(out_dir / "archive" / record.filename, source)
+
+        for market in record.marketplaces or []:
+            if not market.get("eligible"):
+                continue
+            package = out_dir / "stock/marketplace_packages" / str(market.get("platform_id", "other"))
+            package.mkdir(parents=True, exist_ok=True)
+            _relink(package / record.filename, source)
+
+    return counts
+
+
+def _clear_symlinks_recursive(folder: Path) -> None:
+    for entry in folder.rglob("*"):
+        if entry.is_symlink():
+            entry.unlink()
+
+
+def write_record_manifest(records: list, out_dir: Path) -> Path:
+    """The CSV with a `destination` column, for anyone who does not want links."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / "distribution.csv"
+    fields = [
+        "filename", "source_path", "destination", "route_class", "route",
+        "routing_score", "post_edit_potential", "current_quality", "expected_gain",
+        "confidence", "genre", "proposed_action", "reason",
+    ]
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        for record in records:
+            scores = record.scores or {}
+            writer.writerow(
+                {
+                    "filename": record.filename,
+                    "source_path": record.source_path,
+                    "destination": CLASS_TREE.get(record.route_class, ""),
+                    "route_class": record.route_class,
+                    "route": record.route,
+                    "routing_score": scores.get("routing_score", ""),
+                    "post_edit_potential": scores.get("post_edit_potential", ""),
+                    "current_quality": scores.get("current_quality", ""),
+                    "expected_gain": record.expected_gain,
+                    "confidence": record.confidence,
+                    "genre": record.genre,
+                    "proposed_action": record.proposed_action,
+                    "reason": "; ".join(record.reasons[:2]),
+                }
+            )
+    return path
+
+
+def write_record_delete_candidates(records: list, out_dir: Path) -> dict:
+    """The trash list, the script, and nothing else. Deletes nothing.
+
+    The script moves to the Trash rather than calling rm. Everything on this
+    list was proposed by a measurement or a model, and both have already been
+    wrong on this archive.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    candidates = [r for r in records if r.route_class == "trash"]
+
+    listing = out_dir / "delete_candidates.txt"
+    lines = [
+        "# Proposed deletions. Nothing has been removed.",
+        "# Look at contact_sheet_delete.jpg before running delete.sh.",
+        f"# {len(candidates)} candidate(s).",
+        "",
+    ]
+    for record in candidates:
+        reason = "; ".join(record.reasons) or "below every threshold"
+        lines.append(f"{record.source_path}\t{reason}")
+    listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    script = out_dir / "delete.sh"
+    pairs = [(r.source_path, "; ".join(r.reasons) or "below every threshold") for r in candidates]
+    script.write_text(_delete_script_for_paths(pairs), encoding="utf-8")
+    script.chmod(0o755)
+    return {"count": len(candidates), "listing": listing, "script": script}
+
+
+def _delete_script_for_paths(pairs: list[tuple[str, str]]) -> str:
+    lines = [
+        "#!/bin/bash",
+        "# Generated by photo-ai-toolkit. Review contact_sheet_delete.jpg first.",
+        "#",
+        "# Moves the listed files to the macOS Trash. It does not run rm, so a",
+        "# mistake here is recoverable -- put them back from the Trash.",
+        "set -euo pipefail",
+        "",
+        'TRASH="$HOME/.Trash"',
+        "moved=0",
+        "",
+    ]
+    for source, reason in pairs:
+        quoted = shlex.quote(str(source))
+        lines += [
+            f"# {reason}",
+            f"if [ -e {quoted} ]; then",
+            f'  mv -n {quoted} "$TRASH"/ && moved=$((moved+1))',
+            "else",
+            f"  echo 'already gone: {Path(source).name}'",
+            "fi",
+            "",
+        ]
+    lines += [
+        'echo "Moved $moved file(s) to $TRASH."',
+        'echo "Nothing was permanently deleted; empty the Trash yourself when happy."',
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def relative_to_home(path: Path) -> str:
     """Shorter paths in reports, without pretending the file moved."""
     try:
