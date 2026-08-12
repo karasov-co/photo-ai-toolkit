@@ -58,6 +58,10 @@ CLIP_MARGIN = 0.995
 # Lifting them is possible and looks like coloured mud.
 NOISE_FLOOR_FRACTION = 0.004
 
+# Bumped whenever the measurement changes meaning, so a cached figure from an
+# older definition is visible rather than silently mixed with a newer one.
+MEASUREMENT_VERSION = "1.0"
+
 
 @dataclass
 class ChannelStats:

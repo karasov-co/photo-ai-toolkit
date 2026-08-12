@@ -4,11 +4,30 @@ Ties the pieces together in the order that keeps them honest:
 
     RAW measurements  ->  intent  ->  candidates  ->  render  ->  validate  ->  Pareto
 
-The measurements come first because they are the only thing that knows what is
-actually recoverable. The intent comes from the deterministic signals in
-`artistic.py`, so "preserve the low-key structure" is a finding rather than a
-sentiment. Candidates are generated from both. Rendering and validation decide
-which survive -- nothing is proposed that has not been made and looked at.
+**Which decision comes from which domain**, because the distinction is easy to
+overstate and worth being exact about:
+
+    display appearance   what the frame visually lacks -- how bright it reads,
+                         what colour cast it has, how much grain is visible.
+                         Necessarily measured on the developed preview, because
+                         that is what "looks too dark" means.
+    RAW capacity         how far that can safely be corrected -- highlight
+                         headroom, shadow headroom before the noise floor,
+                         which channels actually saturated. Measured on the
+                         sensor plane.
+    render validation    whether the correction actually helped, measured by
+                         rendering it and comparing.
+
+So the sensor data **bounds** the tonal moves rather than originating all of
+them: the target exposure comes from how the frame reads, and the ceiling on
+reaching it comes from what the sensor holds. Saying "every tonal decision is
+made from the sensor plane" would be an overstatement; saying the previous
+version confused a rendered preview for RAW headroom would be exactly right.
+
+The intent comes from the deterministic signals in `artistic.py`, so "preserve
+the low-key structure" is a finding rather than a sentiment. Rendering and
+validation decide which candidates survive -- nothing is proposed that has not
+been made and looked at.
 
 Only frames worth editing are put through it. Rendering costs roughly a second
 each, and a frame already routed to `archive_only` does not need three readings
@@ -51,6 +70,7 @@ def run(
     out_dir: Path,
     renderer_name: str | None = None,
     write_sidecars: bool = True,
+    faces_present: bool | None = None,
 ) -> dict:
     """Produce recipes, previews and sidecars for one frame."""
     result: dict = {
@@ -60,6 +80,8 @@ def run(
         "preserve_intent": [],
         "sidecars": {},
         "rejected": [],
+        "engine": "",
+        "engine_version": "",
     }
 
     try:
@@ -68,6 +90,9 @@ def run(
         logger.warning("Darkroom skipped: %s", e)
         result["rejected"].append(str(e))
         return result
+
+    result["engine"] = engine.name
+    result["engine_version"] = engine.version()
 
     raw_stats = raw_measurements.measure_or_empty(asset.path, asset.is_raw)
 
@@ -86,7 +111,9 @@ def run(
         monochrome_worth_offering=_monochrome_worth_offering(measurement),
     )
 
-    candidates, original = recipe_optimizer.evaluate(asset.path, recipes, renderer=engine)
+    candidates, original = recipe_optimizer.evaluate(
+        asset.path, recipes, renderer=engine, faces_present=faces_present
+    )
     chosen = recipe_optimizer.choose(candidates)
 
     result["rejected"] = [

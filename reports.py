@@ -130,6 +130,9 @@ class AssetRecord:
     reasons: list[str] = field(default_factory=list)
 
     genre: str = ""
+    # Normalised "Make Model". The personal model abstains on an unfamiliar
+    # camera, and it can only do that if the camera actually reaches it.
+    camera: str = ""
     concepts: list[str] = field(default_factory=list)
     description: str = ""
     stock_metadata: dict = field(default_factory=dict)
@@ -161,6 +164,13 @@ class AssetRecord:
     rendered_variants: dict = field(default_factory=dict)
     recipe_confidence: dict = field(default_factory=dict)
     preserve_intent: list[str] = field(default_factory=list)
+    # The files that were actually written, and why the other candidates were
+    # refused. A rejection is the more useful half: it says what the tool
+    # thought about doing and decided would have damaged the frame.
+    suggested_sidecars: dict = field(default_factory=dict)
+    darkroom_engine: str = ""
+    darkroom_engine_version: str = ""
+    darkroom_rejections: list[str] = field(default_factory=list)
 
     # --- artistic read and the learning loop ---
     artistic: dict = field(default_factory=dict)
@@ -419,6 +429,14 @@ h1 {{ font-size:20px; margin:0 0 4px; }}
 .gain {{ color:#6fcf97; font-weight:600; }}
 ul {{ margin:6px 0; padding-left:18px; font-size:12px; }}
 .bad {{ color:#e08585; }} .mid {{ color:#e0c185; }} .ok {{ color:#85c8e0; }}
+.ab {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:6px; margin:8px 0; }}
+.ab figure {{ margin:0; }}
+.ab img {{ width:100%; aspect-ratio:3/2; object-fit:cover; border-radius:4px; background:#000; }}
+.ab figcaption {{ font-size:11px; color:#9a9a9a; text-align:center; padding-top:2px; }}
+.keep {{ border-left:3px solid #6fcf97; padding-left:8px; margin:6px 0; font-size:12px; }}
+.veto {{ border-left:3px solid #e08585; padding-left:8px; margin:6px 0; font-size:12px; color:#e0a5a5; }}
+.bucket {{ display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px;
+          background:#26323a; color:#9fd0e0; }}
 details summary {{ cursor:pointer; color:#9a9a9a; font-size:12px; }}
 </style>
 </head>
@@ -510,6 +528,7 @@ def _card(record: AssetRecord, base: Path, language: str) -> str:
     )
 
     img = f'<img src="{html.escape(preview)}" alt="" loading="lazy">' if preview else ""
+    darkroom_html = _darkroom_html(record, base, language)
     class_label = html.escape(t(f"class.{record.route_class}", language))
     route_label = html.escape(t(f"route.{record.route}", language) if record.route else "")
     score_rows = rows(
@@ -527,6 +546,7 @@ def _card(record: AssetRecord, base: Path, language: str) -> str:
 <span class="badge" style="background:#333">{route_label}</span>
 <div class="scores">{score_rows}{gain_html}</div>
 {issue_list("unrecoverable", "bad")}{issue_list("partially_fixable", "mid")}{issue_list("fixable", "ok")}
+{darkroom_html}
 {recipe}
 {markets_html}
 {warnings}
@@ -534,6 +554,83 @@ def _card(record: AssetRecord, base: Path, language: str) -> str:
 {"".join(f"<li>{html.escape(str(r))}</li>" for r in record.reasons)}
 </ul></details>
 </div></div>"""
+
+
+def _darkroom_html(record: AssetRecord, base: Path, language: str) -> str:
+    """The A/B panel: what was proposed, what was protected, what was refused.
+
+    A pilot cannot be run by reading JSON. The three things a photographer
+    actually needs side by side are the original, the variants, and the reason a
+    candidate was thrown away -- the last one especially, because it says what
+    the tool nearly did to the frame.
+    """
+    if not (record.edit_recipes or record.darkroom_rejections or record.decision_bucket):
+        return ""
+
+    parts: list[str] = ['<details open><summary>Darkroom</summary>']
+
+    if record.decision_bucket:
+        parts.append(f'<div><span class="bucket">{html.escape(record.decision_bucket)}</span></div>')
+
+    variants = record.rendered_variants or {}
+    if variants:
+        order = ["original", "faithful", "expressive", "monochrome"]
+        cells = []
+        for name in order:
+            if name not in variants:
+                continue
+            src = _relative_preview(variants[name], base)
+            cells.append(
+                f'<figure><img src="{html.escape(src)}" alt="" loading="lazy">'
+                f"<figcaption>{html.escape(name)}</figcaption></figure>"
+            )
+        if cells:
+            parts.append('<div class="ab">' + "".join(cells) + "</div>")
+
+    for item in record.preserve_intent or []:
+        parts.append(f'<div class="keep">keep: {html.escape(str(item))}</div>')
+
+    for recipe in record.edit_recipes or []:
+        steps = recipe.get("human_readable") or []
+        parts.append(
+            f"<div style=\"font-size:12px;margin-top:6px\"><b>{html.escape(recipe.get('variant', ''))}</b>"
+            f" &mdash; {html.escape(recipe.get('intent', ''))}</div><ul>"
+            + "".join(f"<li>{html.escape(str(step))}</li>" for step in steps)
+            + "</ul>"
+        )
+        for warning in recipe.get("warnings") or []:
+            parts.append(f'<div class="mid" style="font-size:12px">{html.escape(str(warning))}</div>')
+
+    for rejection in record.darkroom_rejections or []:
+        parts.append(f'<div class="veto">refused: {html.escape(str(rejection))}</div>')
+
+    confidence = record.recipe_confidence or {}
+    if confidence:
+        first = next(iter(confidence.values()))
+        parts.append(
+            '<div style="font-size:12px;color:#9a9a9a">confidence &mdash; '
+            f"tone {first.get('tone', 0):.2f}, colour {first.get('color', 0):.2f}, "
+            f"crop {first.get('crop', 0):.2f}</div>"
+        )
+
+    if record.darkroom_engine:
+        parts.append(
+            '<div style="font-size:11px;color:#777">engine: '
+            f"{html.escape(record.darkroom_engine)} {html.escape(record.darkroom_engine_version)}</div>"
+        )
+    if record.suggested_sidecars:
+        names = ", ".join(sorted(record.suggested_sidecars))
+        parts.append(f'<div style="font-size:11px;color:#777">sidecars: {html.escape(names)}</div>')
+
+    if record.policy_evidence:
+        parts.append(
+            '<details><summary>why the tool held back</summary><ul>'
+            + "".join(f"<li>{html.escape(str(r))}</li>" for r in record.policy_evidence[:6])
+            + "</ul></details>"
+        )
+
+    parts.append("</details>")
+    return "".join(parts)
 
 
 def _relative_preview(preview_path: str, base: Path) -> str:

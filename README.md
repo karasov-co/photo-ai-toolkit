@@ -210,6 +210,13 @@ python cli.py purge --quarantine ./quarantine \
 | `export` | Build a marketplace-ready package |
 | `override` | Record a manual decision future runs must respect |
 | `profiles` / `validate-profile` | Inspect and dump calibration profiles |
+| `darkroom` | Show the edit suggestions from a stored run |
+| `apply-recipe` | Write a recipe beside the RAW (dry run; refuses to clobber) |
+| `ask` | The questions worth five minutes, most informative first |
+| `record` | Record one decision for the personal model |
+| `policy` | What would be automated, and what is holding each gate shut |
+| `monitor` | False-trash rate, drift, calibration; can switch automation off |
+| `trash` | Carry out `delete_plan.json` in Python (dry run unless `--apply`) |
 
 Filtering and sorting on `report`: `--media`, `--route-class`, `--route`,
 `--genre`, `--marketplace`, `--min-score`, `--min-potential`, `--min-confidence`,
@@ -375,7 +382,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 878 tests, no network, no API key
+pytest          # 1020 tests, no network, no API key
 ruff check .
 ```
 
@@ -397,7 +404,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 - **Tilt estimation declines on scenes without straight lines.** Foliage and open water have a dominant direction only by accident; the estimator returns "no tilt" rather than a confident wrong angle.
 - **Subject-relative sharpness is approximated** by the sharpest tile, not by detecting the subject. A portrait with a sharp face and a blurred background scores correctly; a frame where the *wrong* object is sharp will not be caught.
 - **Faces, logos and identifiable people come from the vision model**, not a detector. Offline they are unknown, which blocks commercial stock by design.
-- **Analysis is single-process.** Roughly 1.5s per RAW, dominated by decoding.
+- **Analysis is single-process.** Roughly 1.5s per RAW, dominated by decoding; the darkroom pass adds about a second per frame.
+- **The darkroom mixes two domains on purpose.** Display appearance says what the frame visually lacks and is necessarily measured on the developed preview; RAW capacity says how far that can safely be corrected and is measured on the sensor plane; render validation says whether it actually helped. The sensor data *bounds* the tonal moves rather than originating all of them.
+- **The darktable and RawTherapee adapters have never been executed.** Neither binary was available; they are written from the documented CLIs and report themselves `[unverified]`.
+- **The skin-hue check is an HSV heuristic** and sand, wood and sunsets fall in the same band. Without a confirmed face it is advisory and does not veto.
+- **The adaptive loop runs in shadow mode.** It records what it would do; `--no-shadow-mode` is not enough to make it act, because nine other gates and a healthy monitor are also required.
 
 ---
 

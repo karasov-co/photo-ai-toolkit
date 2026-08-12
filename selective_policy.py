@@ -10,7 +10,8 @@ exactly as much of the photographer's attention as confidently discarding a bad
 one, and costs nothing when it is wrong.
 
 Automatic quarantine on a *personal aesthetic model* is gated behind all ten
-conditions below, simultaneously. Automatic purge is not reachable from here at
+conditions below, simultaneously, and then a random audit slice is held back on
+top of that. Automatic purge is not reachable from here at
 any confidence: no model output is grounds for permanent deletion.
 
 On sample size, plainly: demonstrating a false-trash rate below 0.1% with zero
@@ -93,6 +94,7 @@ def decide(
     stable_across_runs: bool = True,
     holdout_checks: int = 0,
     shadow_mode: bool = True,
+    monitor_healthy: bool = False,
 ) -> PolicyDecision:
     """Route one asset into a decision bucket, applying every gate."""
     reasons: list[str] = []
@@ -147,6 +149,12 @@ def decide(
              f"{AUTO_QUARANTINE_CONFIDENCE}"),
         Gate("not_shadow_mode", not shadow_mode,
              "shadow mode: recording what would happen, moving nothing"),
+        # The tenth. Without it the monitor could observe a rising false-trash
+        # rate, switch automation off, and the pipeline would carry on
+        # quarantining regardless -- two systems that never spoke to each other.
+        Gate("monitor_healthy", monitor_healthy,
+             "the monitor has not certified this model: automation is off, drifting, "
+             "or has recorded a false trash"),
     ]
 
     if all(gate.passed for gate in gates):

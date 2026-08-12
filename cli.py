@@ -126,6 +126,9 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             for op in result.planned_operations
             if _still_trash(op.asset_id, result.records)
         ]
+        overrides_module.resolve_observations(
+            result.records, store, output_dir / "model_monitoring.json"
+        )
 
     _write_outputs(result, output_dir, language)
     print(reports.format_summary(result.summary, language))
@@ -539,6 +542,30 @@ def cmd_restore(args: argparse.Namespace) -> int:
     results = quarantine.restore(args.operation, dry_run=False)
     restored = sum(1 for r in results if r.status == "restored")
     print(f"Restored {restored} of {len(results)}.")
+
+    # A restore is the loudest correction available: the tool proposed removing
+    # this file and the photographer went and undid it. Recording it is what
+    # gives the monitor a real false-trash rate instead of one over an empty set.
+    if restored and args.monitor:
+        from model_monitoring import Monitor
+        from preference_store import Decision, PreferenceStore, Signal
+
+        monitor = Monitor(Path(args.monitor).resolve())
+        store = PreferenceStore(Path(args.monitor).resolve().parent / "preferences.jsonl")
+        for op in results:
+            if op.status != "restored":
+                continue
+            monitor.resolve(op.asset_id, "restored")
+            store.record(
+                Decision(signal=Signal.RESTORED_FROM_QUARANTINE.value, asset_id=op.asset_id,
+                         tool_said="trash", answer="keep", note=op.reason)
+            )
+        report = monitor.evaluate()
+        monitor.save()
+        print(f"Recorded {restored} correction(s). False-trash rate now "
+              f"{report['false_trash_rate']:.3%} over {report['resolved_cases']} resolved.")
+        if not report["automation_enabled"] and report["disabled_reason"]:
+            print(f"Automation switched off: {report['disabled_reason']}")
     for op in results:
         if op.status != "restored":
             print(f"  {op.status}: {op.destination} ({op.error})")
@@ -830,6 +857,7 @@ def build_parser() -> argparse.ArgumentParser:
     restore.add_argument("--quarantine", required=True)
     restore.add_argument("--operation", help="operation id; default is everything still quarantined")
     restore.add_argument("--apply", action="store_true")
+    restore.add_argument("--monitor", help="monitoring state to record the correction in")
     restore.set_defaults(func=cmd_restore)
 
     purge = sub.add_parser("purge", help="PERMANENTLY delete quarantined files")
