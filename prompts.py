@@ -295,6 +295,30 @@ ALSO REPORT
                    recurring_motif | closing | context | turn | none
   note             Max 20 words. One concrete visible observation. Not a verdict.
 
+FACES
+
+When a frame contains a recognisable face large enough to read, judge the FACE
+SEPARATELY from the photograph. A blink is not an aesthetic property, and a frame
+whose light, colour and composition are excellent is still unusable if the subject
+has their eyes shut. You will be shown extra crops for these frames.
+
+Answer specifically:
+
+- are the eyes open, closed, squinting, or partly closed?
+- is this a settled expression, or a transitional one -- mid-blink, mid-word,
+  mid-laugh in the phase that reads as a grimace?
+- is the face itself sharp, or only the background?
+- is the face obstructed?
+- would a person be happy to see this picture of themselves published?
+- OR is an apparently "bad" expression clearly deliberate and effective? Say so
+  explicitly in artistic_reasoning if it is, using the word "deliberate".
+
+Do not answer these from the whole frame's attractiveness. A beautiful photograph
+of a bad moment is a bad moment.
+
+Set expression_confidence honestly. Low confidence is useful; a confident wrong
+answer about somebody's face is not.
+
 OUTPUT
 
 A JSON array, one object per frame, in the order given. No prose outside the JSON.
@@ -304,14 +328,38 @@ A JSON array, one object per frame, in the order given. No prose outside the JSO
  "narrative_openness": <0-100>, "moment_specificity": <0-100>,
  "formal_coherence": <0-100>, "distinctiveness": <0-100>,
  "documentary_significance": <0-100>, "conventional_beauty": <0-100>,
+ "artistic_candidate": <true|false: worth a human's attention, NOT "this is art">,
+ "artistic_confidence": <0-100: how sure you are of the above>,
+ "artistic_reasoning": "<max 40 words, concrete and visible>",
+ "artistic_strengths": ["<short, concrete>"],
+ "artistic_weaknesses": ["<short, concrete>"],
  "intent_reading": {"<defect>": "deliberate|accidental|cannot_tell"},
  "uncertainty": <0-100>,
  "series_role": "<one of the roles or none>",
- "note": "<max 20 words, concrete and visible>"}
+ "portrait": {
+   "face_count": <int>,
+   "primary_face_visible": <true|false>,
+   "primary_face_area_ratio": <0.0-1.0 of the frame>,
+   "face_sharpness": <0-100>,
+   "eyes_state": "OPEN|CLOSED|SQUINTING|PARTIALLY_CLOSED|UNCLEAR|NOT_APPLICABLE",
+   "expression": "GOOD|NEUTRAL|AWKWARD|GRIMACE|BLINK|MID_SPEECH|UNCLEAR|NOT_APPLICABLE",
+   "expression_quality": <0-100>,
+   "pose_quality": <0-100>,
+   "face_occlusion": <0-100>,
+   "blink_probability": <0-100>,
+   "grimace_probability": <0-100>,
+   "portrait_publishability": <0-100>,
+   "expression_confidence": <0-100>,
+   "portrait_reasoning": "<max 25 words>",
+   "portrait_blockers": ["<short>"]
+ }}
+
+Omit the `portrait` object entirely when there is no face. Every numeric field is
+required when you include it.
 
 These are absolute ratings, not ranks: two frames may score identically. If you
-cannot tell, say so through `uncertainty` rather than by inventing a number you do
-not believe."""
+cannot tell, say so through `uncertainty` and the confidence fields rather than by
+inventing a number you do not believe."""
 
 
 STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME = 220
@@ -324,25 +372,35 @@ def stage3_user_content(frames: list[dict]) -> list[dict]:
     problems. This stage is given nothing of the sort, because a model told a
     frame is two stops under will explain why that is a fault -- and whether it
     is a fault is the exact question being asked.
+
+    Frames with a face carry extra crops. Each one is labelled, because an
+    unlabelled sequence of three similar images is read as three photographs.
     """
     content: list[dict] = [
         {
             "type": "input_text",
             "text": (
                 f"Read these {len(frames)} photographs. Return {len(frames)} JSON objects "
-                "in the order given."
+                "in the order given, one per frame."
             ),
         }
     ]
     for i, frame in enumerate(frames, start=1):
-        content.append({"type": "input_text", "text": f"Frame {i}:"})
-        content.append(
-            {
-                "type": "input_image",
-                "image_url": f"data:image/jpeg;base64,{frame['encoded']}",
-                "detail": "high",
-            }
-        )
+        views = frame.get("views") or [("full frame", frame.get("encoded", ""))]
+        label = f"Frame {i}"
+        if len(views) > 1:
+            label += f" -- {len(views)} views of the SAME photograph, judge them as one"
+        content.append({"type": "input_text", "text": f"{label}:"})
+        for view_name, encoded in views:
+            if len(views) > 1:
+                content.append({"type": "input_text", "text": f"  ({view_name})"})
+            content.append(
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/jpeg;base64,{encoded}",
+                    "detail": "high",
+                }
+            )
     return content
 
 

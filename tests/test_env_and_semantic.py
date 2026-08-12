@@ -216,21 +216,36 @@ class FakeResponse:
 
 
 class FakeResponses:
-    def __init__(self, payload=None, error=None):
+    """Records which stage each call belonged to.
+
+    Stage 3 now runs alongside Stage 2, so a bare call count no longer says
+    anything about whether the semantic pass happened.
+    """
+
+    def __init__(self, payload=None, error=None, stage3_payload=None):
         self.payload = payload
         self.error = error
+        self.stage3_payload = stage3_payload
         self.calls = 0
+        self.stage2_calls = 0
+        self.stage3_calls = 0
 
     def create(self, **kwargs):
         self.calls += 1
+        instructions = kwargs.get("instructions", "")
+        is_stage3 = "emotional_resonance" in instructions
+        if is_stage3:
+            self.stage3_calls += 1
+        else:
+            self.stage2_calls += 1
         if self.error:
             raise self.error
-        return FakeResponse(self.payload)
+        return FakeResponse(self.stage3_payload if is_stage3 else self.payload)
 
 
 class FakeClient:
-    def __init__(self, payload=None, error=None):
-        self.responses = FakeResponses(payload, error)
+    def __init__(self, payload=None, error=None, stage3_payload=None):
+        self.responses = FakeResponses(payload, error, stage3_payload)
 
 
 def ranking_for(count: int) -> str:
@@ -257,7 +272,7 @@ def test_a_key_from_the_env_file_reaches_the_client(archive, tmp_path, monkeypat
         client=client,
     )
 
-    assert client.responses.calls == 1
+    assert client.responses.stage2_calls == 1
     assert result.semantic_completed
     assert result.analysis_mode == "local_and_semantic"
 
@@ -394,7 +409,7 @@ def test_the_semantic_pass_runs_on_a_rerun_without_force(archive, tmp_path, monk
     )
 
     assert decoded["n"] == 0, "local measurements should come from the cache"
-    assert client.responses.calls == 1, "the semantic pass must still run"
+    assert client.responses.stage2_calls == 1, "the semantic pass must still run"
     assert second.semantic_completed
 
 

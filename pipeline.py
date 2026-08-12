@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 import duplicates
 import edit_recipe
@@ -90,6 +91,10 @@ class PipelineOptions:
     follow_symlinks: bool = False
     # The darkroom pass renders candidate edits, which costs about a second per
     # frame, so it is opt-in and by default runs only on frames worth editing.
+    # Stage 3 is the artistic read. It is what makes a HERO promotion possible at
+    # all, so it runs whenever `--semantic` does unless explicitly disabled.
+    stage3: bool = True
+    stage3_model: str | None = None
     darkroom: bool = False
     darkroom_renderer: str | None = None
     conservative_art: bool = True
@@ -119,6 +124,9 @@ class RunResult:
     semantic_completed: bool = False
     semantic_model: str = ""
     semantic_error: str = ""
+    stage3_completed: int = 0
+    stage3_failed: int = 0
+    stage3_skipped: int = 0
 
     @property
     def analysis_mode(self) -> str:
@@ -172,6 +180,23 @@ class AnalysisCache:
     def is_local_only(payload: dict) -> bool:
         """Cached entries never carry semantic state, by construction."""
         return "semantic" not in payload
+
+    # --- Stage 3, keyed apart on purpose ------------------------------------
+    #
+    # A shared key would let a valid Stage 2 entry answer "already analysed" for
+    # a frame whose artistic read never ran. Stage 3 is keyed by checksum, model
+    # AND prompt version, so changing the prompt invalidates exactly the work
+    # whose meaning changed.
+
+    def get_stage3(self, checksum: str, model: str) -> dict | None:
+        import stage3
+
+        return self._data.get(stage3.cache_key(checksum, model))
+
+    def put_stage3(self, checksum: str, model: str, payload: dict) -> None:
+        import stage3
+
+        self._data[stage3.cache_key(checksum, model)] = payload
 
     def get(self, checksum: str) -> dict | None:
         return self._data.get(self.key(checksum))
@@ -573,6 +598,157 @@ def semantic_pass(
     return out
 
 
+def stage3_pass(
+    assets,
+    measurements,
+    routed: dict[str, str],
+    artistic_hints: dict,
+    *,
+    model: str,
+    client,
+    cache: AnalysisCache | None = None,
+    group_size: int = 6,
+) -> dict:
+    """The artistic read, in small groups, with crops for anything with a face.
+
+    Groups are smaller than Stage 2's twelve because each frame may carry three
+    views and the reply is far longer per frame; a group of twelve portraits is
+    thirty-six high-detail images and an output budget nobody should spend in
+    one call.
+
+    A per-group failure is recorded against every frame in that group as
+    `FAILED` rather than dropped, so a frame can never end up looking like it
+    was never a candidate when in fact the analysis broke.
+    """
+    import base64
+
+    import stage3 as stage3_module
+
+    out: dict[str, stage3_module.ArtisticAssessment] = {}
+    pending: list[str] = []
+
+    for asset in assets:
+        key = asset.key
+        measurement = measurements.get(key)
+        if measurement is None:
+            continue
+
+        hint = artistic_hints.get(key, {})
+        needed, reason = stage3_module.should_run(
+            route_class=routed.get(key, "review"),
+            has_unrecoverable=bool(hint.get("has_unrecoverable")),
+            intentionality_likelihood=int(hint.get("intentionality_likelihood", 50)),
+            curatorial_uncertainty=int(hint.get("curatorial_uncertainty", 100)),
+            faces_present=bool(hint.get("faces_present")),
+            corrupt=bool(measurement.error),
+        )
+        if not needed:
+            out[key] = stage3_module.ArtisticAssessment.not_required(reason)
+            continue
+
+        if cache is not None:
+            cached = cache.get_stage3(asset.checksum, model)
+            if cached is not None:
+                out[key] = stage3_module.ArtisticAssessment.from_dict(cached)
+                continue
+        pending.append(key)
+
+    if not pending:
+        return out
+
+    by_key = {a.key: a for a in assets}
+    for start in range(0, len(pending), group_size):
+        group = pending[start : start + group_size]
+        frames = []
+        for key in group:
+            measurement = measurements[key]
+            preview = Path(measurement.preview_path)
+            if not preview.exists():
+                out[key] = stage3_module.ArtisticAssessment.skipped("no preview was generated")
+                continue
+            views = _stage3_views(by_key[key], preview, artistic_hints.get(key, {}))
+            frames.append({"key": key, "views": views, "encoded": views[0][1]})
+
+        if not frames:
+            continue
+
+        assessments = _stage3_call(
+            frames, model=model, client=client, stage3_module=stage3_module
+        )
+        for frame in frames:
+            key = frame["key"]
+            assessment = assessments.get(key)
+            out[key] = assessment or stage3_module.ArtisticAssessment.failed(
+                ["the model returned nothing usable for this frame"], model=model
+            )
+            if cache is not None and out[key].completed:
+                cache.put_stage3(by_key[key].checksum, model, out[key].to_dict())
+
+    del base64
+    return out
+
+
+def _stage3_views(asset, preview: Path, hint: dict) -> list[tuple[str, str]]:
+    """Base64 views for one frame: the whole picture, plus crops when a face is in it."""
+    import base64
+
+    import stage3 as stage3_module
+
+    def encode(image) -> str:
+        import io
+
+        buffer = io.BytesIO()
+        image.convert("RGB").save(buffer, "JPEG", quality=88)
+        return base64.standard_b64encode(buffer.getvalue()).decode()
+
+    with Image.open(preview) as opened:
+        image = opened.convert("RGB")
+        if not hint.get("faces_present"):
+            return [("full frame", encode(image))]
+        return [(name, encode(view)) for name, view in stage3_module.face_crops(image)]
+
+
+def _stage3_call(frames, *, model, client, stage3_module):
+    """One group, with bounded retries on a malformed reply."""
+    import prompts
+
+    group = [f["key"] for f in frames]
+    errors: list[str] = []
+
+    for attempt in range(stage3_module.MAX_RETRIES + 1):
+        try:
+            response = client.responses.create(
+                model=model,
+                instructions=prompts.STAGE3_SYSTEM,
+                input=[{"role": "user", "content": prompts.stage3_user_content(frames)}],
+                max_output_tokens=600 + prompts.STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME * len(frames),
+                reasoning={"effort": "low"},
+            )
+            parsed = stage3_module.parse_group(
+                response.output_text or "", group, model=model
+            )
+            if parsed:
+                for assessment in parsed.values():
+                    assessment.retries = attempt
+                return parsed
+            errors.append(f"attempt {attempt + 1}: no usable object in the reply")
+        except stage3_module.Stage3ParseError as e:
+            errors.append(f"attempt {attempt + 1}: {e}")
+        except Exception as e:
+            # Not swallowed: recorded against every frame in the group.
+            errors.append(f"attempt {attempt + 1}: {reports.redact(str(e))}")
+            logger.warning("Stage 3 group failed: %s", reports.redact(str(e)))
+            break
+
+    logger.error("Stage 3 gave up after %d attempt(s): %s", len(errors), "; ".join(errors[:2]))
+    return {
+        key: stage3_module.ArtisticAssessment.failed(
+            errors, retries=len(errors) - 1, model=model
+        )
+        for key in group
+    }
+
+
 # --- the run ----------------------------------------------------------------
 
 
@@ -651,8 +827,18 @@ def run(
     clusters = _cluster(assets, measurements)
     semantics = _semantics(assets, measurements, options, client, result, model)
 
-    result.records = _score_all(
+    # Stage 3 needs a provisional route to decide who is worth reading, so the
+    # scoring pass runs twice: once to get candidates, then again with the
+    # artistic evidence that can promote or block them.
+    provisional = _score_all(
         assets, measurements, clusters, semantics, calibration, options, model
+    )
+    stage3_results = _stage3(
+        assets, measurements, provisional, semantics, options, client, result, model
+    )
+
+    result.records = _score_all(
+        assets, measurements, clusters, semantics, calibration, options, model, stage3_results
     )
     _apply_policy(result.records, options)
     if options.darkroom:
@@ -797,6 +983,84 @@ def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> N
         record.darkroom_engine_version = produced.get("engine_version", "")
 
 
+def _stage3(assets, measurements, provisional, semantics, options, client, result, model):
+    """Run the artistic read, or record for every frame why it did not run."""
+    import stage3 as stage3_module  # noqa: F401  (used throughout this function)
+
+    routed = {r.asset_key: r.route_class for r in provisional}
+    hints = {
+        r.asset_key: {
+            "has_unrecoverable": bool(r.issues.get("unrecoverable")),
+            "intentionality_likelihood": (r.artistic or {}).get("intentionality_likelihood", 50),
+            "curatorial_uncertainty": (r.artistic or {}).get("curatorial_uncertainty", 100),
+            "faces_present": semantics.get(r.asset_key, Semantic()).faces,
+        }
+        for r in provisional
+    }
+
+    if not options.stage3:
+        # Asked for by the operator: no read was wanted.
+        return {
+            key: stage3_module.ArtisticAssessment.not_required("Stage 3 was switched off")
+            for key in routed
+        }
+    if not options.semantic:
+        # Wanted but unavailable, which is a different thing and reads differently
+        # in the report: these frames were never judged, not judged and passed over.
+        return {
+            key: stage3_module.ArtisticAssessment.skipped(
+                "the semantic pass did not run, so there was no model to read with"
+            )
+            for key in routed
+        }
+
+    stage3_model = bootstrap_model(options, model)
+    cache = AnalysisCache(options.output_dir / CACHE_NAME)
+    try:
+        assessments = stage3_pass(
+            assets, measurements, routed, hints,
+            model=stage3_model, client=client or _client_for(options), cache=cache,
+        )
+    except Exception as e:
+        logger.error("Stage 3 failed entirely: %s", reports.redact(str(e)))
+        return {
+            key: stage3_module.ArtisticAssessment.failed(
+                [reports.redact(str(e))], model=stage3_model
+            )
+            for key in routed
+        }
+    cache.save()
+
+    result.stage3_completed = sum(1 for a in assessments.values() if a.completed)
+    result.stage3_failed = sum(
+        1 for a in assessments.values() if a.status == stage3_module.Stage3Status.FAILED.value
+    )
+    result.stage3_skipped = sum(
+        1 for a in assessments.values()
+        if a.status in (
+            stage3_module.Stage3Status.SKIPPED.value,
+            stage3_module.Stage3Status.NOT_REQUIRED.value,
+        )
+    )
+    logger.info(
+        "Stage 3: %d completed, %d failed, %d not required",
+        result.stage3_completed, result.stage3_failed, result.stage3_skipped,
+    )
+    return assessments
+
+
+def bootstrap_model(options, fallback: str) -> str:
+    import bootstrap
+
+    return bootstrap.resolve_model(options.stage3_model) if options.stage3_model else fallback
+
+
+def _client_for(options):
+    import bootstrap
+
+    return bootstrap.make_client()
+
+
 def _semantics(
     assets, measurements, options: PipelineOptions, client, result: RunResult, model: str
 ) -> dict[str, Semantic]:
@@ -862,7 +1126,8 @@ def _cluster(assets, measurements) -> dict[str, tuple[str, int, bool, float, flo
 
 
 def _score_all(
-    assets, measurements, clusters, semantics, calibration, options, semantic_model: str = ""
+    assets, measurements, clusters, semantics, calibration, options,
+    semantic_model: str = "", stage3_results: dict | None = None,
 ) -> list[AssetRecord]:
     """Score, then run the collection-level flagship pass, then classify."""
     prepared: list[tuple[media.Asset, Measurement, ScoreInput, object]] = []
@@ -910,6 +1175,7 @@ def _score_all(
             cluster_margin=margin,
             evidence_completeness=completeness,
             semantic_ran=semantic.present,
+            artistic=(stage3_results or {}).get(asset.key),
         )
         prepared.append((asset, measurement, inp, scoring.score(inp, profile)))
 
@@ -1009,6 +1275,7 @@ def _build_record(
     metadata.suggested_marketplaces = [r.platform_name for r in recommendations if r.eligible][:3]
 
     art = _artistic_for(asset, measurement, inp)
+    stage3_payload, portrait_verdict = _stage3_payload(inp)
 
     legal_warnings = []
     if inp.semantic.faces or inp.semantic.identifiable_people:
@@ -1070,9 +1337,25 @@ def _build_record(
         preview_path=measurement.preview_path,
         proposed_action=_proposed_action(scored.route_class),
         artistic=art.to_dict(),
+        stage3=stage3_payload,
+        portrait_verdict=portrait_verdict,
         status="error" if measurement.error else "ok",
         error=measurement.error,
     )
+
+
+def _stage3_payload(inp) -> tuple[dict, str]:
+    """The stored artistic record, plus what the face says to do about it."""
+    import stage3 as stage3_module
+
+    assessment = inp.artistic
+    if not isinstance(assessment, stage3_module.ArtisticAssessment):
+        return stage3_module.ArtisticAssessment.not_required(
+            "no artistic analysis was attached"
+        ).to_dict(), "keep"
+
+    verdict, _ = stage3_module.portrait_verdict(assessment)
+    return assessment.to_dict(), verdict
 
 
 def _camera_key(exif: dict) -> str:

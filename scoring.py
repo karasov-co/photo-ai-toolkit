@@ -248,6 +248,10 @@ class ScoreInput:
     # which cannot see the expression, the gesture or the moment that usually
     # decides which of two takes is the keeper.
     semantic_ran: bool = False
+    # The artistic read. `None` means Stage 3 has not been attached, which is
+    # itself a blocker: a frame cannot become the best thing in a shoot because
+    # the analysis that would have judged it never finished.
+    artistic: object | None = None
 
 
 @dataclass
@@ -660,9 +664,24 @@ def _decide(
         return RouteClass.ARCHIVE_ONLY
 
     if flagship_selected:
+        blocking = hero_blockers(inp)
+        if blocking:
+            # The invariant. Ranking a frame top of its genre is necessary and
+            # nowhere near sufficient: a portrait taken mid-blink can lead every
+            # ranked axis, because not one of those axes is looking at the face.
+            # An absent or failed artistic read blocks promotion for the same
+            # reason -- the analysis that would have judged it did not finish.
+            reasons.append("held back from flagship: " + "; ".join(blocking))
+            _key(keys, "reason.hero_blocked", {"detail": "; ".join(blocking)}, reasons[-1])
+            if scores.stock_potential >= profile.threshold("stock_strong"):
+                return RouteClass.STOCK_STRONG
+            if scores.stock_potential >= profile.threshold("stock_standard"):
+                return RouteClass.STOCK_STANDARD
+            return RouteClass.REVIEW
+
         reasons.append(
-            f"portfolio potential {scores.portfolio_potential} clears the absolute floor "
-            f"and ranks near the top of its genre"
+            f"portfolio potential {scores.portfolio_potential} clears the absolute floor, "
+            "ranks near the top of its genre, and the artistic read raises no objection"
         )
         _key(keys, "reason.flagship", {"value": scores.portfolio_potential}, reasons[-1])
         return RouteClass.FLAGSHIP
@@ -693,6 +712,23 @@ def _decide(
 def _key(keys: list[Reason] | None, name: str, params: dict, text: str) -> None:
     if keys is not None:
         keys.append(Reason(name, params, text))
+
+
+def hero_blockers(inp: ScoreInput) -> list[str]:
+    """Every reason this frame may not be promoted, from the artistic read.
+
+    An absent assessment is a blocker rather than a neutral. That is the whole
+    point: the previous behaviour promoted frames whose Stage 3 fields were all
+    `null`, because nothing checked that they were not.
+    """
+    import stage3
+
+    assessment = inp.artistic
+    if assessment is None:
+        return ["no artistic analysis is attached to this frame"]
+    if not isinstance(assessment, stage3.ArtisticAssessment):
+        return ["the artistic analysis is not in a form that can be trusted"]
+    return stage3.hero_blockers(assessment)
 
 
 def eligible_for_flagship(scores: AssetScores, profile: CalibrationProfile) -> bool:

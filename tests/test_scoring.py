@@ -328,7 +328,18 @@ def test_flagship_requires_being_selected_not_merely_scoring_well(profile):
     assert routed(profile, **strong).route_class is not RouteClass.FLAGSHIP
 
 
+def completed_artistic(**overrides):
+    """A Stage 3 result good enough to raise no objection."""
+    import stage3
+
+    payload = {**dict.fromkeys(stage3.ARTISTIC_FIELDS, 80),
+               "artistic_candidate": True, "artistic_confidence": 80}
+    payload.update(overrides)
+    return stage3.parse_assessment(payload)
+
+
 def test_a_selected_frame_becomes_flagship(profile):
+    """Selection is necessary; a completed artistic read is what makes it sufficient."""
     inp = ScoreInput(
         asset_id="a",
         filename="a.RW2",
@@ -336,10 +347,22 @@ def test_a_selected_frame_becomes_flagship(profile):
         uplift=6,
         is_raw=True,
         semantic=clean_semantic(axis_b=98),
+        artistic=completed_artistic(),
     )
     result = classify(inp, score(inp, profile), profile, flagship_selected=True)
     assert result.route_class is RouteClass.FLAGSHIP
     assert AssetTag.PORTFOLIO in result.tags
+
+
+def test_selection_alone_is_not_enough_without_an_artistic_read(profile):
+    """The invariant: a null Stage 3 cannot be promoted."""
+    inp = ScoreInput(
+        asset_id="a", filename="a.RW2", technical_quality=92, uplift=6,
+        is_raw=True, semantic=clean_semantic(axis_b=98),
+    )
+    result = classify(inp, score(inp, profile), profile, flagship_selected=True)
+    assert result.route_class is not RouteClass.FLAGSHIP
+    assert any("no artistic analysis" in r for r in result.reasons)
 
 
 def test_the_class_reason_comes_before_the_release_note(profile):

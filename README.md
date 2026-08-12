@@ -152,6 +152,48 @@ frames of the same sunset.
 
 ---
 
+## Stage 3: the artistic read
+
+Sharpness, exposure and rarity are the three axes a technical pass can rank, and
+none of them can tell whether a photograph is any good. Stage 3 is a separate
+call that looks at a frame and answers eight questions the ranking cannot —
+emotional resonance, visual tension, narrative openness, moment specificity,
+formal coherence, distinctiveness, documentary significance, conventional beauty
+— each with its own reasoning, plus a confidence in the whole read.
+
+**Nothing reaches `flagship` without a completed Stage 3.** A pending, skipped,
+failed, or half-parsed assessment blocks the promotion and the frame falls back
+to its commercial route. This is the rule that matters most here, because the
+failure it replaces was silent: the artistic fields were `null` in every report
+and `flagship` was being assigned from three technical axes alone.
+
+The read is bounded, not universal. It runs on every keep and hero candidate, on
+anything with a face, and on frames whose defect might be deliberate — a
+motion-blurred pan and an intentional silhouette are exactly what a technical
+filter judges worst. It does not run on a corrupt file or a confidently
+unrecoverable one.
+
+### Faces are a separate question
+
+A blink is not an aesthetic property. When a face is the subject, the same call
+returns eyes state, expression, expression quality, pose, occlusion, blink and
+grimace probabilities, publishability, and — separately — how confident it is in
+the expression reading. Closed eyes, a confidently bad expression, a soft face,
+or low confidence each block promotion on their own; a beautiful photograph of a
+bad moment is still a bad moment. Two guards keep that from overreaching: a face
+occupying a fraction of a landscape is not a portrait and gates nothing, and
+closed eyes can be overridden only when the artistic read *says* they are
+deliberate — never by a high aesthetic score.
+
+A confident bad expression is a decision, not a question for a person. Only an
+uncertain one goes to review.
+
+Stage 3 is cached separately from the semantic pass, keyed by checksum, model and
+prompt version, so a valid Stage 2 entry can never stand in for a missing
+artistic read.
+
+---
+
 ## Video
 
 A clip is not a photograph with a duration, and its first frame is routinely its
@@ -480,7 +522,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 1069 tests, no network, no API key
+pytest          # 1172 tests, no network, no API key
 ruff check .
 ```
 

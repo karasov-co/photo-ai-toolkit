@@ -182,6 +182,10 @@ class AssetRecord:
 
     # --- artistic read and the learning loop ---
     artistic: dict = field(default_factory=dict)
+    # The Stage 3 record: validated scores, or an explicit status saying why
+    # there are none. Never a bare null pretending to be a low score.
+    stage3: dict = field(default_factory=dict)
+    portrait_verdict: str = "keep"
     personal_preference_probability: float | None = None
     curatorial_disagreement: bool = False
     out_of_distribution: bool = False

@@ -153,6 +153,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "reason.stock_strong": "stock potential {value} is strong",
         "reason.stock_standard": "stock potential {value} is usable after the suggested edit",
+        "reason.hero_blocked": "held back from flagship: {detail}",
         "reason.flagship": (
             "portfolio potential {value} clears the absolute floor and ranks near the top "
             "of its genre"
@@ -295,6 +296,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "reason.stock_strong": "стоковый потенциал {value} — высокий",
         "reason.stock_standard": "стоковый потенциал {value} пригоден после обработки",
+        "reason.hero_blocked": "не пропущен во флагманы: {detail}",
         "reason.flagship": (
             "потенциал для портфолио {value} проходит абсолютный порог и входит в топ "
             "своего жанра"
