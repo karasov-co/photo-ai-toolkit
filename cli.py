@@ -95,6 +95,9 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         force=args.force,
         limit=args.limit,
         copyright_holder=args.copyright or "",
+        darkroom=args.darkroom,
+        darkroom_renderer=args.renderer,
+        shadow_mode=not args.no_shadow_mode,
     )
 
     printed = {"n": 0}
@@ -326,6 +329,179 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
     print(f"Manifest: {quarantine.manifest.path}")
     print("Restore anything with:  python cli.py restore --quarantine <dir> --apply")
     return 1 if failed else 0
+
+
+def cmd_darkroom(args: argparse.Namespace) -> int:
+    """Render edit suggestions for a stored run. Writes only under suggestions/."""
+    import darkroom
+
+    analysis = Path(args.analysis).resolve()
+    records = _load_records(analysis)
+    out_dir = Path(args.output).resolve() if args.output else analysis.parent.parent
+
+    shown = 0
+    for record in records:
+        if not record.edit_recipes:
+            continue
+        print(darkroom.format_report(record))
+        shown += 1
+        if args.limit and shown >= args.limit:
+            break
+    if not shown:
+        print(
+            "No edit recipes in this run. Re-run `analyze --darkroom` to generate them "
+            "(about a second per frame)."
+        )
+    print(f"\nSuggestions live under {out_dir / 'suggestions'}; no original was touched.")
+    return 0
+
+
+def cmd_apply_recipe(args: argparse.Namespace) -> int:
+    """Write a recipe beside the RAW. Dry run by default; refuses to clobber."""
+    import media
+    from edit_schema import read_recipe
+    from exporters import adobe_xmp
+
+    recipe = read_recipe(Path(args.recipe))
+    raw_path = Path(args.raw).resolve()
+    if not raw_path.exists():
+        print(f"Error: {raw_path} does not exist", file=sys.stderr)
+        return 1
+
+    current = media.checksum_file(raw_path)
+    plan = adobe_xmp.plan_apply(recipe, raw_path, current_checksum=current, force=args.force)
+
+    if plan.stale:
+        print(
+            f"Refusing: this recipe was computed from different contents.\n"
+            f"  recipe checksum : {recipe.source_checksum[:16]}\n"
+            f"  file checksum   : {current[:16]}\n"
+            "Re-analyse the file before applying anything to it.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if plan.exists:
+        print(f"An existing sidecar is already at {plan.target}")
+        if plan.diff:
+            print("Differences that would be written:")
+            for line in plan.diff:
+                print(line)
+        if plan.would_overwrite:
+            print(
+                "\nRefusing to overwrite your own edits. Re-run with --force if that is "
+                "genuinely what you want.",
+                file=sys.stderr,
+            )
+            return 2
+
+    if not args.apply:
+        print(f"\nWould write {plan.target}. Nothing has been written; re-run with --apply.")
+        return 0
+
+    plan.target.write_text(adobe_xmp.to_adobe_xmp(recipe), encoding="utf-8")
+    print(f"Wrote {plan.target}")
+    return 0
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    """The active-learning session: the questions worth five minutes."""
+    import active_learning
+    import preference_model
+    from preference_store import PreferenceStore
+
+    analysis = Path(args.analysis).resolve()
+    records = _load_records(analysis)
+    store = PreferenceStore(analysis.parent.parent / "preferences.jsonl")
+    model = preference_model.fit(store)
+
+    questions = active_learning.propose(records, model, limit=args.limit or 12)
+    print(active_learning.format_session(questions))
+    print(f"{store.count()} decision(s) recorded so far.")
+    print("Answer with:  python cli.py record --signal <signal> --winner <id> --loser <id>")
+    return 0
+
+
+def cmd_record(args: argparse.Namespace) -> int:
+    """Record one decision the photographer made."""
+    from preference_store import Decision, PreferenceStore
+
+    store = PreferenceStore(Path(args.store).resolve())
+    decision = store.record(
+        Decision(
+            signal=args.signal,
+            winner=args.winner or "",
+            loser=args.loser or "",
+            asset_id=args.asset or "",
+            answer=args.answer or "",
+            genre=args.genre or "",
+            camera=args.camera or "",
+            note=args.note or "",
+        )
+    )
+    print(f"Recorded {decision.signal} (weight {decision.weight:.1f}). {store.count()} total.")
+    return 0
+
+
+def cmd_policy(args: argparse.Namespace) -> int:
+    """What the tool would automate, and what is holding each gate shut."""
+    import selective_policy
+
+    records = _load_records(Path(args.analysis).resolve())
+    buckets: dict[str, int] = {}
+    for record in records:
+        buckets[record.decision_bucket or "unassigned"] = (
+            buckets.get(record.decision_bucket or "unassigned", 0) + 1
+        )
+
+    total = max(len(records), 1)
+    needs_human = sum(
+        count for bucket, count in buckets.items()
+        if bucket in ("manual_review", "curatorial_review")
+    )
+    print(f"{len(records)} asset(s)\n")
+    for bucket, count in sorted(buckets.items(), key=lambda kv: -kv[1]):
+        print(f"  {bucket:<28}{count:>6}  {count / total:>6.1%}")
+    print(f"\n  needs a full human decision : {needs_human} ({needs_human / total:.1%})")
+    print(f"  handled without one         : {1 - needs_human / total:.1%}")
+    acting = sum(
+        1 for r in records
+        if r.decision_bucket == selective_policy.Bucket.SAFE_QUARANTINE_CANDIDATE.value
+    )
+    print(f"  acts on files               : {acting}")
+
+    held = [r for r in records if r.policy_evidence and r.abstained]
+    if held:
+        print("\nWhy the tool held back (most common):")
+        counts: dict[str, int] = {}
+        for record in held:
+            counts[record.policy_evidence[0]] = counts.get(record.policy_evidence[0], 0) + 1
+        for reason, count in sorted(counts.items(), key=lambda kv: -kv[1])[:6]:
+            print(f"  {count:>5}  {reason}")
+    return 0
+
+
+def cmd_monitor(args: argparse.Namespace) -> int:
+    """False-trash rate, drift and calibration. Switches automation off itself."""
+    from model_monitoring import Monitor
+
+    monitor = Monitor(Path(args.state).resolve())
+    report = monitor.evaluate()
+    monitor.save()
+
+    print(f"false-trash rate      : {report['false_trash_rate']:.3%} over {report['resolved_cases']} resolved")
+    print(f"drift (out of dist.)  : {report['drift']:.1%}")
+    print(f"worst calibration gap : {report['worst_calibration_gap']:.3f}")
+    print(f"automation            : {'ON' if report['automation_enabled'] else 'OFF'}")
+    if report["disabled_reason"]:
+        print(f"  reason: {report['disabled_reason']}")
+    for problem in report["problems"]:
+        print(f"  PROBLEM: {problem}")
+    if args.enable:
+        ok, message = monitor.enable_automation(holdout_checks=args.holdout)
+        monitor.save()
+        print(f"\nenable: {'granted' if ok else 'refused'} -- {message}")
+    return 0
 
 
 def cmd_trash(args: argparse.Namespace) -> int:
@@ -565,6 +741,11 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--force", action="store_true", help="ignore the analysis cache")
     analyze.add_argument("--limit", type=int)
     analyze.add_argument("--copyright", help="copyright holder for generated metadata")
+    analyze.add_argument("--darkroom", action="store_true",
+                         help="render edit suggestions (about a second per frame)")
+    analyze.add_argument("--renderer", help="darkroom engine: builtin, darktable, rawtherapee")
+    analyze.add_argument("--no-shadow-mode", action="store_true",
+                         help="let the policy act instead of only recording what it would do")
     analyze.set_defaults(func=cmd_analyze)
 
     report = sub.add_parser("report", help="filter, sort and re-render a stored run")
@@ -598,6 +779,46 @@ def build_parser() -> argparse.ArgumentParser:
     quarantine.add_argument("--input", help="source root, to fence the operation")
     quarantine.add_argument("--apply", action="store_true", help="actually move the files")
     quarantine.set_defaults(func=cmd_quarantine)
+
+    darkroom_cmd = sub.add_parser("darkroom", help="show edit suggestions from a stored run")
+    darkroom_cmd.add_argument("--analysis", required=True)
+    darkroom_cmd.add_argument("--output")
+    darkroom_cmd.add_argument("--limit", type=int)
+    darkroom_cmd.set_defaults(func=cmd_darkroom)
+
+    apply_cmd = sub.add_parser("apply-recipe", help="write a recipe beside the RAW (dry run)")
+    apply_cmd.add_argument("--recipe", required=True)
+    apply_cmd.add_argument("--raw", required=True)
+    apply_cmd.add_argument("--apply", action="store_true")
+    apply_cmd.add_argument("--force", action="store_true", help="overwrite an existing sidecar")
+    apply_cmd.set_defaults(func=cmd_apply_recipe)
+
+    ask = sub.add_parser("ask", help="the questions worth answering, most informative first")
+    ask.add_argument("--analysis", required=True)
+    ask.add_argument("--limit", type=int)
+    ask.set_defaults(func=cmd_ask)
+
+    record_cmd = sub.add_parser("record", help="record one decision for the personal model")
+    record_cmd.add_argument("--store", required=True)
+    record_cmd.add_argument("--signal", required=True)
+    record_cmd.add_argument("--winner")
+    record_cmd.add_argument("--loser")
+    record_cmd.add_argument("--asset")
+    record_cmd.add_argument("--answer")
+    record_cmd.add_argument("--genre")
+    record_cmd.add_argument("--camera")
+    record_cmd.add_argument("--note")
+    record_cmd.set_defaults(func=cmd_record)
+
+    policy = sub.add_parser("policy", help="what would be automated, and what is holding it back")
+    policy.add_argument("--analysis", required=True)
+    policy.set_defaults(func=cmd_policy)
+
+    monitor = sub.add_parser("monitor", help="false-trash rate, drift and calibration")
+    monitor.add_argument("--state", required=True)
+    monitor.add_argument("--enable", action="store_true")
+    monitor.add_argument("--holdout", type=int, default=0)
+    monitor.set_defaults(func=cmd_monitor)
 
     trash = sub.add_parser("trash", help="carry out delete_plan.json (dry run unless --apply)")
     trash.add_argument("--plan", required=True)

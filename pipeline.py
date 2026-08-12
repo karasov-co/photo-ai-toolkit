@@ -84,6 +84,12 @@ class PipelineOptions:
     limit: int | None = None
     copyright_holder: str = ""
     follow_symlinks: bool = False
+    # The darkroom pass renders candidate edits, which costs about a second per
+    # frame, so it is opt-in and by default runs only on frames worth editing.
+    darkroom: bool = False
+    darkroom_renderer: str | None = None
+    conservative_art: bool = True
+    shadow_mode: bool = True
 
     def resolved_quarantine(self) -> Path:
         return self.quarantine_dir or (self.output_dir / "trash_quarantine")
@@ -551,6 +557,9 @@ def run(
     semantics = _semantics(assets, measurements, options, client)
 
     result.records = _score_all(assets, measurements, clusters, semantics, calibration, options)
+    _apply_policy(result.records, options)
+    if options.darkroom:
+        _darkroom_pass(assets, measurements, result.records, options)
     result.planned_operations = _plan_operations(assets, result.records, options)
     result.summary = reports.summarise(
         result.records,
@@ -562,6 +571,90 @@ def run(
         ),
     )
     return result
+
+
+def _apply_policy(records, options: PipelineOptions) -> None:
+    """Assign a decision bucket to every record, with every gate recorded.
+
+    Runs in shadow mode by default: the bucket says what the tool *would* do,
+    and nothing acts on it. Turning that off requires evidence the monitor has
+    to certify, which is the point.
+    """
+    import artistic
+    import preference_model
+    import selective_policy
+    from preference_store import PreferenceStore
+
+    store = PreferenceStore(options.output_dir / "preferences.jsonl")
+    model = preference_model.fit(store)
+
+    for record in records:
+        scores = artistic.ArtisticScores(
+            technical_integrity=record.artistic.get("technical_integrity", 0),
+            intentionality_likelihood=record.artistic.get("intentionality_likelihood", 0),
+            curatorial_uncertainty=record.artistic.get("curatorial_uncertainty", 100),
+        )
+        prediction = model.predict(record.asset_id, genre=record.genre, camera="")
+        decision = selective_policy.decide(
+            asset_id=record.asset_id,
+            route_class=record.route_class,
+            technical_evidence=record.evidence,
+            prediction=prediction,
+            model=model,
+            artistic_scores=scores,
+            genre=record.genre,
+            is_best_in_cluster=record.best_in_cluster,
+            cluster_size=record.cluster_size,
+            shadow_mode=options.shadow_mode,
+        )
+        record.decision_bucket = decision.bucket
+        record.abstained = decision.abstained
+        record.out_of_distribution = not prediction.in_distribution
+        record.personal_preference_probability = (
+            None if prediction.abstained else prediction.probability
+        )
+        record.curatorial_disagreement = preference_model.disagreement(
+            prediction, scores.has_any_artistic_signal
+        )
+        record.policy_evidence = decision.reasons + decision.failed_gates
+
+
+def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> None:
+    """Render candidate edits for the frames worth editing."""
+    import artistic
+    import darkroom
+
+    by_key = {a.key: a for a in assets}
+    for record in records:
+        scores = artistic.ArtisticScores(
+            intentionality_likelihood=record.artistic.get("intentionality_likelihood", 0),
+            curatorial_uncertainty=record.artistic.get("curatorial_uncertainty", 100),
+            signals=[
+                artistic.IntentSignal(
+                    s.get("defect", ""), s.get("verdict", "cannot_tell"), 0.7, s.get("evidence", "")
+                )
+                for s in record.artistic.get("intent_signals") or []
+            ],
+        )
+        if not darkroom.should_run(record.route_class, scores):
+            continue
+        asset = by_key.get(record.asset_key)
+        measurement = measurements.get(record.asset_key)
+        if asset is None or measurement is None:
+            continue
+        try:
+            produced = darkroom.run(
+                asset, measurement, scores,
+                out_dir=options.output_dir,
+                renderer_name=options.darkroom_renderer,
+            )
+        except Exception as e:
+            logger.warning("Darkroom failed for %s: %s", record.filename, reports.redact(str(e)))
+            continue
+        record.edit_recipes = produced["edit_recipes"]
+        record.rendered_variants = produced["rendered_variants"]
+        record.recipe_confidence = produced["recipe_confidence"]
+        record.preserve_intent = produced["preserve_intent"]
 
 
 def _semantics(assets, measurements, options: PipelineOptions, client) -> dict[str, Semantic]:
@@ -743,6 +836,8 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
     )
     metadata.suggested_marketplaces = [r.platform_name for r in recommendations if r.eligible][:3]
 
+    art = _artistic_for(asset, measurement, inp)
+
     legal_warnings = []
     if inp.semantic.faces or inp.semantic.identifiable_people:
         legal_warnings.append("Model release required before commercial licensing")
@@ -796,9 +891,55 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         video=measurement.video,
         preview_path=measurement.preview_path,
         proposed_action=_proposed_action(scored.route_class),
+        artistic=art.to_dict(),
         status="error" if measurement.error else "ok",
         error=measurement.error,
     )
+
+
+def _artistic_for(asset, measurement, inp):
+    """Deterministic intentionality signals for one frame.
+
+    Runs on every asset because it is cheap and because its output decides
+    whether a frame may be destroyed. The model-supplied dimensions stay None
+    until the vision pass fills them.
+    """
+    import artistic
+
+    scores = artistic.ArtisticScores(
+        technical_integrity=int(max(0, min(100, measurement.quality))),
+    )
+    if asset.kind is media.MediaKind.VIDEO or measurement.error:
+        scores.curatorial_uncertainty = 80
+        return scores
+
+    try:
+        image = media.open_photo(asset.path)
+        work = image.copy()
+        work.thumbnail((edit_recipe.WORK_PX, edit_recipe.WORK_PX), 1)
+        array = np.asarray(work.convert("RGB"), dtype=np.float64)
+        image.close()
+    except Exception as e:
+        logger.debug("Artistic pass skipped for %s: %s", asset.filename, e)
+        scores.curatorial_uncertainty = 85
+        return scores
+
+    luma = array @ np.array([0.299, 0.587, 0.114])
+    scores.signals = artistic.assess_intent(
+        array,
+        blur_ratio=measurement.blur_ratio,
+        sharpness_global=measurement.blur_ratio,
+        sharpness_tile=measurement.blur_ratio,
+        tilt_degrees=edit_recipe.estimate_tilt(array),
+        clipped_highlights=measurement.clipped_highlights,
+        mean_luma=float(luma.mean()),
+        iso=measurement.exif.get("iso"),
+    )
+    scores.intentionality_likelihood = artistic.intentionality_score(scores.signals)
+    scores.curatorial_uncertainty = artistic.uncertainty_score(
+        scores.signals, semantic_present=inp.semantic.present
+    )
+    return scores
 
 
 def _file_states(asset) -> dict:

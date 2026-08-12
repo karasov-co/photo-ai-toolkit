@@ -156,6 +156,21 @@ class AssetRecord:
     video: dict = field(default_factory=dict)
     preview_path: str = ""
 
+    # --- darkroom assistant ---
+    edit_recipes: list[dict] = field(default_factory=list)
+    rendered_variants: dict = field(default_factory=dict)
+    recipe_confidence: dict = field(default_factory=dict)
+    preserve_intent: list[str] = field(default_factory=list)
+
+    # --- artistic read and the learning loop ---
+    artistic: dict = field(default_factory=dict)
+    personal_preference_probability: float | None = None
+    curatorial_disagreement: bool = False
+    out_of_distribution: bool = False
+    abstained: bool = False
+    decision_bucket: str = ""
+    policy_evidence: list[str] = field(default_factory=list)
+
     proposed_action: str = ""
     completed_action: str = ""
     status: str = "ok"
