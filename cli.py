@@ -23,6 +23,7 @@ import logging
 import sys
 from pathlib import Path
 
+import bootstrap
 import i18n
 import layout
 import overrides as overrides_module
@@ -81,6 +82,17 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     setup_logging(output_dir, args.verbose)
     language = i18n.normalise(args.lang)
 
+    if args.semantic:
+        # Flushed, so the status line cannot appear after the error that follows
+        # it: stdout is block-buffered while stderr is not.
+        print(bootstrap.credential_status(language), flush=True)
+        if not bootstrap.has_credentials():
+            # Fail before a single photograph is decoded, and with a non-zero
+            # exit code. The previous behaviour spent minutes measuring files and
+            # then printed a summary that looked like a success.
+            print(i18n.t("creds.error", language), file=sys.stderr)
+            return 2
+
     options = pipeline.PipelineOptions(
         input_dir=input_dir,
         output_dir=output_dir,
@@ -98,6 +110,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         darkroom=args.darkroom,
         darkroom_renderer=args.renderer,
         shadow_mode=not args.no_shadow_mode,
+        allow_semantic_fallback=args.allow_semantic_fallback,
     )
 
     printed = {"n": 0}
@@ -109,7 +122,15 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         print(f"  [{index:>4}/{total}] {filename}", flush=True)
 
     print(f"Analyzing {input_dir}")
-    result = pipeline.run(options, progress=progress)
+    try:
+        result = pipeline.run(options, progress=progress)
+    except bootstrap.SemanticCredentialsMissing:
+        print(i18n.t("creds.error", language), file=sys.stderr)
+        return 2
+    except bootstrap.SemanticUnavailable as e:
+        print(i18n.t("creds.failed", language, reason=str(e)), file=sys.stderr)
+        print(i18n.t("creds.fallback_hint", language), file=sys.stderr)
+        return 3
     if result.cancelled:
         print("Run cancelled; partial results follow.")
 
@@ -135,7 +156,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 
     if result.planned_operations:
         print()
-        print(quarantine_module.summarise_plan(result.planned_operations))
+        print(quarantine_module.summarise_plan(result.planned_operations, language))
     return 0
 
 
@@ -162,14 +183,60 @@ def _write_outputs(result: pipeline.RunResult, output_dir: Path, language: str) 
     ]
     sheet = layout.build_contact_sheet(previews, reports_dir / "contact_sheet_delete.jpg")
 
+    comparison = layout.build_comparison_sheet(
+        _comparison_rows(result.records, language),
+        reports_dir / "contact_sheet_duplicates.jpg",
+        language=language,
+        semantic_ran=result.semantic_completed,
+    )
+
     print(f"\nReports written to {reports_dir}")
     print("  symlink farm: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
     print(f"  delete candidates: {trash['count']} (list + delete.sh, nothing removed)")
     if sheet:
         print(f"  contact sheet: {sheet}")
+    if comparison:
+        print(f"  duplicate comparison sheet: {comparison}")
 
 
 # --- report -----------------------------------------------------------------
+
+
+def _comparison_rows(records: list[AssetRecord], language: str) -> list[dict]:
+    """Pair every duplicate candidate with the frame that beat it."""
+    best_by_cluster = {r.cluster_id: r for r in records if r.best_in_cluster}
+
+    rows: list[dict] = []
+    for record in records:
+        if record.route_class not in (
+            RouteClass.DUPLICATE_CANDIDATE.value,
+            RouteClass.TRASH.value,
+        ):
+            continue
+        if not record.preview_path:
+            continue
+        best = best_by_cluster.get(record.cluster_id)
+        rows.append(
+            {
+                "label": record.filename,
+                "candidate_preview": record.preview_path,
+                "best_label": best.filename if best and best is not record else "",
+                "best_preview": best.preview_path if best and best is not record else "",
+                "margin": f"{record.cluster_margin:g}",
+                "reason": _localise_first_reason(record, language),
+            }
+        )
+    return rows
+
+
+def _localise_first_reason(record: AssetRecord, language: str) -> str:
+    from scoring import Reason
+
+    for payload in record.reason_keys or []:
+        return Reason(
+            payload.get("key", ""), payload.get("params") or {}, payload.get("text", "")
+        ).localise(language)
+    return record.reasons[0] if record.reasons else ""
 
 
 def _load_records(path: Path) -> list[AssetRecord]:
@@ -319,7 +386,7 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
 
     planned = quarantine.plan(moves)
     if not args.apply:
-        print(quarantine_module.summarise_plan(planned))
+        print(quarantine_module.summarise_plan(planned, i18n.normalise(args.lang)))
         return 0
 
     results = quarantine.apply(planned, dry_run=False)
@@ -762,7 +829,19 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--profile", choices=list(BUILTIN_PROFILES), help="built-in calibration profile")
     analyze.add_argument("--profile-file", help="path to a calibration profile JSON")
     analyze.add_argument("--semantic", action="store_true", help="run the paid vision pass")
-    analyze.add_argument("--model", default="gpt-5.6-sol")
+    analyze.add_argument(
+        "--allow-semantic-fallback",
+        action="store_true",
+        help="accept a local-only result if the semantic pass fails (off by default)",
+    )
+    analyze.add_argument(
+        "--model",
+        default=None,
+        help=(
+            f"semantic model; overrides {bootstrap.MODEL_VAR}, which overrides the default "
+            f"({bootstrap.DEFAULT_SEMANTIC_MODEL})"
+        ),
+    )
     analyze.add_argument("--no-video", action="store_true")
     analyze.add_argument("--video-samples", type=int, default=9)
     analyze.add_argument("--force", action="store_true", help="ignore the analysis cache")
@@ -898,6 +977,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Before anything reads an environment variable. The whole point of a single
+    # bootstrap is that no subcommand has to remember to do this.
+    bootstrap.load_project_environment()
     args = build_parser().parse_args(argv)
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

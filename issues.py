@@ -57,6 +57,13 @@ class IssueCode(StrEnum):
     COMPRESSION_ARTIFACTS = "compression_artifacts"
     EXPOSURE_DRIFT = "exposure_drift"
     ROLLING_SHUTTER = "rolling_shutter"
+    # A near-identical sibling exists. Not damage: two takes of one moment, and
+    # which is better depends on a gesture or an expression that no local
+    # measurement can see.
+    WEAKER_DUPLICATE = "weaker_duplicate"
+    # Shorter than most marketplaces accept. A three-second minimum is a
+    # submission rule, not a property of the footage.
+    SHORT_CLIP = "short_clip"
 
     # --- unrecoverable ---
     MISSED_FOCUS = "missed_focus"
@@ -69,7 +76,6 @@ class IssueCode(StrEnum):
     EMPTY_FRAME = "empty_frame"
     DEAD_MOMENT = "dead_moment"
     OBSTRUCTED_SUBJECT = "obstructed_subject"
-    WEAKER_DUPLICATE = "weaker_duplicate"
     LEGAL_BLOCKER = "legal_blocker"
     NO_USABLE_SEGMENT = "no_usable_segment"
     UNUSABLE_SHAKE = "unusable_shake"
@@ -101,6 +107,8 @@ FIXABILITY: dict[IssueCode, Fixability] = {
     IssueCode.COMPRESSION_ARTIFACTS: Fixability.PARTIAL,
     IssueCode.EXPOSURE_DRIFT: Fixability.PARTIAL,
     IssueCode.ROLLING_SHUTTER: Fixability.PARTIAL,
+    IssueCode.WEAKER_DUPLICATE: Fixability.PARTIAL,
+    IssueCode.SHORT_CLIP: Fixability.PARTIAL,
     IssueCode.MISSED_FOCUS: Fixability.UNRECOVERABLE,
     IssueCode.SEVERE_MOTION_BLUR: Fixability.UNRECOVERABLE,
     IssueCode.BLOWN_HIGHLIGHTS: Fixability.UNRECOVERABLE,
@@ -111,7 +119,6 @@ FIXABILITY: dict[IssueCode, Fixability] = {
     IssueCode.EMPTY_FRAME: Fixability.UNRECOVERABLE,
     IssueCode.DEAD_MOMENT: Fixability.UNRECOVERABLE,
     IssueCode.OBSTRUCTED_SUBJECT: Fixability.UNRECOVERABLE,
-    IssueCode.WEAKER_DUPLICATE: Fixability.UNRECOVERABLE,
     IssueCode.LEGAL_BLOCKER: Fixability.UNRECOVERABLE,
     IssueCode.NO_USABLE_SEGMENT: Fixability.UNRECOVERABLE,
     IssueCode.UNUSABLE_SHAKE: Fixability.UNRECOVERABLE,
@@ -119,6 +126,12 @@ FIXABILITY: dict[IssueCode, Fixability] = {
     IssueCode.ENCODING_CORRUPTION: Fixability.UNRECOVERABLE,
     IssueCode.UNUSABLE_DURATION: Fixability.UNRECOVERABLE,
 }
+
+# A clip is only *unusably* short when there is essentially no footage at all.
+# Below a marketplace's three-second floor is a submission fact; below this is a
+# fragment. The two were conflated, and one-second clips were being proposed for
+# deletion as though they were corrupt.
+TRULY_UNUSABLE_DURATION = 0.4
 
 
 @dataclass

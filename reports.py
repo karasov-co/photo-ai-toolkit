@@ -128,6 +128,9 @@ class AssetRecord:
     issues: dict = field(default_factory=dict)
     strengths: list[str] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
+    # Stable keys plus params, so the console and the HTML can render the same
+    # reason in the user's language while the JSON keeps the English text.
+    reason_keys: list[dict] = field(default_factory=list)
 
     genre: str = ""
     # Normalised "Make Model". The personal model abstains on an unfamiliar
@@ -155,6 +158,11 @@ class AssetRecord:
     # against each other rather than against a threshold.
     phash: str = ""
     semantic_present: bool = False
+    analysis_mode: str = "local_only"
+    semantic_requested: bool = False
+    semantic_completed: bool = False
+    semantic_model: str = ""
+    semantic_error: str = ""
 
     video: dict = field(default_factory=dict)
     preview_path: str = ""
@@ -294,6 +302,13 @@ def write_csv(records: list[AssetRecord], path: Path) -> Path:
 
 
 def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict:
+    """Counts, with the two stock figures named so they cannot be confused.
+
+    "Usable stock: 37" beside "Marketplace-ready: 0" was technically correct and
+    read as a contradiction. They answer different questions: one is a technical
+    screen, the other requires content, faces, logos, releases and metadata to
+    have been checked. The names now say which is which.
+    """
     ok = [r for r in records if r.status == "ok"]
     by_class: dict[str, int] = {}
     for record in ok:
@@ -321,9 +336,20 @@ def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict
         "recoverable_mb": round(recoverable_bytes / 1_048_576, 1),
         "top_genres": sorted(genres.items(), key=lambda kv: -kv[1])[:8],
         "missing_releases": sum(1 for r in ok if "needs_model_release" in r.tags),
+        # Technically past the thresholds. Says nothing about content.
+        "technically_usable": sum(
+            1 for r in ok if r.route_class in ("stock_standard", "stock_strong", "flagship")
+        ),
+        # Everything checked and exportable. Requires the semantic pass.
+        "fully_checked": sum(
+            1 for r in ok if any(m.get("export_ready") for m in r.marketplaces)
+        ),
         "marketplace_ready": sum(
             1 for r in ok if any(m.get("export_ready") for m in r.marketplaces)
         ),
+        "not_semantically_checked": sum(1 for r in ok if not r.semantic_present),
+        "semantic_ran": any(r.semantic_present for r in ok),
+        "analysis_mode": next((r.analysis_mode for r in records if r.analysis_mode), "local_only"),
         "strongest": [
             {"filename": r.filename, "score": r.scores.get("routing_score", 0), "class": r.route_class}
             for r in strongest
@@ -331,25 +357,69 @@ def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict
     }
 
 
+# Column width for the summary. Russian labels are longer than English ones and
+# were overflowing the old 38, which pushed the numbers out of alignment.
+LABEL_WIDTH = 44
+
+
+def _row(label: str, value, width: int = LABEL_WIDTH) -> str:
+    """One aligned line. Padding is measured on the label, not guessed.
+
+    A label longer than the column gets a single space rather than being butted
+    straight against its number -- which is where `Готово к загрузке на сток0`
+    came from.
+    """
+    text = str(label)
+    padding = max(1, width - len(text))
+    return f"  {text}{' ' * padding}{value:>7}"
+
+
 def format_summary(summary: dict, language: str = "en") -> str:
     """The block printed at the end of a run."""
-    lines = ["", "=" * 62, t("summary.title", language), "=" * 62]
-    lines.append(f"  {t('summary.total', language):<38}{summary.get('total', 0):>8}")
-    lines.append(f"  {t('summary.photos', language):<38}{summary.get('photos', 0):>8}")
-    lines.append(f"  {t('summary.videos', language):<38}{summary.get('videos', 0):>8}")
+    lines = ["", "=" * 66, t("summary.title", language), "=" * 66]
+
+    mode = summary.get("analysis_mode", "local_only")
+    lines.append(_row(t("mode.title", language), t(f"mode.{mode}", language)))
+    if mode != "local_and_semantic":
+        lines.append("")
+        lines.append(f"  *** {t('mode.banner', language)} ***")
+        lines.append(f"  {t('mode.banner_detail', language)}")
+    lines.append("")
+
+    lines.append(_row(t("summary.total", language), summary.get("total", 0)))
+    lines.append(_row(t("summary.photos", language), summary.get("photos", 0)))
+    lines.append(_row(t("summary.videos", language), summary.get("videos", 0)))
     lines.append("")
     for route_class, count in sorted(
         (summary.get("by_class") or {}).items(), key=lambda kv: -kv[1]
     ):
-        lines.append(f"  {t(f'class.{route_class}', language):<38}{count:>8}")
+        lines.append(_row(t(f"class.{route_class}", language), count))
     lines.append("")
-    lines.append(f"  {t('summary.clusters', language):<38}{summary.get('duplicate_clusters', 0):>8}")
-    lines.append(f"  {t('summary.low_confidence', language):<38}{summary.get('low_confidence', 0):>8}")
-    lines.append(f"  {t('summary.missing_releases', language):<38}{summary.get('missing_releases', 0):>8}")
-    lines.append(f"  {t('summary.marketplace_ready', language):<38}{summary.get('marketplace_ready', 0):>8}")
-    lines.append(f"  {t('summary.failed', language):<38}{summary.get('failed', 0):>8}")
+    lines.append(_row(t("summary.clusters", language), summary.get("duplicate_clusters", 0)))
+    lines.append(_row(t("summary.low_confidence", language), summary.get("low_confidence", 0)))
+
+    semantic_ran = bool(summary.get("semantic_ran"))
+    if semantic_ran:
+        lines.append(_row(t("summary.missing_releases", language), summary.get("missing_releases", 0)))
+    else:
+        lines.append(
+            _row(t("summary.release_status", language), t("summary.release_unchecked", language))
+        )
     lines.append(
-        f"  {t('summary.recoverable_space', language):<38}{summary.get('recoverable_mb', 0):>7} MB"
+        _row(t("summary.technically_usable", language), summary.get("technically_usable", 0))
+    )
+    lines.append(_row(t("summary.fully_checked", language), summary.get("fully_checked", 0)))
+    if not semantic_ran:
+        lines.append(
+            _row(
+                t("summary.not_semantically_checked", language),
+                summary.get("not_semantically_checked", 0),
+            )
+        )
+        lines.append(f"  {t('summary.export_blocked_reason', language)}")
+    lines.append(_row(t("summary.failed", language), summary.get("failed", 0)))
+    lines.append(
+        _row(t("summary.recoverable_space", language), f"{summary.get('recoverable_mb', 0)} MB")
     )
 
     genres = summary.get("top_genres") or []
@@ -365,9 +435,16 @@ def format_summary(summary: dict, language: str = "en") -> str:
             lines.append(f"    [{item['score']:>3}] {item['filename']}  ({item['class']})")
 
     lines.append("")
-    lines.append("  " + t("warn.disclaimer", language))
-    lines.append("=" * 62)
+    lines.extend(_wrap(t("warn.disclaimer", language)))
+    lines.append("=" * 66)
     return "\n".join(lines)
+
+
+def _wrap(text: str, width: int = 64) -> list[str]:
+    """Wrap on whitespace, so no join can ever fuse two words together."""
+    import textwrap
+
+    return ["  " + line for line in textwrap.wrap(" ".join(text.split()), width=width)]
 
 
 # --- HTML -------------------------------------------------------------------
@@ -377,6 +454,7 @@ CLASS_COLORS = {
     "trash": "#7a2e2e",
     "review": "#7a682e",
     "archive_only": "#4a4a4a",
+    "duplicate_candidate": "#5a4a7a",
     "stock_standard": "#2e5a7a",
     "stock_strong": "#2e7a55",
     "flagship": "#6b2e7a",
@@ -437,11 +515,17 @@ ul {{ margin:6px 0; padding-left:18px; font-size:12px; }}
 .veto {{ border-left:3px solid #e08585; padding-left:8px; margin:6px 0; font-size:12px; color:#e0a5a5; }}
 .bucket {{ display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px;
           background:#26323a; color:#9fd0e0; }}
+.banner {{ background:#4a2020; border:1px solid #7a3030; border-radius:8px; padding:12px 16px;
+          margin-bottom:16px; }}
+.banner b {{ display:block; font-size:15px; letter-spacing:0.04em; }}
+.banner span {{ color:#e0b5b5; font-size:13px; }}
+.stat[title] {{ cursor:help; border-bottom:1px dotted #555; }}
 details summary {{ cursor:pointer; color:#9a9a9a; font-size:12px; }}
 </style>
 </head>
 <body>
 <h1>photo-ai-toolkit &mdash; {len(records)} assets</h1>
+{_mode_banner(summary, language)}
 <p class="disclaimer">{html.escape(t("warn.disclaimer", language))}</p>
 <div class="summary">{_summary_html(summary, language)}</div>
 <div class="grid">
@@ -454,9 +538,35 @@ details summary {{ cursor:pointer; color:#9a9a9a; font-size:12px; }}
     return path
 
 
+def _mode_banner(summary: dict, language: str) -> str:
+    """A report from a run whose content check never happened must say so.
+
+    Large, red and above the fold, because the failure this guards against is a
+    user reading a local-only report as though the pictures had been looked at.
+    """
+    mode = summary.get("analysis_mode", "local_only")
+    if mode == "local_and_semantic":
+        return (
+            f'<p class="disclaimer">{html.escape(t("mode.title", language))}: '
+            f'{html.escape(t(f"mode.{mode}", language))}</p>'
+        )
+    return (
+        f'<div class="banner"><b>{html.escape(t("mode.banner", language))}</b>'
+        f'<span>{html.escape(t("mode.banner_detail", language))}</span>'
+        f'<span>{html.escape(t("mode.title", language))}: '
+        f'{html.escape(t(f"mode.{mode}", language))}</span></div>'
+    )
+
+
 def _summary_html(summary: dict, language: str) -> str:
+    tooltips = {
+        t("summary.technically_usable", language): t("summary.technically_usable_help", language),
+        t("summary.fully_checked", language): t("summary.fully_checked_help", language),
+    }
     stats = [
         (t("summary.total", language), summary.get("total", 0)),
+        (t("summary.technically_usable", language), summary.get("technically_usable", 0)),
+        (t("summary.fully_checked", language), summary.get("fully_checked", 0)),
         (t("summary.photos", language), summary.get("photos", 0)),
         (t("summary.videos", language), summary.get("videos", 0)),
         (t("summary.clusters", language), summary.get("duplicate_clusters", 0)),
@@ -467,9 +577,14 @@ def _summary_html(summary: dict, language: str) -> str:
     for route_class, count in by_class:
         stats.append((t(f"class.{route_class}", language), count))
     return "".join(
-        f'<div class="stat"><b>{value}</b><span>{html.escape(str(label))}</span></div>'
+        f'<div class="stat"{_title(tooltips.get(label))}><b>{value}</b>'
+        f"<span>{html.escape(str(label))}</span></div>"
         for label, value in stats
     )
+
+
+def _title(text: str | None) -> str:
+    return f' title="{html.escape(text)}"' if text else ""
 
 
 def _card(record: AssetRecord, base: Path, language: str) -> str:

@@ -231,8 +231,10 @@ def test_a_burst_is_collapsed_to_its_best_frame(tmp_path):
 
     weaker = [r for r in result.records if not r.best_in_cluster]
     assert weaker
-    assert all(r.route_class == RouteClass.TRASH.value for r in weaker)
-    assert all("weaker_duplicate" in "".join(r.issues["unrecoverable"]) for r in weaker)
+    # A comparison for a person, never a deletion.
+    assert all(r.route_class == RouteClass.DUPLICATE_CANDIDATE.value for r in weaker)
+    assert all(not r.issues["unrecoverable"] for r in weaker)
+    assert all("weaker_duplicate" in "".join(r.issues["partially_fixable"]) for r in weaker)
 
 
 def test_two_frames_too_close_to_separate_are_both_kept(tmp_path):

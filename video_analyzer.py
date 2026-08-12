@@ -647,6 +647,7 @@ def _burst_starts(duration: float, count: int) -> list[float]:
 
 def detect_video_issues(analysis: VideoAnalysis):
     """Video measurements to the same Issue vocabulary the photos use."""
+    import issues as issues_module
     from issues import IssueCode, IssueSet
 
     found = IssueSet()
@@ -656,8 +657,18 @@ def detect_video_issues(analysis: VideoAnalysis):
         found.add(IssueCode.ENCODING_CORRUPTION, info.error or "unreadable stream")
         return found
 
-    if info.duration < MIN_USABLE_DURATION:
-        found.add(IssueCode.UNUSABLE_DURATION, f"{info.duration:.1f}s is below {MIN_USABLE_DURATION}s")
+    if info.duration < issues_module.TRULY_UNUSABLE_DURATION:
+        found.add(IssueCode.UNUSABLE_DURATION, f"{info.duration:.2f}s is barely any footage")
+    elif info.duration < MIN_USABLE_DURATION:
+        # Below the usual marketplace floor, which is a submission rule rather
+        # than a defect. A two-second clip can still be the only footage of
+        # something, and deleting it because Adobe wants five seconds is the
+        # tool substituting a stock policy for the photographer's judgement.
+        found.add(
+            IssueCode.SHORT_CLIP,
+            f"{info.duration:.1f}s is below the usual {MIN_USABLE_DURATION:.0f}s marketplace floor",
+            certainty=0.9,
+        )
     if info.megapixels < 1.9:  # below roughly 1920x1080
         found.add(IssueCode.INSUFFICIENT_RESOLUTION, f"{info.width}x{info.height}")
 

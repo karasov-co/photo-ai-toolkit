@@ -299,11 +299,21 @@ def test_a_corrupt_clip_reports_encoding_corruption():
     assert IssueCode.ENCODING_CORRUPTION in va.detect_video_issues(result).codes()
 
 
-def test_a_clip_shorter_than_the_floor_is_unusable():
+def test_a_clip_shorter_than_the_marketplace_floor_is_not_called_damaged():
+    """Three seconds is a submission rule, not a property of the footage."""
     probe = va.parse_probe(probe_payload(duration="1.5"))
     result = analysis_with([sample(0.75)], probe=probe)
-    codes = va.detect_video_issues(result).codes()
-    assert IssueCode.UNUSABLE_DURATION in codes
+    found = va.detect_video_issues(result)
+
+    assert IssueCode.SHORT_CLIP in found.codes()
+    assert IssueCode.UNUSABLE_DURATION not in found.codes()
+    assert not any(i.code is IssueCode.SHORT_CLIP and i.is_blocker for i in found)
+
+
+def test_a_fragment_of_a_second_is_still_unusable():
+    probe = va.parse_probe(probe_payload(duration="0.2"))
+    result = analysis_with([sample(0.1)], probe=probe)
+    assert IssueCode.UNUSABLE_DURATION in va.detect_video_issues(result).codes()
 
 
 def test_a_clip_with_no_usable_segment_says_so():

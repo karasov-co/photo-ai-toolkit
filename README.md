@@ -113,7 +113,13 @@ Problems are typed at detection time, not inferred afterwards:
 
 - **fixable** — underexposure, colour cast, tilt, weak crop, edge clutter, mild noise, unusable audio, needs trim
 - **partially fixable** — heavy noise, some clipping, moderate shake (stabilisation costs a crop), soft focus, compression artifacts, rolling shutter
-- **unrecoverable** — missed focus, severe motion blur, blown highlights with no data, crushed shadows, insufficient resolution, corrupt file, no usable video segment, weaker burst duplicate
+- **unrecoverable** — missed focus, severe motion blur, blown highlights with no data, crushed shadows, insufficient resolution, corrupt file, no usable video segment
+
+A **weaker duplicate** and a **short clip** are deliberately *not* in that list.
+Sharpness picks the winner of a burst and cannot see which take has the better
+expression; a three-second floor is a marketplace submission rule and not a
+property of the footage. Both go to a review class, and neither can ever be
+permanently purged.
 
 ---
 
@@ -121,7 +127,8 @@ Problems are typed at detection time, not inferred afterwards:
 
 | Class | Meaning |
 |---|---|
-| `trash` | Unrecoverable, corrupt, or a measurably weaker duplicate |
+| `trash` | Unrecoverable or corrupt. **Never a duplicate and never a short clip.** |
+| `duplicate_candidate` | A sharper frame exists in the group — a comparison for a person, not a deletion |
 | `review` | Low confidence, conflicting signals, or below the stock floor but worth keeping |
 | `stock_standard` | Becomes acceptable stock material after the suggested edit |
 | `stock_strong` | Strong commercial stock potential |
@@ -217,6 +224,16 @@ python cli.py purge --quarantine ./quarantine \
 | `policy` | What would be automated, and what is holding each gate shut |
 | `monitor` | False-trash rate, drift, calibration; can switch automation off |
 | `trash` | Carry out `delete_plan.json` in Python (dry run unless `--apply`) |
+
+### The two stock counters
+
+They answer different questions and are named apart for that reason:
+
+- **Technically usable, needs checking** — past the technical thresholds. Says
+  nothing about content, faces, logos or releases.
+- **Fully checked and ready to export** — everything verified and exportable.
+  Requires the semantic pass, so it is `0` in a local-only run, and the summary
+  says why.
 
 Filtering and sorting on `report`: `--media`, `--route-class`, `--route`,
 `--genre`, `--marketplace`, `--min-score`, `--min-potential`, `--min-confidence`,
@@ -344,8 +361,93 @@ Requires Python 3.12+. FFmpeg is optional and only needed for video.
 ```bash
 pip install -r requirements.txt
 brew install ffmpeg          # macOS; apt-get install ffmpeg on Debian/Ubuntu
-cp .env.example .env         # only needed for the optional vision pass
+cp .env.example .env         # then put your key in it, once
 ```
+
+Edit `.env` and set your key:
+
+```
+OPENAI_API_KEY=your_key_here
+```
+
+That is the whole setup. **Do not `source .env` and do not `export` anything** —
+the application loads the file itself, from the project root, no matter which
+directory you run it from:
+
+```bash
+python cli.py --lang ru analyze --input ./photos --output ./run --semantic
+```
+
+`.env` is in `.gitignore` and is never committed. `.env.example` holds only a
+placeholder.
+
+### Where the key is looked for
+
+In order, highest priority first:
+
+1. a variable already set in your shell environment
+2. `<project root>/.env`
+3. `<current directory>/.env`, if that is a different directory
+
+A variable exported in your shell always wins — `.env` never overrides it. Every
+run with `--semantic` prints where the credential came from, and never the key:
+
+```
+Semantic credentials: loaded from /path/to/photo-ai-toolkit/.env
+```
+
+### The model
+
+Precedence: `--model` → `OPENAI_MODEL` → the documented default
+(`gpt-5.6-sol`). If that model is not available to your account, set
+`OPENAI_MODEL` in the same `.env`. The model actually used is recorded in every
+report.
+
+---
+
+## Two modes, and the difference matters
+
+| Mode | What runs | What you get |
+|---|---|---|
+| **local-only** (default) | Decoding, technical metrics, edit-potential search, duplicate clustering | Technical routing. **Genre is `unknown`. Faces, logos and releases are not checked.** |
+| **local + semantic** (`--semantic`) | The above, plus a vision model over 512px previews | Genre, concepts, faces, logos, release requirements, marketplace eligibility |
+
+**What is sent to the API:** 512px JPEG previews of your photographs, in groups
+of twelve, plus the measured clipping figures. No original file is uploaded. No
+video frames are sent.
+
+**Semantic costs money.** It is opt-in for that reason, and off by default.
+
+### When the semantic pass fails
+
+`--semantic` **fails fast**. If the key is missing, the run stops with a non-zero
+exit code *before any photograph is decoded* — it does not spend minutes
+measuring files and then present a local-only result as a finished analysis.
+
+If the key exists but the API rejects it, the model is unavailable, or the reply
+is unusable, the run also stops with a non-zero exit code. To accept a
+local-only result instead, ask for it explicitly:
+
+```bash
+python cli.py analyze --input ./photos --output ./run --semantic --allow-semantic-fallback
+```
+
+That report is stamped `SEMANTIC ANALYSIS DID NOT RUN` in the console and at the
+top of the HTML, and every record carries
+`analysis_mode=local_only_after_semantic_failure`.
+
+### Re-running after adding a key
+
+Just run the same command again. Local measurements come from the cache; the
+semantic pass runs. `--force` is not needed, and a local-only cache entry can
+never be mistaken for a semantic result.
+
+---
+
+## Nothing moves without `--apply`
+
+`analyze` only ever writes reports, symlinks and proposals. Moving files is a
+separate command, and it is a dry run unless you pass `--apply`.
 
 **The default pipeline is entirely local, offline and free.** It needs no API
 key and makes no network calls; a culling tool that cannot run without a network
@@ -353,11 +455,7 @@ is not a culling tool. The paid vision pass is opt-in via `--semantic`, and
 without it confidence is reduced — which the confidence score states rather than
 hides.
 
-```bash
-python cli.py analyze --input ./photos --output ./run              # local only
-python cli.py analyze --input ./photos --output ./run --semantic   # + vision
-python cli.py --lang ru analyze --input ./photos --output ./run    # Russian UI
-```
+
 
 ### Models and licences
 
@@ -382,7 +480,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 1020 tests, no network, no API key
+pytest          # 1069 tests, no network, no API key
 ruff check .
 ```
 

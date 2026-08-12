@@ -1,0 +1,250 @@
+"""One place that finds configuration, so no entry point has to remember to.
+
+The bug this exists to prevent: `main.py` called `load_dotenv()` and `cli.py`
+did not. A user who put `OPENAI_API_KEY` in `.env` and ran the new CLI got a
+credentials error from deep inside the semantic pass -- after every photograph
+had already been decoded -- and the run then carried on to a summary that looked
+like a success.
+
+Three rules follow from that:
+
+- **Loading happens once, at the entry point, before anything reads an
+  environment variable.** Not lazily inside the module that needs it, because
+  that is exactly how one caller ends up configured and another does not.
+
+- **The project `.env` is found relative to the source, not the shell.** A user
+  running `python /path/to/repo/cli.py` from their Pictures folder is still
+  running this project, and its `.env` is still the one that applies. A `.env`
+  in the working directory is also honoured, and the resolution order is
+  reported rather than guessed at.
+
+- **A real environment variable always wins.** `override=False` throughout: a
+  key exported for one command must not be silently replaced by a stale one in a
+  file.
+
+Nothing here ever logs, prints, or returns the key -- not its value, not its
+prefix, not its length. `credential_status()` returns where it came from and
+nothing else, because "sk-proj-abc…" in a bug report is still a leaked key.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ENV = PROJECT_ROOT / ".env"
+
+API_KEY_VAR = "OPENAI_API_KEY"
+MODEL_VAR = "OPENAI_MODEL"
+
+# The documented default. Overridable precisely because a model available to one
+# account is not available to another, and a hard-coded name that returns 404 is
+# indistinguishable to the user from a broken tool.
+DEFAULT_SEMANTIC_MODEL = "gpt-5.6-sol"
+
+_loaded_from: Path | None = None
+_load_attempted = False
+
+
+class CredentialSource(StrEnum):
+    ENVIRONMENT = "environment"
+    PROJECT_ENV = "project_env"
+    WORKING_DIR_ENV = "working_dir_env"
+    MISSING = "missing"
+
+
+@dataclass(frozen=True)
+class EnvironmentReport:
+    """What was loaded and from where. Never what the value is."""
+
+    loaded_files: tuple[Path, ...] = ()
+    key_present: bool = False
+    source: CredentialSource = CredentialSource.MISSING
+
+    @property
+    def env_path(self) -> Path | None:
+        return self.loaded_files[0] if self.loaded_files else None
+
+
+def load_project_environment(*, working_dir: Path | None = None) -> EnvironmentReport:
+    """Load `.env` files, then report where the API key came from.
+
+    Order, highest priority first:
+
+      1. a variable already set in the real environment
+      2. `<project root>/.env`
+      3. `<working directory>/.env`, when that is a different directory
+
+    `override=False` at every step, so nothing already set is replaced.
+    Idempotent: calling it from several entry points is harmless.
+    """
+    global _loaded_from, _load_attempted
+
+    key_was_in_environment = bool(os.environ.get(API_KEY_VAR, "").strip())
+
+    loaded: list[Path] = []
+    for candidate in _candidates(working_dir):
+        if _load_one(candidate):
+            loaded.append(candidate)
+
+    _load_attempted = True
+    _loaded_from = loaded[0] if loaded else None
+
+    if key_was_in_environment:
+        source = CredentialSource.ENVIRONMENT
+    elif os.environ.get(API_KEY_VAR, "").strip():
+        source = (
+            CredentialSource.PROJECT_ENV
+            if loaded and loaded[0] == PROJECT_ENV
+            else CredentialSource.WORKING_DIR_ENV
+        )
+    else:
+        source = CredentialSource.MISSING
+
+    return EnvironmentReport(
+        loaded_files=tuple(loaded),
+        key_present=source is not CredentialSource.MISSING,
+        source=source,
+    )
+
+
+def _candidates(working_dir: Path | None) -> list[Path]:
+    """Project root first, then the working directory if it differs."""
+    paths = [PROJECT_ENV]
+    cwd_env = (Path(working_dir) if working_dir else Path.cwd()).resolve() / ".env"
+    if cwd_env != PROJECT_ENV:
+        paths.append(cwd_env)
+    return paths
+
+
+def _load_one(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # pragma: no cover - python-dotenv is a hard dependency
+        logger.warning("python-dotenv is not installed; %s was not loaded", path.name)
+        return False
+    # override=False: an exported variable outranks anything in a file.
+    load_dotenv(path, override=False)
+    return True
+
+
+# --- credentials ------------------------------------------------------------
+
+
+def api_key() -> str | None:
+    """The key, or None. Callers pass it straight to the client and never log it."""
+    value = os.environ.get(API_KEY_VAR, "").strip()
+    return value or None
+
+
+def has_credentials() -> bool:
+    return api_key() is not None
+
+
+def credential_source() -> CredentialSource:
+    if not has_credentials():
+        return CredentialSource.MISSING
+    if _loaded_from is None:
+        return CredentialSource.ENVIRONMENT
+    return (
+        CredentialSource.PROJECT_ENV
+        if _loaded_from == PROJECT_ENV
+        else CredentialSource.WORKING_DIR_ENV
+    )
+
+
+def credential_status(language: str = "en") -> str:
+    """A one-line, key-free statement of where the credential came from."""
+    from i18n import t
+
+    source = credential_source()
+    if source is CredentialSource.MISSING:
+        return t("creds.missing", language)
+    if source is CredentialSource.ENVIRONMENT:
+        return t("creds.environment", language)
+    return t("creds.dotenv", language, path=str(_loaded_from))
+
+
+# --- model ------------------------------------------------------------------
+
+
+def resolve_model(cli_model: str | None = None) -> str:
+    """CLI, then `OPENAI_MODEL`, then the documented default.
+
+    The precedence is fixed here rather than at each call site so that the CLI
+    help, the README and the behaviour cannot drift apart.
+    """
+    if cli_model:
+        return cli_model
+    from_env = os.environ.get(MODEL_VAR, "").strip()
+    return from_env or DEFAULT_SEMANTIC_MODEL
+
+
+def model_source(cli_model: str | None = None) -> str:
+    if cli_model:
+        return "--model"
+    if os.environ.get(MODEL_VAR, "").strip():
+        return MODEL_VAR
+    return "default"
+
+
+# --- the client -------------------------------------------------------------
+
+
+class SemanticCredentialsMissing(RuntimeError):
+    """No API key. Raised before any file is decoded, never after."""
+
+
+class SemanticUnavailable(RuntimeError):
+    """The key exists but the API refused it, or the model is not reachable."""
+
+    def __init__(self, message: str, *, kind: str = "unknown") -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
+def make_client(*, api_key_override: str | None = None):
+    """Build an OpenAI client with the key passed explicitly.
+
+    Explicit rather than relying on the SDK to read the environment: that
+    implicit read is what made the original failure invisible until the client
+    was constructed, halfway through a long run.
+    """
+    key = api_key_override or api_key()
+    if not key:
+        raise SemanticCredentialsMissing(
+            f"{API_KEY_VAR} is not set in the environment or in a .env file"
+        )
+    import openai
+
+    return openai.OpenAI(api_key=key)
+
+
+def classify_api_error(error: Exception) -> tuple[str, str]:
+    """Turn an SDK exception into (kind, safe message).
+
+    The message is rebuilt rather than passed through, because an SDK error
+    string can quote the request -- including headers.
+    """
+    name = type(error).__name__
+    text = str(error).lower()
+
+    if "authenticationerror" in name.lower() or "invalid_api_key" in text or "401" in text:
+        return "authentication", "the API rejected the key"
+    if "permissiondenied" in name.lower() or "403" in text:
+        return "permission", "the key does not have access to this model"
+    if "notfound" in name.lower() or "404" in text or "does not exist" in text:
+        return "model_not_found", "the model does not exist or is not available to this key"
+    if "ratelimit" in name.lower() or "429" in text:
+        return "rate_limit", "the API rate limit was reached"
+    if any(word in name.lower() for word in ("connection", "timeout", "apiconnection")):
+        return "network", "the API could not be reached"
+    return "unknown", f"the API call failed ({name})"
