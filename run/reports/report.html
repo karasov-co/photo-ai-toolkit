@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>photo-ai-toolkit report</title>
+<style>
+:root { color-scheme: dark; }
+body { background:#141414; color:#e8e8e8; margin:0; padding:24px;
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+h1 { font-size:20px; margin:0 0 4px; }
+.disclaimer { color:#9a9a9a; font-size:12px; max-width:70ch; margin-bottom:20px; }
+.summary { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
+.stat { background:#1e1e1e; border-radius:8px; padding:10px 14px; min-width:120px; }
+.stat b { display:block; font-size:20px; }
+.stat span { color:#9a9a9a; font-size:12px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+.card { background:#1c1c1c; border-radius:10px; overflow:hidden; border:1px solid #2a2a2a; }
+.card img { width:100%; display:block; background:#000; aspect-ratio:3/2; object-fit:contain; }
+.card .body { padding:12px; }
+.name { font-weight:600; word-break:break-all; }
+.badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; color:#fff; }
+.scores { display:grid; grid-template-columns:1fr auto; gap:2px 10px; font-size:12px; margin:8px 0; }
+.scores .k { color:#9a9a9a; }
+.gain { color:#6fcf97; font-weight:600; }
+ul { margin:6px 0; padding-left:18px; font-size:12px; }
+.bad { color:#e08585; } .mid { color:#e0c185; } .ok { color:#85c8e0; }
+.ab { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:6px; margin:8px 0; }
+.ab figure { margin:0; }
+.ab img { width:100%; aspect-ratio:3/2; object-fit:cover; border-radius:4px; background:#000; }
+.ab figcaption { font-size:11px; color:#9a9a9a; text-align:center; padding-top:2px; }
+.keep { border-left:3px solid #6fcf97; padding-left:8px; margin:6px 0; font-size:12px; }
+.veto { border-left:3px solid #e08585; padding-left:8px; margin:6px 0; font-size:12px; color:#e0a5a5; }
+.bucket { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px;
+          background:#26323a; color:#9fd0e0; }
+.banner { background:#4a2020; border:1px solid #7a3030; border-radius:8px; padding:12px 16px;
+          margin-bottom:16px; }
+.banner b { display:block; font-size:15px; letter-spacing:0.04em; }
+.banner span { color:#e0b5b5; font-size:13px; }
+.stat[title] { cursor:help; border-bottom:1px dotted #555; }
+details summary { cursor:pointer; color:#9a9a9a; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>photo-ai-toolkit &mdash; 50 assets</h1>
+<p class="disclaimer">Режим анализа: локальный + semantic</p>
+<p class="disclaimer">Оценки — это рекомендации, а не гарантия художественного качества, приёмки на стоке или продаж. Определение релизов и прав носит справочный характер и не заменяет юридическую проверку. Правила стоков меняются, их нужно перепроверять.</p>
+<div class="summary"><div class="stat"><b>50</b><span>Всего файлов</span></div><div class="stat" title="Прошло технические пороги. Содержание, лица, логотипы и релизы могли не проверяться."><b>19</b><span>Технически пригодно, нужна проверка</span></div><div class="stat" title="Проверено полностью и готово к экспорту: содержание, лица, логотипы, релизы и метаданные. Требует semantic-анализа."><b>16</b><span>Полностью проверено и готово к экспорту</span></div><div class="stat"><b>47</b><span>Фотографий</span></div><div class="stat"><b>3</b><span>Видео</span></div><div class="stat"><b>8</b><span>Групп дублей</span></div><div class="stat"><b>1</b><span>Низкая уверенность</span></div><div class="stat"><b>16</b><span>Готово к загрузке на сток</span></div><div class="stat"><b>25</b><span>Нужен ручной просмотр</span></div><div class="stat"><b>11</b><span>Сильный сток</span></div><div class="stat"><b>6</b><span>Пригодно для стока</span></div><div class="stat"><b>4</b><span>Похожий кадр, сравнить вручную</span></div><div class="stat"><b>2</b><span>Брак / в отказ</span></div><div class="stat"><b>2</b><span>Флагман / портфолио</span></div></div>
+<div class="grid">
+<div class="card">
+<img src="../previews/P1019399_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019399.JPG</div>
+<span class="badge" style="background:#6b2e7a">Флагман / портфолио</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>79</div><div class="k">Текущее качество</div><div>58</div><div class="k">Реальный потенциал после обработки</div><div>73</div><div class="k">Стоковый потенциал</div><div>64</div><div class="k">Потенциал для портфолио</div><div>84</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+15</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 80/87/104</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_keep_and_edit</span></div><details><summary>why the tool held back</summary><ul><li>portfolio candidate; edit recipes generated</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.4 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>portfolio potential 84 clears the absolute floor and ranks near the top of its genre</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019389_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019389.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>77</div><div class="k">Текущее качество</div><div>87</div><div class="k">Реальный потенциал после обработки</div><div>89</div><div class="k">Стоковый потенциал</div><div>79</div><div class="k">Потенциал для портфолио</div><div>60</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 3.6</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 3 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 79 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019412_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019412.JPG</div>
+<span class="badge" style="background:#2e5a7a">Пригодно для стока</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>77</div><div class="k">Текущее качество</div><div>74</div><div class="k">Реальный потенциал после обработки</div><div>78</div><div class="k">Стоковый потенциал</div><div>56</div><div class="k">Потенциал для портфолио</div><div>83</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+4</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.1 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 3.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 56 is usable after the suggested edit</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019413_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019413.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>76</div><div class="k">Текущее качество</div><div>80</div><div class="k">Реальный потенциал после обработки</div><div>82</div><div class="k">Стоковый потенциал</div><div>40</div><div class="k">Потенциал для портфолио</div><div>86</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 1.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (82 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019417_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019417.JPG</div>
+<span class="badge" style="background:#6b2e7a">Флагман / портфолио</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>75</div><div class="k">Текущее качество</div><div>84</div><div class="k">Реальный потенциал после обработки</div><div>85</div><div class="k">Стоковый потенциал</div><div>30</div><div class="k">Потенциал для портфолио</div><div>89</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_keep_and_edit</span></div><details><summary>why the tool held back</summary><ul><li>portfolio candidate; edit recipes generated</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 2.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>portfolio potential 89 clears the absolute floor and ranks near the top of its genre</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019407_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019407.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>74</div><div class="k">Текущее качество</div><div>83</div><div class="k">Реальный потенциал после обработки</div><div>85</div><div class="k">Стоковый потенциал</div><div>94</div><div class="k">Потенциал для портфолио</div><div>39</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 106/112/125</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 3.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 94 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019416_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019416.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>74</div><div class="k">Текущее качество</div><div>87</div><div class="k">Реальный потенциал после обработки</div><div>88</div><div class="k">Стоковый потенциал</div><div>33</div><div class="k">Потенциал для портфолио</div><div>78</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 0.8° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (88 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019368_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019368.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>73</div><div class="k">Текущее качество</div><div>78</div><div class="k">Реальный потенциал после обработки</div><div>79</div><div class="k">Стоковый потенциал</div><div>82</div><div class="k">Потенциал для портфолио</div><div>51</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 110/122/134</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Straighten: rotate 7.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 82 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019387_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019387.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>73</div><div class="k">Текущее качество</div><div>87</div><div class="k">Реальный потенциал после обработки</div><div>88</div><div class="k">Стоковый потенциал</div><div>85</div><div class="k">Потенциал для портфолио</div><div>46</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 7.2</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.2 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 85 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019405_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019405.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>73</div><div class="k">Текущее качество</div><div>80</div><div class="k">Реальный потенциал после обработки</div><div>83</div><div class="k">Стоковый потенциал</div><div>85</div><div class="k">Потенциал для портфолио</div><div>44</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+3</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 4.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 85 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019406_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019406.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>71</div><div class="k">Текущее качество</div><div>79</div><div class="k">Реальный потенциал после обработки</div><div>81</div><div class="k">Стоковый потенциал</div><div>75</div><div class="k">Потенциал для портфолио</div><div>47</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 6.8° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 75 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019382_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019382.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>70</div><div class="k">Текущее качество</div><div>70</div><div class="k">Реальный потенциал после обработки</div><div>76</div><div class="k">Стоковый потенциал</div><div>44</div><div class="k">Потенциал для портфолио</div><div>75</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+6</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 90/99/112</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 3.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (76 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019388_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019388.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>70</div><div class="k">Текущее качество</div><div>87</div><div class="k">Реальный потенциал после обработки</div><div>88</div><div class="k">Стоковый потенциал</div><div>80</div><div class="k">Потенциал для портфолио</div><div>40</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 7.2</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 2 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.2 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 80 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019395_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019395.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>70</div><div class="k">Текущее качество</div><div>70</div><div class="k">Реальный потенциал после обработки</div><div>77</div><div class="k">Стоковый потенциал</div><div>89</div><div class="k">Потенциал для портфолио</div><div>39</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+7</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 96/106/115</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.2 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 5.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 89 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019414_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019414.JPG</div>
+<span class="badge" style="background:#2e5a7a">Пригодно для стока</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>70</div><div class="k">Текущее качество</div><div>84</div><div class="k">Реальный потенциал после обработки</div><div>85</div><div class="k">Стоковый потенциал</div><div>62</div><div class="k">Потенциал для портфолио</div><div>64</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 0.8° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 62 is usable after the suggested edit</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019373_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019373.JPG</div>
+<span class="badge" style="background:#2e5a7a">Пригодно для стока</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>69</div><div class="k">Текущее качество</div><div>53</div><div class="k">Реальный потенциал после обработки</div><div>73</div><div class="k">Стоковый потенциал</div><div>65</div><div class="k">Потенциал для портфолио</div><div>53</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+20</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>underexposed: mean luma 68</li><li>color_cast: channel means 61/69/82</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.8 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Crop: 16:9 crop -- keep 84% of the frame (x 0-512, y 0-288 of the working image)</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 65 is usable after the suggested edit</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019409_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019409.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>69</div><div class="k">Текущее качество</div><div>73</div><div class="k">Реальный потенциал после обработки</div><div>75</div><div class="k">Стоковый потенциал</div><div>42</div><div class="k">Потенциал для портфолио</div><div>71</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 3.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (75 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019415_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019415.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>69</div><div class="k">Текущее качество</div><div>84</div><div class="k">Реальный потенциал после обработки</div><div>85</div><div class="k">Стоковый потенциал</div><div>37</div><div class="k">Потенциал для портфолио</div><div>75</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+1</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 2 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 1.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (85 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019379_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019379.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>68</div><div class="k">Текущее качество</div><div>71</div><div class="k">Реальный потенциал после обработки</div><div>77</div><div class="k">Стоковый потенциал</div><div>21</div><div class="k">Потенциал для портфолио</div><div>87</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+6</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 1.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (77 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces and logos present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019396_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019396.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>68</div><div class="k">Текущее качество</div><div>75</div><div class="k">Реальный потенциал после обработки</div><div>79</div><div class="k">Стоковый потенциал</div><div>33</div><div class="k">Потенциал для портфолио</div><div>72</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+4</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 3.1</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.4 EV</li><li>Recover highlights and lift shadows: moderate</li><li>Straighten: rotate 3.8° anticlockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (79 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019376_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019376.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>67</div><div class="k">Текущее качество</div><div>75</div><div class="k">Реальный потенциал после обработки</div><div>83</div><div class="k">Стоковый потенциал</div><div>28</div><div class="k">Потенциал для портфолио</div><div>76</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+8</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_clipped_highlights: 6.7%</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 4.7</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_archive</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>confident: discard confidence 0.50 below 0.93</li><li>not_shadow_mode: shadow mode: recording what would happen, moving nothing</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (83 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces and logos present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019404_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019404.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>67</div><div class="k">Текущее качество</div><div>60</div><div class="k">Реальный потенциал после обработки</div><div>71</div><div class="k">Стоковый потенциал</div><div>22</div><div class="k">Потенциал для портфолио</div><div>82</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+11</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 5.7</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_archive</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>confident: discard confidence 0.50 below 0.93</li><li>not_shadow_mode: shadow mode: recording what would happen, moving nothing</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.6 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (71 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019383_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019383.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>66</div><div class="k">Текущее качество</div><div>64</div><div class="k">Реальный потенциал после обработки</div><div>74</div><div class="k">Стоковый потенциал</div><div>27</div><div class="k">Потенциал для портфолио</div><div>84</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+10</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 84/94/109</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 3 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 7.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (74 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019402_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019402.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>66</div><div class="k">Текущее качество</div><div>58</div><div class="k">Реальный потенциал после обработки</div><div>68</div><div class="k">Стоковый потенциал</div><div>34</div><div class="k">Потенциал для портфолио</div><div>73</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+10</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 6.8</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.7 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Crop: 16:9 crop -- keep 84% of the frame (x 0-512, y 53-341 of the working image)</li><li>Straighten: rotate 1.8° anticlockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (68 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019403_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019403.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>66</div><div class="k">Текущее качество</div><div>59</div><div class="k">Реальный потенциал после обработки</div><div>69</div><div class="k">Стоковый потенциал</div><div>37</div><div class="k">Потенциал для портфолио</div><div>69</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+10</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 6.9</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.7 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Crop: 16:9 crop -- keep 84% of the frame (x 0-512, y 53-341 of the working image)</li><li>Straighten: rotate 1.2° anticlockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (69 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019377_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019377.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>65</div><div class="k">Текущее качество</div><div>75</div><div class="k">Реальный потенциал после обработки</div><div>83</div><div class="k">Стоковый потенциал</div><div>30</div><div class="k">Потенциал для портфолио</div><div>69</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+8</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_clipped_highlights: 6.7%</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 4.8</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 2 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 0.8° anticlockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (83 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces and logos present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019381_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019381.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>65</div><div class="k">Текущее качество</div><div>69</div><div class="k">Реальный потенциал после обработки</div><div>76</div><div class="k">Стоковый потенциал</div><div>22</div><div class="k">Потенциал для портфолио</div><div>77</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+7</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 88/96/107</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 5.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (76 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces and logos present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019397_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019397.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>65</div><div class="k">Текущее качество</div><div>80</div><div class="k">Реальный потенциал после обработки</div><div>85</div><div class="k">Стоковый потенциал</div><div>29</div><div class="k">Потенциал для портфолио</div><div>59</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+5</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.2 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 1.8° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (85 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019384_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019384.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>63</div><div class="k">Текущее качество</div><div>64</div><div class="k">Реальный потенциал после обработки</div><div>74</div><div class="k">Стоковый потенциал</div><div>24</div><div class="k">Потенциал для портфолио</div><div>77</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+10</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 84/94/109</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 6.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (74 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019378_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019378.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>62</div><div class="k">Текущее качество</div><div>69</div><div class="k">Реальный потенциал после обработки</div><div>78</div><div class="k">Стоковый потенциал</div><div>25</div><div class="k">Потенциал для портфолио</div><div>63</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+9</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_clipped_highlights: 7.9%</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 3.4</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_archive</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>confident: discard confidence 0.50 below 0.93</li><li>not_shadow_mode: shadow mode: recording what would happen, moving nothing</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (78 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces and logos present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019392_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019392.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>61</div><div class="k">Текущее качество</div><div>59</div><div class="k">Реальный потенциал после обработки</div><div>67</div><div class="k">Стоковый потенциал</div><div>82</div><div class="k">Потенциал для портфолио</div><div>27</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+8</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>underexposed: mean luma 67</li><li>mild_noise: sigma 6.8</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.8 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Straighten: rotate 5.8° anticlockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 82 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019394_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019394.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>61</div><div class="k">Текущее качество</div><div>65</div><div class="k">Реальный потенциал после обработки</div><div>76</div><div class="k">Стоковый потенциал</div><div>40</div><div class="k">Потенциал для портфолио</div><div>50</div><div class="k">Уверенность оценки</div><div>82</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+11</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_clipped_highlights: 7.3%</li><li>heavy_noise: sigma 9.9</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 104/102/87</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.2 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Straighten: rotate 4.8° clockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (76 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019410_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019410.JPG</div>
+<span class="badge" style="background:#2e5a7a">Пригодно для стока</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>61</div><div class="k">Текущее качество</div><div>74</div><div class="k">Реальный потенциал после обработки</div><div>76</div><div class="k">Стоковый потенциал</div><div>48</div><div class="k">Потенциал для портфолио</div><div>52</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 1.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 48 is usable after the suggested edit</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019380_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019380.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>60</div><div class="k">Текущее качество</div><div>67</div><div class="k">Реальный потенциал после обработки</div><div>74</div><div class="k">Стоковый потенциал</div><div>19</div><div class="k">Потенциал для портфолио</div><div>66</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+7</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 91/100/115</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 0.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (74 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces and logos present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019386_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019386.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>60</div><div class="k">Текущее качество</div><div>72</div><div class="k">Реальный потенциал после обработки</div><div>78</div><div class="k">Стоковый потенциал</div><div>29</div><div class="k">Потенциал для портфолио</div><div>53</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+6</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 89/98/110</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 0.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (78 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019390_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019390.JPG</div>
+<span class="badge" style="background:#5a4a7a">Похожий кадр, сравнить вручную</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>60</div><div class="k">Текущее качество</div><div>71</div><div class="k">Реальный потенциал после обработки</div><div>78</div><div class="k">Стоковый потенциал</div><div>70</div><div class="k">Потенциал для портфолио</div><div>46</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+7</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>weaker_duplicate: a sharper frame exists in cluster P1019389.JPG (quality 16 points higher)</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 6.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>a sharper frame exists in this group (16 points higher); compare them by hand</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019401_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019401.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>60</div><div class="k">Текущее качество</div><div>59</div><div class="k">Реальный потенциал после обработки</div><div>70</div><div class="k">Стоковый потенциал</div><div>30</div><div class="k">Потенциал для портфолио</div><div>61</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+11</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>mild_noise: sigma 4.5</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 2 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.6 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 0.8° clockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (70 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019408_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019408.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>60</div><div class="k">Текущее качество</div><div>72</div><div class="k">Реальный потенциал после обработки</div><div>74</div><div class="k">Стоковый потенциал</div><div>43</div><div class="k">Потенциал для портфолио</div><div>46</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_archive</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>confident: discard confidence 0.50 below 0.93</li><li>not_shadow_mode: shadow mode: recording what would happen, moving nothing</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (74 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019391_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019391.JPG</div>
+<span class="badge" style="background:#5a4a7a">Похожий кадр, сравнить вручную</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>59</div><div class="k">Текущее качество</div><div>77</div><div class="k">Реальный потенциал после обработки</div><div>82</div><div class="k">Стоковый потенциал</div><div>56</div><div class="k">Потенциал для портфолио</div><div>53</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+5</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>weaker_duplicate: a sharper frame exists in cluster P1019389.JPG (quality 10 points higher)</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_archive</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>confident: discard confidence 0.50 below 0.93</li><li>not_shadow_mode: shadow mode: recording what would happen, moving nothing</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.2 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>a sharper frame exists in this group (10 points higher); compare them by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019411_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019411.JPG</div>
+<span class="badge" style="background:#2e5a7a">Пригодно для стока</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>59</div><div class="k">Текущее качество</div><div>74</div><div class="k">Реальный потенциал после обработки</div><div>76</div><div class="k">Стоковый потенциал</div><div>50</div><div class="k">Потенциал для портфолио</div><div>44</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+2</div></div>
+
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 2 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 50 is usable after the suggested edit</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019385_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019385.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>57</div><div class="k">Текущее качество</div><div>63</div><div class="k">Реальный потенциал после обработки</div><div>73</div><div class="k">Стоковый потенциал</div><div>22</div><div class="k">Потенциал для портфолио</div><div>60</div><div class="k">Уверенность оценки</div><div>87</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+10</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 85/94/111</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.3 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 2.2° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (73 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019393_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019393.JPG</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>56</div><div class="k">Текущее качество</div><div>56</div><div class="k">Реальный потенциал после обработки</div><div>64</div><div class="k">Стоковый потенциал</div><div>33</div><div class="k">Потенциал для портфолио</div><div>51</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+8</div></div>
+<div class="ok">Исправимые проблемы:</div><ul><li>underexposed: mean luma 63</li><li>mild_noise: sigma 6.6</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.9 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Straighten: rotate 7.2° anticlockwise</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (64 potential) but below the stock floor (45): keep for the archive or decide by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019371_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019371.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>55</div><div class="k">Текущее качество</div><div>22</div><div class="k">Реальный потенциал после обработки</div><div>49</div><div class="k">Стоковый потенциал</div><div>73</div><div class="k">Потенциал для портфолио</div><div>30</div><div class="k">Уверенность оценки</div><div>82</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+27</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_crushed_shadows: 18.9%</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 67/78/97</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.6 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 6.2° anticlockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 73 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019372_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019372.JPG</div>
+<span class="badge" style="background:#2e7a55">Сильный сток</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>55</div><div class="k">Текущее качество</div><div>24</div><div class="k">Реальный потенциал после обработки</div><div>50</div><div class="k">Стоковый потенциал</div><div>77</div><div class="k">Потенциал для портфолио</div><div>28</div><div class="k">Уверенность оценки</div><div>82</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+26</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_crushed_shadows: 18.2%</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 68/78/98</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">auto_stock_candidate</span></div><details><summary>why the tool held back</summary><ul><li>clears the stock thresholds</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.6 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 77 is strong</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019370_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019370.JPG</div>
+<span class="badge" style="background:#2e5a7a">Пригодно для стока</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>53</div><div class="k">Текущее качество</div><div>28</div><div class="k">Реальный потенциал после обработки</div><div>55</div><div class="k">Стоковый потенциал</div><div>67</div><div class="k">Потенциал для портфолио</div><div>29</div><div class="k">Уверенность оценки</div><div>82</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+27</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_crushed_shadows: 18.9%</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>color_cast: channel means 71/82/99</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">burst_winner</span></div><details><summary>why the tool held back</summary><ul><li>strongest of 2 near-identical frames</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.6 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Straighten: rotate 2.8° clockwise</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>stock potential 67 is usable after the suggested edit</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019400_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019400.JPG</div>
+<span class="badge" style="background:#5a4a7a">Похожий кадр, сравнить вручную</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>45</div><div class="k">Текущее качество</div><div>41</div><div class="k">Реальный потенциал после обработки</div><div>54</div><div class="k">Стоковый потенциал</div><div>19</div><div class="k">Потенциал для портфолио</div><div>58</div><div class="k">Уверенность оценки</div><div>92</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+13</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>weaker_duplicate: a sharper frame exists in cluster P1019401.JPG (quality 17 points higher)</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>underexposed: mean luma 59</li><li>mild_noise: sigma 3.8</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +1.0 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Add contrast: restrained S-curve</li><li>Apply luminance denoise: restrained</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, 123RF, Adobe Stock, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>a sharper frame exists in this group (17 points higher); compare them by hand</li><li>faces present: a release is required, so commercial stock is blocked in code</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019369_jpg.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019369.JPG</div>
+<span class="badge" style="background:#5a4a7a">Похожий кадр, сравнить вручную</span>
+<span class="badge" style="background:#333">Коммерческое</span>
+<div class="scores"><div class="k">Итог</div><div>37</div><div class="k">Текущее качество</div><div>17</div><div class="k">Реальный потенциал после обработки</div><div>45</div><div class="k">Стоковый потенциал</div><div>55</div><div class="k">Потенциал для портфолио</div><div>18</div><div class="k">Уверенность оценки</div><div>82</div><div class="k">Ожидаемый реальный прирост</div><div class="gain">+28</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>some_crushed_shadows: 22.9%</li><li>weaker_duplicate: a sharper frame exists in cluster P1019370.JPG (quality 11 points higher)</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>underexposed: mean luma 70</li><li>color_cast: channel means 61/71/88</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>held back: enough_decisions (0 decisions recorded; 1000 needed before a personal model may move a file)</li><li>enough_decisions: 0 decisions recorded; 1000 needed before a personal model may move a file</li><li>model_committed: only 0 decisions recorded</li><li>holdout_validated: 0 holdout checks; 3000 needed to bound the false-trash rate below 0.1%</li><li>no_artistic_rescue: an artistic, emotional or documentary signal is present</li><li>confident: discard confidence 0.50 below 0.93</li></ul></details></details>
+<details><summary>Рекомендуемая обработка</summary><ul><li>Adjust exposure: +0.8 EV</li><li>Correct white balance: neutralise the cast, damped</li><li>Recover highlights and lift shadows: moderate</li><li>Crop: 16:9 crop -- keep 84% of the frame (x 0-512, y 0-288 of the working image)</li><li>Do not apply aggressive sharpening: halos cost more than they buy</li></ul></details>
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: 123RF, Adobe Stock, Alamy, Depositphotos</div>
+
+<details><summary>Почему такой класс</summary><ul>
+<li>a sharper frame exists in this group (11 points higher); compare them by hand</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019375_mp4.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019375.MP4</div>
+<span class="badge" style="background:#7a682e">Нужен ручной просмотр</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>35</div><div class="k">Текущее качество</div><div>34</div><div class="k">Реальный потенциал после обработки</div><div>34</div><div class="k">Стоковый потенциал</div><div>23</div><div class="k">Потенциал для портфолио</div><div>18</div><div class="k">Уверенность оценки</div><div>62</div></div>
+<div class="mid">Частично исправимые проблемы:</div><ul><li>exposure_drift: flicker sigma 10.4</li></ul><div class="ok">Исправимые проблемы:</div><ul><li>needs_trim: usable body is 10.3-13.4s (3.0s)</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">curatorial_review</span></div><details><summary>why the tool held back</summary><ul><li>curatorial uncertainty 80</li></ul></details></details>
+
+<div style="font-size:12px;color:#9a9a9a">Рекомендуемые стоки: Alamy, Adobe Stock, 123RF, Depositphotos</div>
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared<br>Provenance undeclared: confirm this is a camera original</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>recoverable (34 potential) but below the stock floor (40): keep for the archive or decide by hand</li><li>release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019374_mp4.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019374.MP4</div>
+<span class="badge" style="background:#7a2e2e">Брак / в отказ</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>21</div><div class="k">Текущее качество</div><div>67</div><div class="k">Реальный потенциал после обработки</div><div>14</div><div class="k">Стоковый потенциал</div><div>10</div><div class="k">Потенциал для портфолио</div><div>3</div><div class="k">Уверенность оценки</div><div>62</div></div>
+<div class="bad">Неисправимые проблемы:</div><ul><li>unusable_duration: 2.5s is below 3.0s</li><li>no_usable_segment: no run of 3.0s meets the quality floor</li></ul><div class="mid">Частично исправимые проблемы:</div><ul><li>exposure_drift: luma swings 71</li><li>exposure_drift: flicker sigma 12.4</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">safe_quarantine_candidate</span></div><details><summary>why the tool held back</summary><ul><li>demonstrable technical failure: no_usable_segment,unusable_duration</li></ul></details></details>
+
+
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared<br>Provenance undeclared: confirm this is a camera original</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>unrecoverable: no_usable_segment: no run of 3.0s meets the quality floor</li><li>release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done</li>
+</ul></details>
+</div></div><div class="card">
+<img src="../previews/P1019398_mp4.jpg" alt="" loading="lazy">
+<div class="body">
+<div class="name">P1019398.MP4</div>
+<span class="badge" style="background:#7a2e2e">Брак / в отказ</span>
+<span class="badge" style="background:#333">Только редакционное</span>
+<div class="scores"><div class="k">Итог</div><div>12</div><div class="k">Текущее качество</div><div>1</div><div class="k">Реальный потенциал после обработки</div><div>1</div><div class="k">Стоковый потенциал</div><div>1</div><div class="k">Потенциал для портфолио</div><div>0</div><div class="k">Уверенность оценки</div><div>12</div></div>
+<div class="bad">Неисправимые проблемы:</div><ul><li>unusable_duration: 1.0s is below 3.0s</li><li>no_usable_segment: no run of 3.0s meets the quality floor</li></ul>
+<details open><summary>Darkroom</summary><div><span class="bucket">safe_quarantine_candidate</span></div><details><summary>why the tool held back</summary><ul><li>demonstrable technical failure: no_usable_segment,unusable_duration</li></ul></details></details>
+
+
+<div class="bad" style="font-size:12px">Model release required before commercial licensing<br>Readable trademark present: editorial only unless cleared<br>Provenance undeclared: confirm this is a camera original</div>
+<details><summary>Почему такой класс</summary><ul>
+<li>unrecoverable: no_usable_segment: no run of 3.0s meets the quality floor</li><li>release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done</li>
+</ul></details>
+</div></div>
+</div>
+</body>
+</html>

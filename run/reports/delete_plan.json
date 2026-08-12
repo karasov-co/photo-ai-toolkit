@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-12T11:16:45+00:00",
+  "note": "Nothing has been removed. Review contact_sheet_delete.jpg first.",
+  "candidates": [
+    {
+      "asset_key": "P1019374.MP4",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4"
+      ],
+      "checksum": "bde02955294d735dc62e710f99db2b83d7eafee1806e9c22e94cbf2c0e335667",
+      "reason": "unrecoverable: no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "no_usable_segment,unusable_duration"
+    },
+    {
+      "asset_key": "P1019398.MP4",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4"
+      ],
+      "checksum": "dd2670889d0ef6a3e22bf16cae238175acbac86acba5d878ec42ac644a7e3ee0",
+      "reason": "unrecoverable: no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "no_usable_segment,unusable_duration"
+    }
+  ]
+}

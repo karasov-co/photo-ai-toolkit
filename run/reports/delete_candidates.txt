@@ -1,0 +1,8 @@
+# Proposed deletions. Nothing has been removed.
+# Look at contact_sheet_delete.jpg before acting on this.
+# 2 candidate(s).
+# Paths are JSON-encoded so a newline or a quote in a filename cannot
+# break a line or be mistaken for shell syntax.
+
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4"	unrecoverable: no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4"	unrecoverable: no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done

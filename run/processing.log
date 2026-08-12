@@ -1,0 +1,8 @@
+2026-08-12 14:39:20,218 [ERROR] pipeline: Semantic pass failed, continuing without it: Missing credentials. Please pass an `api_key`, `workload_identity`, `admin_api_key`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.
+2026-08-12 18:15:23,402 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-12 18:15:38,831 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-12 18:16:01,419 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-12 18:16:22,691 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-12 18:16:40,095 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-12 18:16:45,398 [ERROR] quarantine: Refusing to plan /Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4: /Users/vitaliikarasov/Desktop/photo-ai-toolkit/run/trash_quarantine/P1019374.MP4 resolves outside /Users/vitaliikarasov/Desktop/photo-ai-toolkit/run/trash_quarantine
+2026-08-12 18:16:45,398 [ERROR] quarantine: Refusing to plan /Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4: /Users/vitaliikarasov/Desktop/photo-ai-toolkit/run/trash_quarantine/P1019398.MP4 resolves outside /Users/vitaliikarasov/Desktop/photo-ai-toolkit/run/trash_quarantine

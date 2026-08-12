@@ -1,0 +1,1007 @@
+{
+  "observations": [
+    {
+      "asset_id": "358b10c03c692506",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "31695f85aaae438e",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "c278d9ef8d9310aa",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "4d6887b4fd8c54e0",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "e1a203f8aa1a11f0",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "302c709f1c829047",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "bde02955294d735d",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "74d9f1d25e12d419",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "7d3272235b70fb32",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "614aad72d812a4f6",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "5e93b41486ab9851",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "5f810c2f87c72a6e",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "3ac63c6bf67f5735",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "9736e50457d36434",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "daf4189a22a7aa8f",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "f598c7c6dd85b3cd",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "b0a2c865e63b7118",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "44b7bbfb5abae3b4",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "d0fcb0e001442189",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "9839c4b93394468d",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "4719676928f11af3",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "64d83587a20cd8b1",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "de86098529959181",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "29f23147e849e2f9",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "a372c84182338c6a",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "1bc8de7ca99f2a6a",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "e1f54b9c4a15f9ca",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "55c6fe3df0d599b4",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "fdbb0848d64a11c8",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "6ff3d6e2066ed3ba",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "dd2670889d0ef6a3",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "d7d2f3431b0ee843",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "0894da92a9dc580e",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "83ed13f01fcb16ab",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "5ca42b3f798bb5a7",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "2c18354a9f7bc862",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "b72e456e93b6c5ce",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "72185a6a78a45508",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "13e83009110f001f",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "ddee25b7e3d4825a",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "d3a2b0862d11d836",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "fa0223926ba818e1",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "b612e6d26ec88c63",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "8a1b574ca54289de",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "018b05ea094e42aa",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "7692f5a3feea9706",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "b2a0fed18722a70b",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "67b0fe00b73a8da4",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "632d6ef0b9fe01a9",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "d8a826c3608e7af4",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "other",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T07:39:25+00:00"
+    },
+    {
+      "asset_id": "358b10c03c692506",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "31695f85aaae438e",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "c278d9ef8d9310aa",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "4d6887b4fd8c54e0",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "e1a203f8aa1a11f0",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "302c709f1c829047",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "bde02955294d735d",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "unknown",
+      "camera": "",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "74d9f1d25e12d419",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "unknown",
+      "camera": "",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "7d3272235b70fb32",
+      "predicted": "auto_archive",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "reportage",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "614aad72d812a4f6",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "reportage",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "5e93b41486ab9851",
+      "predicted": "auto_archive",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "reportage",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "5f810c2f87c72a6e",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "3ac63c6bf67f5735",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "9736e50457d36434",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "daf4189a22a7aa8f",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "f598c7c6dd85b3cd",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "b0a2c865e63b7118",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "44b7bbfb5abae3b4",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "d0fcb0e001442189",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "9839c4b93394468d",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "architecture",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "4719676928f11af3",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "architecture",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "64d83587a20cd8b1",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "de86098529959181",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "29f23147e849e2f9",
+      "predicted": "auto_archive",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "architecture",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "a372c84182338c6a",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "1bc8de7ca99f2a6a",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "e1f54b9c4a15f9ca",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "55c6fe3df0d599b4",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "fdbb0848d64a11c8",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "6ff3d6e2066ed3ba",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "dd2670889d0ef6a3",
+      "predicted": "safe_quarantine_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "unknown",
+      "camera": "",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "d7d2f3431b0ee843",
+      "predicted": "auto_keep_and_edit",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "reportage",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "0894da92a9dc580e",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "83ed13f01fcb16ab",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "5ca42b3f798bb5a7",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "2c18354a9f7bc862",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "b72e456e93b6c5ce",
+      "predicted": "auto_archive",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "72185a6a78a45508",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "13e83009110f001f",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "ddee25b7e3d4825a",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "landscape",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "d3a2b0862d11d836",
+      "predicted": "auto_archive",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "fa0223926ba818e1",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "b612e6d26ec88c63",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "8a1b574ca54289de",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "018b05ea094e42aa",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "7692f5a3feea9706",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "b2a0fed18722a70b",
+      "predicted": "auto_stock_candidate",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "67b0fe00b73a8da4",
+      "predicted": "burst_winner",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "632d6ef0b9fe01a9",
+      "predicted": "curatorial_review",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    },
+    {
+      "asset_id": "d8a826c3608e7af4",
+      "predicted": "auto_keep_and_edit",
+      "actual": "",
+      "confidence": 0.0,
+      "in_distribution": true,
+      "genre": "portrait",
+      "camera": "Panasonic DC-S5M2",
+      "at": "2026-08-12T11:16:45+00:00"
+    }
+  ],
+  "automation_enabled": false,
+  "disabled_reason": "",
+  "updated_at": "2026-08-12T11:16:45+00:00"
+}
