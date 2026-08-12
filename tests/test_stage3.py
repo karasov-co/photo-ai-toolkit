@@ -300,10 +300,10 @@ def test_an_incidental_face_does_not_gate_a_landscape():
 
 
 def test_a_deliberate_expression_can_override_the_eye_gate():
-    """Said explicitly by the artistic read, never inferred from a high score."""
+    """Claimed in the structured field, never inferred from a high score."""
     assessment = stage3.parse_assessment(
         artistic_payload(
-            artistic_reasoning="the closed eyes are deliberate; the subject is listening",
+            intent_reading={"closed eyes": "deliberate"},
             portrait=portrait_payload(
                 eyes_state="CLOSED", expression="NEUTRAL",
                 expression_quality=80, expression_confidence=85,
@@ -311,6 +311,36 @@ def test_a_deliberate_expression_can_override_the_eye_gate():
         )
     )
     assert not any("eyes are closed" in b for b in stage3.hero_blockers(assessment))
+
+
+def test_the_word_deliberate_in_the_prose_does_not_override_anything():
+    """A real reply: "it does not clearly read as deliberate ... may be mid-speech".
+
+    The keyword search that used to back this override matched that sentence and
+    waved the frame through. Negation is invisible to a substring test, which is
+    why the claim has to arrive in a field.
+    """
+    assessment = stage3.parse_assessment(
+        artistic_payload(
+            artistic_reasoning=(
+                "That awkwardness adds tension, though it does not clearly read as "
+                "deliberate and may simply be mid-speech."
+            ),
+            portrait=portrait_payload(
+                eyes_state="CLOSED", expression="NEUTRAL",
+                expression_quality=80, expression_confidence=85,
+            ),
+        )
+    )
+    assert not assessment.says_deliberate
+    assert any("eyes are closed" in b for b in stage3.hero_blockers(assessment))
+
+
+def test_an_accidental_intent_reading_is_not_a_deliberate_one():
+    assessment = stage3.parse_assessment(
+        artistic_payload(intent_reading={"blur": "accidental", "tilt": "cannot_tell"})
+    )
+    assert not assessment.says_deliberate
 
 
 def test_a_high_aesthetic_score_alone_does_not_override_the_eye_gate():
@@ -329,10 +359,29 @@ def test_a_high_aesthetic_score_alone_does_not_override_the_eye_gate():
 
 def test_a_confident_bad_expression_is_a_decision_not_a_review():
     verdict, reason = stage3.portrait_verdict(
-        parsed_portrait(expression="GRIMACE", expression_quality=15, expression_confidence=88)
+        parsed_portrait(
+            expression="GRIMACE", expression_quality=15,
+            portrait_publishability=12, expression_confidence=88,
+        )
     )
     assert verdict == "reject"
     assert "confident" in reason
+
+
+def test_an_unflattering_expression_is_not_a_rejection():
+    """Real numbers from the archive: AWKWARD, quality 47, publishability 51.
+
+    Declining to promote a frame costs nothing, so a label is enough for that.
+    Writing one off costs the photograph, so it takes the model's own numbers --
+    and here they say "not especially flattering", not "unusable".
+    """
+    assessment = parsed_portrait(
+        expression="AWKWARD", expression_quality=47,
+        portrait_publishability=51, expression_confidence=76,
+    )
+    assert stage3.portrait_verdict(assessment)[0] == "keep"
+    # Still not promotable, on the strength of the label alone.
+    assert any("awkward" in b for b in stage3.hero_blockers(assessment))
 
 
 def test_an_uncertain_expression_is_the_kind_worth_a_persons_time():
@@ -677,3 +726,150 @@ def test_a_new_prompt_version_invalidates_the_cache(archive, tmp_path, monkeypat
     monkeypatch.setattr(stage3, "PROMPT_VERSION", stage3.PROMPT_VERSION + "-next")
     run(archive, tmp_path, client)
     assert client.responses.stage3_calls > first
+
+
+# --- truncation ---------------------------------------------------------------
+#
+# Found by running against the archive: the per-frame token budget was under
+# half what a frame actually costs, groups of six truncated mid-JSON, and the
+# retry sent the identical request twice more.
+
+
+class _Truncated:
+    status = "incomplete"
+    output_text = '[{"n": 1, "emotional_res'
+
+
+class _TruncatingResponses:
+    """Truncates any group larger than `fits`, answers cleanly at or below it."""
+
+    def __init__(self, fits: int):
+        self.fits = fits
+        self.budgets: list[int] = []
+        self.group_sizes: list[int] = []
+
+    def create(self, **kwargs):
+        content = kwargs["input"][0]["content"]
+        size = sum(1 for block in content if block.get("type") == "input_image")
+        self.budgets.append(kwargs["max_output_tokens"])
+        self.group_sizes.append(size)
+        if size > self.fits:
+            return _Truncated()
+        return _Reply(stage3_replies(size))
+
+
+def _stage3_frames(count):
+    return [{"key": f"f{i}.jpg", "views": [("full frame", "AA")], "encoded": "AA"} for i in range(count)]
+
+
+def test_a_truncated_reply_splits_the_group_instead_of_repeating_it():
+    import pipeline
+
+    responses = _TruncatingResponses(fits=2)
+    out = pipeline._stage3_call(
+        _stage3_frames(4), model="m",
+        client=type("C", (), {"responses": responses})(), stage3_module=stage3,
+    )
+    assert len(out) == 4
+    assert all(a.completed for a in out.values())
+    assert min(responses.group_sizes) <= 2
+
+
+def test_a_single_frame_that_truncates_gets_a_wider_budget():
+    import pipeline
+
+    responses = _TruncatingResponses(fits=0)
+    pipeline._stage3_call(
+        _stage3_frames(1), model="m",
+        client=type("C", (), {"responses": responses})(), stage3_module=stage3,
+    )
+    assert responses.budgets[-1] > responses.budgets[0]
+
+
+def test_widening_the_budget_is_bounded():
+    import pipeline
+
+    responses = _TruncatingResponses(fits=0)
+    out = pipeline._stage3_call(
+        _stage3_frames(1), model="m",
+        client=type("C", (), {"responses": responses})(), stage3_module=stage3,
+    )
+    assert all(a.status == "failed" for a in out.values())
+    assert max(responses.budgets) <= (
+        pipeline.STAGE3_BUDGET_LIMIT
+        * (prompts.STAGE3_BASE_OUTPUT_TOKENS + prompts.STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME)
+    )
+
+
+def test_the_budget_covers_what_a_frame_actually_costs():
+    """Measured live at ~315 output tokens per frame with no portrait block."""
+    assert prompts.STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME >= 400
+    assert prompts.STAGE3_BASE_OUTPUT_TOKENS >= 600
+
+
+def test_truncation_is_told_apart_from_prose():
+    import pipeline
+
+    assert pipeline._truncated(_Truncated())
+    assert not pipeline._truncated(_Reply("I could not analyse these"))
+
+
+# --- a near-ranking is repaired, not discarded --------------------------------
+#
+# From the archive: one Stage 2 group came back [1,2,3,4,4,5,6,7,8,9,10,12] on
+# one axis. The strict check rejected the group, and eight photographs lost
+# their genre, their faces and their portrait gate to a single miscounted
+# integer -- while the summary still read "local + semantic".
+
+
+def _ranked(values, axis="axis_c"):
+    return [
+        {"n": i + 1, "axis_a": i + 1, "axis_b": i + 1, "axis_c": i + 1, **{axis: v}}
+        for i, v in enumerate(values)
+    ]
+
+
+def test_the_exact_reply_that_cost_eight_photographs_their_genre():
+    import batch_runner
+
+    items = _ranked([1, 2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 12])
+    repaired, notes = batch_runner.repair_group_ranks(items, 12)
+    assert notes
+    assert batch_runner.validate_group_ranks(repaired, 12) == []
+
+
+def test_a_repair_keeps_the_order_the_model_expressed():
+    import batch_runner
+
+    items = _ranked([1, 2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 12])
+    repaired, _ = batch_runner.repair_group_ranks(items, 12)
+    ranks = [item["axis_c"] for item in repaired]
+    assert ranks == sorted(ranks), "a frame the model put first must stay first"
+    assert ranks[0] == 1 and ranks[-1] == 12
+
+
+def test_a_clean_ranking_is_left_alone():
+    import batch_runner
+
+    items = _ranked(list(range(1, 13)))
+    repaired, notes = batch_runner.repair_group_ranks(items, 12)
+    assert notes == []
+    assert [i["axis_c"] for i in repaired] == list(range(1, 13))
+
+
+def test_a_reply_that_ranked_nothing_is_not_repaired():
+    """Half the group tied is not a miscount, and no repair invents an order."""
+    import batch_runner
+
+    items = _ranked([1] * 12)
+    _, notes = batch_runner.repair_group_ranks(items, 12)
+    assert notes == []
+    assert batch_runner.validate_group_ranks(items, 12)
+
+
+def test_a_short_reply_is_not_repaired():
+    import batch_runner
+
+    items = _ranked([1, 2, 3])
+    _, notes = batch_runner.repair_group_ranks(items, 12)
+    assert notes == []

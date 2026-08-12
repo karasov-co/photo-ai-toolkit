@@ -72,6 +72,27 @@ def setup_logging(output_dir: Path, verbose: bool = False) -> None:
 # --- analyze ----------------------------------------------------------------
 
 
+def resolve_semantic(args: argparse.Namespace) -> bool:
+    """Whether the vision passes run. On by default, because they are the analysis.
+
+    The three states are deliberately distinct:
+
+      --no-semantic   off, and the operator said so
+      --semantic      on, and a missing key is an error rather than a downgrade
+      neither         on when a key exists, local-only when it does not
+
+    The default flipped because "full analysis" that skipped the content check
+    and the artistic read was not a full analysis: it produced a run with every
+    artistic field null, no photograph able to reach TOP, and a summary that
+    looked complete.
+    """
+    if getattr(args, "no_semantic", False):
+        return False
+    if getattr(args, "semantic", False):
+        return True
+    return bootstrap.has_credentials()
+
+
 def cmd_analyze(args: argparse.Namespace) -> int:
     input_dir = Path(args.input).resolve()
     output_dir = Path(args.output).resolve()
@@ -82,16 +103,22 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     setup_logging(output_dir, args.verbose)
     language = i18n.normalise(args.lang)
 
-    if args.semantic:
+    semantic = resolve_semantic(args)
+    if semantic or args.semantic:
         # Flushed, so the status line cannot appear after the error that follows
         # it: stdout is block-buffered while stderr is not.
         print(bootstrap.credential_status(language), flush=True)
-        if not bootstrap.has_credentials():
-            # Fail before a single photograph is decoded, and with a non-zero
-            # exit code. The previous behaviour spent minutes measuring files and
-            # then printed a summary that looked like a success.
-            print(i18n.t("creds.error", language), file=sys.stderr)
-            return 2
+    if args.semantic and not bootstrap.has_credentials():
+        # Fail before a single photograph is decoded, and with a non-zero
+        # exit code. The previous behaviour spent minutes measuring files and
+        # then printed a summary that looked like a success.
+        print(i18n.t("creds.error", language), file=sys.stderr)
+        return 2
+    if not semantic and not args.no_semantic:
+        # Nobody switched it off; there is simply no key. Say what that costs,
+        # in the terms the summary will use, rather than quietly producing a
+        # weaker run that looks like a full one.
+        print(i18n.t("creds.local_only", language), flush=True)
 
     options = pipeline.PipelineOptions(
         input_dir=input_dir,
@@ -100,7 +127,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         language=language,
         profile_name=args.profile,
         profile_path=Path(args.profile_file).resolve() if args.profile_file else None,
-        semantic=args.semantic,
+        semantic=semantic,
+        stage3=semantic and not args.no_stage3,
         semantic_model=args.model,
         include_video=not args.no_video,
         video_samples=args.video_samples,
@@ -828,7 +856,24 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--quarantine", help="quarantine directory (default: <output>/trash_quarantine)")
     analyze.add_argument("--profile", choices=list(BUILTIN_PROFILES), help="built-in calibration profile")
     analyze.add_argument("--profile-file", help="path to a calibration profile JSON")
-    analyze.add_argument("--semantic", action="store_true", help="run the paid vision pass")
+    analyze.add_argument(
+        "--semantic",
+        action="store_true",
+        help=(
+            "require the vision passes (Stage 2 content + Stage 3 artistic). They run by "
+            "default when a key is present; this makes a missing key an error instead"
+        ),
+    )
+    analyze.add_argument(
+        "--no-semantic",
+        action="store_true",
+        help="local measurement only: no content check, no artistic read, no TOP photos",
+    )
+    analyze.add_argument(
+        "--no-stage3",
+        action="store_true",
+        help="run the content check but not the artistic read (nothing can reach TOP)",
+    )
     analyze.add_argument(
         "--allow-semantic-fallback",
         action="store_true",

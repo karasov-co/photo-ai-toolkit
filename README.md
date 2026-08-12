@@ -123,7 +123,63 @@ permanently purged.
 
 ---
 
+## The final score, and the five piles
+
+Everything above answers a component question. The question a photographer
+actually asks is "is this any good, and what do I do with it", and that is one
+number and one category per file.
+
+`final_score` (0–100) blends technical potential, the content pass, the artistic
+read, the portrait analysis, documentary value and standing within the
+collection. Three separations hold it together:
+
+**Quality is not saleability.** A release, a crowd of strangers, a private
+context, a subject nobody wants to license — those are facts about
+*distribution*. They decide `GOOD_STOCK` versus `GOOD_PERSONAL` and they never
+touch the score. `legal_readiness` and `stock_potential` appear nowhere in the
+blend, which is why a photograph of your family can outscore everything else in
+the run.
+
+**Technical excellence cannot rescue a failed photograph.** Eyes shut, an
+accidental frame, a dead moment, no subject, an unrecoverable fault — each
+applies a *ceiling*, not a penalty. A penalty can be outvoted by a big enough
+number elsewhere; a ceiling cannot, which is the whole reason for using one.
+
+**Evidence can rescue an unconventional photograph.** The inverse asymmetry. A
+confident Stage 3 read showing high documentary significance or distinctiveness
+applies a *floor*, keeping a technically poor and commercially useless frame out
+of `WEAK`. It only overrules a *guess* — "this looks like a dead moment" — never
+an observation like a closed eye.
+
+| Category | Meaning |
+|---|---|
+| `TOP` | ≥ 85, a completed and confident artistic read, no critical defect. Shown first in the report and linked in `top_photos/` |
+| `GOOD_STOCK` | A good photograph that is commercially usable |
+| `GOOD_PERSONAL` | A good photograph, not for stock: faces, releases, private context, or no commercial demand |
+| `WEAK` | Genuinely poor: accidental frames, dead moments, bad expressions, no subject, technical failures, clearly inferior duplicates |
+| `NEEDS_DECISION` | Genuinely ambiguous, and rare by design — only near the keep boundary, and only when the read says it does not know |
+
+`WEAK` is a shelf, not a bin. No category is grounds for deletion; that still
+requires a demonstrable unrecoverable fault recorded as evidence.
+
+Two asymmetries inside the portrait gate are worth stating, because they look
+inconsistent until you notice which direction each one errs in. Declining to
+*promote* a frame costs nothing, so the label `AWKWARD` alone is enough to keep
+it out of TOP. Writing a frame off costs the photograph, so `WEAK` needs the
+model's own numbers — expression quality and publishability both low, at
+confidence — and not merely a word from a list.
+
+Every record carries `stage3_delta`: how many points the artistic read moved
+that frame, positive or negative, measured by scoring it twice — once with the
+read and once without. A run where that column is all zeros is a run where
+Stage 3 did not happen.
+
+---
+
 ## Route classes
+
+Still here, and still what drives the filesystem: the category says what a
+photograph *is*, the route class says what may be *done* with it.
 
 | Class | Meaning |
 |---|---|
@@ -161,11 +217,18 @@ emotional resonance, visual tension, narrative openness, moment specificity,
 formal coherence, distinctiveness, documentary significance, conventional beauty
 — each with its own reasoning, plus a confidence in the whole read.
 
-**Nothing reaches `flagship` without a completed Stage 3.** A pending, skipped,
-failed, or half-parsed assessment blocks the promotion and the frame falls back
-to its commercial route. This is the rule that matters most here, because the
-failure it replaces was silent: the artistic fields were `null` in every report
-and `flagship` was being assigned from three technical axes alone.
+**Stage 3 is a term in the score, not a veto on the end of it.** The eight
+dimensions are weighted into the final score, so a strong read raises a frame and
+a weak one lowers it; `stage3_delta` reports by how much. It is also the only
+thing that can authorise `TOP` or `flagship`: a pending, skipped, failed or
+half-parsed assessment blocks promotion and caps the score at 79. That is the
+rule that matters most here, because the failure it replaces was silent — the
+artistic fields were `null` in every report while `flagship` was being assigned
+from three technical axes alone.
+
+The vision passes run by default. `--no-semantic` turns them off; `--semantic`
+makes a missing key an error rather than a downgrade; with no key at all the run
+says what it is skipping and continues locally.
 
 The read is bounded, not universal. It runs on every keep and hero candidate, on
 anything with a face, and on frames whose defect might be deliberate — a
@@ -522,7 +585,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 1172 tests, no network, no API key
+pytest          # 1246 tests, no network, no API key
 ruff check .
 ```
 

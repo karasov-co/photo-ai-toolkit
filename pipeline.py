@@ -37,6 +37,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+import curation
 import duplicates
 import edit_recipe
 import issues as issues_module
@@ -555,11 +556,20 @@ def semantic_pass(
             logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
             continue
 
+        # A near-ranking is repaired before it is judged. Discarding a group
+        # costs twelve photographs their genre, their faces and their subject
+        # strength -- and on this archive a single duplicated rank did exactly
+        # that to eight frames, taking the portrait gate with it. The repair is
+        # recorded, never silent.
+        items, repairs = batch_runner.repair_group_ranks(items, len(group))
+        if repairs:
+            logger.info("Group %d repaired: %s", index, "; ".join(repairs))
+
         problems = batch_runner.validate_group_ranks(items, len(group))
         if problems:
-            # Not a ranking. Feeding it to Bradley-Terry would manufacture a
-            # confident order out of a malformed reply, so the group is dropped
-            # and its frames simply go unranked -- which lowers their
+            # Still not a ranking. Feeding it to Bradley-Terry would manufacture
+            # a confident order out of a malformed reply, so the group is
+            # dropped and its frames simply go unranked -- which lowers their
             # confidence and sends them to review, the safe direction.
             logger.warning("Group %d rejected: %s", index, "; ".join(problems))
             continue
@@ -708,12 +718,38 @@ def _stage3_views(asset, preview: Path, hint: dict) -> list[tuple[str, str]]:
         return [(name, encode(view)) for name, view in stage3_module.face_crops(image)]
 
 
-def _stage3_call(frames, *, model, client, stage3_module):
-    """One group, with bounded retries on a malformed reply."""
+def _truncated(response) -> bool:
+    """Whether the reply stopped because it ran out of output budget.
+
+    Worth detecting specifically. A truncated reply presents as "no JSON array
+    in the reply", which is indistinguishable from a model that answered in
+    prose -- and the two need opposite responses. Prose is worth retrying;
+    truncation is not, because an identical request truncates identically.
+    """
+    if str(getattr(response, "status", "")) == "incomplete":
+        return True
+    details = getattr(response, "incomplete_details", None)
+    return bool(details and "max_output_tokens" in str(getattr(details, "reason", details)))
+
+
+def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float = 1.0):
+    """One group, with bounded retries on a malformed reply.
+
+    Two failure modes, handled differently. A malformed reply is retried as-is,
+    because models do occasionally wrap JSON in prose and asking again fixes it.
+    A *truncated* reply splits the group instead: sending the same six frames
+    again with the same budget produces the same truncation, and on this archive
+    that cost two minutes and three times the tokens per group before failing.
+    """
     import prompts
 
     group = [f["key"] for f in frames]
     errors: list[str] = []
+    budget = int(
+        (prompts.STAGE3_BASE_OUTPUT_TOKENS
+         + prompts.STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME * len(frames))
+        * budget_factor
+    )
 
     for attempt in range(stage3_module.MAX_RETRIES + 1):
         try:
@@ -721,9 +757,15 @@ def _stage3_call(frames, *, model, client, stage3_module):
                 model=model,
                 instructions=prompts.STAGE3_SYSTEM,
                 input=[{"role": "user", "content": prompts.stage3_user_content(frames)}],
-                max_output_tokens=600 + prompts.STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME * len(frames),
+                max_output_tokens=budget,
                 reasoning={"effort": "low"},
             )
+            if _truncated(response):
+                errors.append(f"attempt {attempt + 1}: the reply hit the {budget}-token limit")
+                return _split_or_widen(
+                    frames, model=model, client=client, stage3_module=stage3_module,
+                    budget_factor=budget_factor, errors=errors,
+                )
             parsed = stage3_module.parse_group(
                 response.output_text or "", group, model=model
             )
@@ -746,6 +788,42 @@ def _stage3_call(frames, *, model, client, stage3_module):
             errors, retries=len(errors) - 1, model=model
         )
         for key in group
+    }
+
+
+# How far the budget may be raised for a single frame that still truncates.
+# Bounded, because the alternative to a bound is paying for a reply that never
+# ends.
+STAGE3_BUDGET_LIMIT = 3.0
+
+
+def _split_or_widen(frames, *, model, client, stage3_module, budget_factor, errors):
+    """Halve the group, or -- when it is already one frame -- widen the budget."""
+    if len(frames) > 1:
+        middle = len(frames) // 2
+        logger.info("Stage 3 reply truncated; splitting %d frames into two", len(frames))
+        out = {}
+        for half in (frames[:middle], frames[middle:]):
+            out.update(
+                _stage3_call(
+                    half, model=model, client=client, stage3_module=stage3_module,
+                    budget_factor=budget_factor,
+                )
+            )
+        return out
+
+    widened = budget_factor * 2
+    if widened <= STAGE3_BUDGET_LIMIT:
+        logger.info("Stage 3 reply truncated on a single frame; widening the budget")
+        return _stage3_call(
+            frames, model=model, client=client, stage3_module=stage3_module,
+            budget_factor=widened,
+        )
+
+    logger.error("Stage 3 truncated even at the widest budget: %s", "; ".join(errors[:2]))
+    return {
+        frame["key"]: stage3_module.ArtisticAssessment.failed(errors, model=model)
+        for frame in frames
     }
 
 
@@ -1276,6 +1354,7 @@ def _build_record(
 
     art = _artistic_for(asset, measurement, inp)
     stage3_payload, portrait_verdict = _stage3_payload(inp)
+    verdict = curation.categorise(inp, scored.scores, calibration.for_kind(inp.kind))
 
     legal_warnings = []
     if inp.semantic.faces or inp.semantic.identifiable_people:
@@ -1304,6 +1383,11 @@ def _build_record(
         model_versions={"semantic": semantic_model or "none"},
         analyzed_at=reports.datetime.now(reports.UTC).isoformat(timespec="seconds"),
         scores=scored.scores.to_dict(),
+        category=verdict.category,
+        final_score=verdict.final_score,
+        final_score_detail=verdict.score.to_dict(),
+        category_reasons=verdict.reasons,
+        commercial_blockers=verdict.commercial_blockers,
         route_class=scored.route_class.value,
         route=scored.route.value,
         tags=[t.value for t in scored.tags],
@@ -1345,7 +1429,14 @@ def _build_record(
 
 
 def _stage3_payload(inp) -> tuple[dict, str]:
-    """The stored artistic record, plus what the face says to do about it."""
+    """The stored artistic record, plus what the face says to do about it.
+
+    `is_portrait` has to be passed here for the same reason it is passed to the
+    gates: without it this reported `keep` on a frame the categoriser had just
+    rejected for a half-closed eye, because the face was small enough to look
+    incidental. Two answers to one question in one record.
+    """
+    import curation as curation_module
     import stage3 as stage3_module
 
     assessment = inp.artistic
@@ -1354,7 +1445,9 @@ def _stage3_payload(inp) -> tuple[dict, str]:
             "no artistic analysis was attached"
         ).to_dict(), "keep"
 
-    verdict, _ = stage3_module.portrait_verdict(assessment)
+    verdict, _ = stage3_module.portrait_verdict(
+        assessment, is_portrait=curation_module.is_portrait(inp.semantic)
+    )
     return assessment.to_dict(), verdict
 
 

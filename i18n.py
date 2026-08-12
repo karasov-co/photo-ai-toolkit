@@ -34,6 +34,40 @@ STRINGS: dict[str, dict[str, str]] = {
         "summary.recoverable_space": "Space recoverable from quarantine",
         "summary.top_genres": "Top genres",
         "summary.strongest": "Strongest assets",
+        "summary.categories": "What these photographs are:",
+        "summary.route_classes": "What can be done with them:",
+        "summary.top_photos": "Top photos",
+        "summary.no_top_photos": (
+            "Nothing in this run reached TOP. That is a normal result for a shoot, "
+            "and it is not a failure of the analysis."
+        ),
+        "misc.not_for_stock": "Not for stock",
+        "summary.top_gap": (
+            "(nothing reached TOP: the best photograph scored {best}, and TOP needs {threshold})"
+        ),
+        "summary.semantic_partial": (
+            "*** {count} of {total} files have NO content check: their genre, faces and "
+            "trademarks are unverified and no portrait gate was applied to them ***"
+        ),
+        "summary.stage3_completed": "Artistic read completed",
+        # categories
+        "category.TOP": "Top photos",
+        "category.GOOD_STOCK": "Good, sellable as stock",
+        "category.GOOD_PERSONAL": "Good, keep (not for stock)",
+        "category.NEEDS_DECISION": "Genuinely ambiguous, you decide",
+        "category.WEAK": "Weak",
+        "category.top": "final score {value}: a completed artistic read and no critical defect",
+        "category.weak": "final score {value} is below the keep threshold",
+        "category.good_stock": "final score {value}, no release needed and commercially usable",
+        "category.good_personal": "final score {value}: worth keeping, but not stock material",
+        "category.needs_decision": "on the boundary at {value} and the analysis is unsure",
+        "category.defect.bad_expression": "the expression failed: {detail}",
+        "category.defect.eyes_closed": "the subject's eyes are closed: {detail}",
+        "category.defect.accidental_frame": "not a photograph anybody meant to take: {detail}",
+        "category.defect.dead_moment": "nothing is happening: {detail}",
+        "category.defect.no_subject": "no legible subject: {detail}",
+        "category.defect.inferior_duplicate": "a better frame of this exists: {detail}",
+        "category.defect.unrecoverable": "unrecoverable: {detail}",
         "summary.clusters": "Duplicate clusters",
         "summary.missing_releases": "Missing releases",
         "summary.marketplace_ready": "Marketplace-ready",
@@ -98,6 +132,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "creds.environment": "Semantic credentials: found in environment",
         "creds.dotenv": "Semantic credentials: loaded from {path}",
         "creds.missing": "Semantic credentials: missing",
+        "creds.local_only": (
+            "No API key found: running local measurement only. Without the content check "
+            "and the artistic read, no photograph can be categorised as TOP and release "
+            "status stays unverified. Set OPENAI_API_KEY in .env for the full analysis."
+        ),
         "creds.error": (
             "Error: --semantic was requested but OPENAI_API_KEY was not found.\n"
             "Add OPENAI_API_KEY to the .env file in the project root and run again.\n"
@@ -187,6 +226,39 @@ STRINGS: dict[str, dict[str, str]] = {
         "summary.recoverable_space": "Освободится после карантина",
         "summary.top_genres": "Основные жанры",
         "summary.strongest": "Сильнейшие кадры",
+        "summary.categories": "Что это за фотографии:",
+        "summary.route_classes": "Что с ними можно делать:",
+        "summary.top_photos": "Лучшие фотографии",
+        "summary.no_top_photos": (
+            "Ни один кадр в этом запуске не попал в TOP. Для съёмки это нормальный "
+            "результат, а не сбой анализа."
+        ),
+        "misc.not_for_stock": "Не для стока",
+        "summary.top_gap": (
+            "(в TOP не попал никто: лучшая фотография набрала {best}, а для TOP нужно {threshold})"
+        ),
+        "summary.semantic_partial": (
+            "*** У {count} из {total} файлов НЕТ проверки содержимого: жанр, лица и "
+            "торговые марки не проверены, портретные правила к ним не применялись ***"
+        ),
+        "summary.stage3_completed": "Художественный разбор выполнен",
+        "category.TOP": "Лучшие фотографии",
+        "category.GOOD_STOCK": "Хорошие, годятся для стока",
+        "category.GOOD_PERSONAL": "Хорошие, оставить (не для стока)",
+        "category.NEEDS_DECISION": "Действительно спорные, решать вам",
+        "category.WEAK": "Слабые",
+        "category.top": "итоговая оценка {value}: художественный разбор выполнен, критических дефектов нет",
+        "category.weak": "итоговая оценка {value} ниже порога сохранения",
+        "category.good_stock": "итоговая оценка {value}, релиз не нужен, коммерчески пригодно",
+        "category.good_personal": "итоговая оценка {value}: стоит оставить, но не для стока",
+        "category.needs_decision": "на границе ({value}), и разбор не уверен",
+        "category.defect.bad_expression": "неудачное выражение лица: {detail}",
+        "category.defect.eyes_closed": "у героя закрыты глаза: {detail}",
+        "category.defect.accidental_frame": "кадр снят случайно: {detail}",
+        "category.defect.dead_moment": "мёртвый момент, ничего не происходит: {detail}",
+        "category.defect.no_subject": "нет читаемого сюжета: {detail}",
+        "category.defect.inferior_duplicate": "есть кадр этого же лучше: {detail}",
+        "category.defect.unrecoverable": "неисправимо: {detail}",
         "summary.clusters": "Групп дублей",
         "summary.missing_releases": "Не хватает релизов",
         "summary.marketplace_ready": "Готово к загрузке на сток",
@@ -242,6 +314,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "creds.environment": "Ключ для semantic-анализа: найден в окружении",
         "creds.dotenv": "Ключ для semantic-анализа: загружен из {path}",
         "creds.missing": "Ключ для semantic-анализа: не найден",
+        "creds.local_only": (
+            "API-ключ не найден: выполняется только локальный анализ. Без проверки "
+            "содержимого и художественного разбора ни одна фотография не может попасть "
+            "в TOP, а статус релизов остаётся непроверенным. Укажите OPENAI_API_KEY "
+            "в .env для полного анализа."
+        ),
         "creds.error": (
             "Ошибка: включён --semantic, но OPENAI_API_KEY не найден.\n"
             "Добавьте OPENAI_API_KEY в файл .env в корне проекта и повторите запуск.\n"

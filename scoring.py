@@ -146,6 +146,16 @@ class Semantic:
     camera_angle: str = "unknown"
     note: str = ""
 
+    # Whether the frame was taken on purpose and whether anything is in it.
+    # Benign defaults, for the same reason the release flags have pessimistic
+    # ones: each default is set to the side where being wrong is cheap. Assuming
+    # a release is needed costs a sale; assuming a frame was an accident costs
+    # the photograph.
+    intended_frame: bool = True
+    subject_strength: int = 50
+    accidental_probability: int = 0
+    dead_moment_probability: int = 0
+
     @property
     def needs_release(self) -> bool:
         return self.faces or self.identifiable_people or self.recognizable_property
@@ -200,6 +210,10 @@ def semantic_from_assessment(assessment, *, group_size: int | None = None) -> Se
         faces=bool(assessment.faces),
         logos=bool(assessment.logos),
         identifiable_people=bool(assessment.faces),
+        intended_frame=bool(getattr(assessment, "intended_frame", True)),
+        subject_strength=int(getattr(assessment, "subject_strength", 50)),
+        accidental_probability=int(getattr(assessment, "accidental_probability", 0)),
+        dead_moment_probability=int(getattr(assessment, "dead_moment_probability", 0)),
         note=str(assessment.note or ""),
     )
 

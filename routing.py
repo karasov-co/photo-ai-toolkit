@@ -92,6 +92,15 @@ class Assessment:
     is_video: bool = False
     technically_rejected_for: list[str] = field(default_factory=list)
 
+    # Whether this frame was taken on purpose, and whether anything is happening
+    # in it. Defaults are deliberately benign: a frame nobody asked about is not
+    # an accident and does not hold a dead moment. The asymmetry matters -- being
+    # wrong here writes off a photograph, which is the expensive direction.
+    intended_frame: bool = True
+    subject_strength: int = 50
+    accidental_probability: int = 0
+    dead_moment_probability: int = 0
+
     @property
     def technically_rejected(self) -> bool:
         return bool(self.technically_rejected_for)
@@ -243,10 +252,26 @@ def parse_assessment(
         faces=_as_bool(payload["faces"]),
         logos=_as_bool(payload["logos"]),
         note=_trim_note(payload.get("note", "")),
+        intended_frame=_as_bool(payload.get("intended_frame", True)),
+        subject_strength=_clamp_0_100(payload.get("subject_strength", 50), 50),
+        accidental_probability=_clamp_0_100(payload.get("accidental_probability", 0), 0),
+        dead_moment_probability=_clamp_0_100(payload.get("dead_moment_probability", 0), 0),
         model_destination=payload.get("destination"),
         is_video=is_video,
         technically_rejected_for=list(technically_rejected_for or []),
     )
+
+
+def _clamp_0_100(value, default: int) -> int:
+    """A missing or unparseable answer becomes the benign default, not zero.
+
+    Zero on `subject_strength` reads as "there is no subject", which is a claim.
+    A model that did not answer has not made one.
+    """
+    try:
+        return max(0, min(100, int(round(float(value)))))
+    except (TypeError, ValueError):
+        return default
 
 
 def _enum_or_default(enum_cls, value, default):

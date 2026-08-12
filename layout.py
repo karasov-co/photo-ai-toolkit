@@ -356,6 +356,18 @@ CLASS_TREE = {
     "flagship": "portfolio/flagship",
 }
 
+# The curatorial view: what each photograph *is*, rather than what may be done
+# with it. This is the one a person browses, so `top_photos` sits at the root of
+# the output directory instead of two levels down.
+CATEGORY_TREE = {
+    "TOP": "top_photos",
+    "GOOD_STOCK": "good/stock",
+    "GOOD_PERSONAL": "good/personal",
+    "NEEDS_DECISION": "needs_decision",
+    # Nothing here is scheduled for anything. It is a shelf.
+    "WEAK": "weak",
+}
+
 
 def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
     """Symlinks by class, then by genre, then per eligible marketplace.
@@ -369,13 +381,22 @@ def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
     extra = ("stock/editorial", "stock/by_genre", "portfolio/by_genre",
              "stock/marketplace_packages", "archive", "duplicate_review")
     # Never clear or write inside the physical quarantine, whatever it is called.
-    for folder in (*CLASS_TREE.values(), *extra):
+    for folder in (*CLASS_TREE.values(), *CATEGORY_TREE.values(), *extra):
         target = out_dir / folder
         target.mkdir(parents=True, exist_ok=True)
         _clear_symlinks_recursive(target)
 
     for record in records:
         source = Path(record.source_path)
+
+        # The curatorial view is written first and independently of the routing
+        # one: a photograph with no route folder -- a video, an unknown class --
+        # still belongs in a pile.
+        category_folder = CATEGORY_TREE.get(getattr(record, "category", ""))
+        if category_folder:
+            _relink(out_dir / category_folder / record.filename, source)
+            counts[record.category] = counts.get(record.category, 0) + 1
+
         folder = CLASS_TREE.get(record.route_class)
         if folder is None:
             continue

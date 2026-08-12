@@ -202,6 +202,54 @@ def parse_group_json(text: str) -> list[dict]:
 
 AXES = ("axis_a", "axis_b", "axis_c")
 
+# How far from a strict permutation a reply may be and still be repairable.
+# One or two collisions in twelve is a model losing count; half the group tied
+# is a model that did not rank anything, and no repair recovers information that
+# was never there.
+REPAIRABLE_COLLISION_FRACTION = 0.25
+
+
+def repair_group_ranks(items: list[dict], expected: int) -> tuple[list[dict], list[str]]:
+    """Fix a near-permutation in place of discarding the whole group.
+
+    A live reply ranked twelve frames as [1,2,3,4,4,5,6,7,8,9,10,12] on one
+    axis: one duplicated rank and one skipped. The strict check rejected it, and
+    with it the content analysis for all twelve frames -- their genre, their
+    faces, their subject strength -- while the run still reported that the
+    semantic pass had happened. Eight photographs lost their portrait gate to a
+    single miscounted integer.
+
+    The ordering the model expressed is almost entirely intact in such a reply,
+    and re-ranking the values recovers it. Ties are broken by position, which is
+    arbitrary but bounded: it can only ever reorder frames the model itself
+    placed level.
+
+    Returns the repaired items and a note for each axis that needed work, so
+    that a repair is recorded rather than hidden.
+    """
+    notes: list[str] = []
+    if len(items) != expected:
+        return items, notes
+
+    for axis in AXES:
+        try:
+            values = [int(item[axis]) for item in items]
+        except (KeyError, TypeError, ValueError):
+            continue
+        if sorted(values) == list(range(1, len(values) + 1)):
+            continue
+
+        collisions = len(values) - len(set(values))
+        missing = len(set(range(1, len(values) + 1)) - set(values))
+        if max(collisions, missing) > len(values) * REPAIRABLE_COLLISION_FRACTION:
+            continue
+
+        order = sorted(range(len(values)), key=lambda i: (values[i], i))
+        for rank, index in enumerate(order, start=1):
+            items[index][axis] = rank
+        notes.append(f"{axis}: repaired a near-ranking ({collisions} tied, {missing} skipped)")
+    return items, notes
+
 
 def validate_group_ranks(items: list[dict], expected: int) -> list[str]:
     """Check the reply is a strict ranking. Returns the problems found.

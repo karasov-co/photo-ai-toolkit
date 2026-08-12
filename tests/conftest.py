@@ -60,10 +60,33 @@ def _no_network(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _no_api_key(monkeypatch):
-    """Make sure nothing picks up a real key from the developer's shell."""
-    for var in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_ORG_ID"):
+def _no_api_key(monkeypatch, tmp_path_factory):
+    """Make sure nothing picks up a real key, from the shell OR from `.env`.
+
+    Clearing the environment is not enough and never was. `bootstrap` reads the
+    project's own `.env` from disk and injects what it finds, so any test that
+    asked whether credentials exist -- which is now every test, because the
+    vision passes default to on -- loaded the developer's real key and tried to
+    spend it. The socket guard caught the call, but a guard catching it is not
+    the same as the key never being read.
+
+    So the project root is redirected at a directory that has no `.env` in it,
+    for the whole suite. Tests that need to exercise credential loading point it
+    somewhere of their own.
+    """
+    import bootstrap
+
+    for var in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_ORG_ID", "OPENAI_MODEL"):
         monkeypatch.delenv(var, raising=False)
+
+    empty = tmp_path_factory.mktemp("no_env")
+    monkeypatch.setattr(bootstrap, "PROJECT_ROOT", empty)
+    monkeypatch.setattr(bootstrap, "PROJECT_ENV", empty / ".env")
+    monkeypatch.setattr(bootstrap, "_loaded_from", None)
+    # The working directory is the second place `.env` is looked for, and pytest
+    # runs from the repository -- so redirecting the project root alone still
+    # left the real file one lookup away.
+    monkeypatch.chdir(empty)
 
 
 @pytest.fixture

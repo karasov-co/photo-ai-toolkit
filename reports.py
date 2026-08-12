@@ -120,6 +120,18 @@ class AssetRecord:
     analyzed_at: str = ""
 
     scores: dict = field(default_factory=dict)
+    # The headline answer: one of TOP, GOOD_STOCK, GOOD_PERSONAL, WEAK,
+    # NEEDS_DECISION. `route_class` still drives the filesystem layout and the
+    # marketplace logic; this is what the photograph *is*.
+    category: str = ""
+    final_score: int = 0
+    # How the final score was arrived at, including what Stage 3 moved it by and
+    # every ceiling or floor that was applied. A capped score and a genuinely
+    # low one are indistinguishable without this.
+    final_score_detail: dict = field(default_factory=dict)
+    category_reasons: list[str] = field(default_factory=list)
+    # Why it cannot be sold, kept strictly apart from why it is or is not good.
+    commercial_blockers: list[str] = field(default_factory=list)
     route_class: str = ""
     route: str = ""
     tags: list[str] = field(default_factory=list)
@@ -205,7 +217,8 @@ class AssetRecord:
 
 
 CSV_FIELDS = [
-    "asset_id", "filename", "source_path", "media_type", "route_class", "route",
+    "asset_id", "filename", "category", "final_score", "stage3_delta",
+    "source_path", "media_type", "route_class", "route",
     "routing_score", "current_quality", "post_edit_potential", "expected_gain",
     "recoverability", "aesthetic_potential", "stock_potential", "portfolio_potential",
     "legal_readiness", "uniqueness", "confidence",
@@ -223,6 +236,9 @@ def _csv_row(record: AssetRecord) -> dict:
     return {
         "asset_id": record.asset_id,
         "filename": record.filename,
+        "category": record.category,
+        "final_score": record.final_score,
+        "stage3_delta": (record.final_score_detail or {}).get("stage3_delta", ""),
         "source_path": record.source_path,
         "media_type": record.media_type,
         "route_class": record.route_class,
@@ -324,11 +340,37 @@ def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict
             genres[record.genre] = genres.get(record.genre, 0) + 1
 
     clusters = {r.cluster_id for r in ok if r.cluster_id and r.cluster_size > 1}
-    strongest = sorted(
-        ok, key=lambda r: r.scores.get("routing_score", 0), reverse=True
-    )[:10]
+    # Ranked by the photographic score, not by `routing_score`. The old ordering
+    # put the most *saleable* frames at the top of a list headed "strongest",
+    # which is a different question and frequently a different answer.
+    strongest = sorted(ok, key=lambda r: r.final_score, reverse=True)[:10]
 
+    import curation
+
+    by_category = curation.counts([r.category for r in ok])
+    top_photos = [r for r in ok if r.category == curation.PhotoCategory.TOP.value]
+    stage3_moved = [
+        r for r in ok if (r.final_score_detail or {}).get("stage3_delta")
+    ]
+
+    best = max((r.final_score for r in ok), default=0)
     return {
+        "by_category": by_category,
+        # So that an empty TOP pile explains itself. "0 top photos" alone leaves
+        # the reader unable to tell a strict threshold from a broken one.
+        "best_final_score": best,
+        "top_threshold": curation.DEFAULT_THRESHOLDS.top,
+        "top_photos": [
+            {"filename": r.filename, "score": r.final_score, "genre": r.genre}
+            for r in sorted(top_photos, key=lambda r: r.final_score, reverse=True)
+        ],
+        "stage3_completed": sum(
+            1 for r in ok if (r.stage3 or {}).get("status") == "completed"
+        ),
+        "stage3_influenced": len(stage3_moved),
+        "needs_decision_fraction": (
+            round(by_category.get("NEEDS_DECISION", 0) / len(ok), 4) if ok else 0.0
+        ),
         "total": len(records),
         "photos": sum(1 for r in records if r.media_type == "photo"),
         "videos": sum(1 for r in records if r.media_type == "video"),
@@ -353,9 +395,19 @@ def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict
         ),
         "not_semantically_checked": sum(1 for r in ok if not r.semantic_present),
         "semantic_ran": any(r.semantic_present for r in ok),
+        # Partial coverage has to be visible. "local + semantic" was printed on
+        # a run where a rejected group left eight of forty-seven photographs
+        # with no content check at all, and nothing in the summary said so.
+        "semantic_partial": any(r.semantic_present for r in ok)
+        and not all(r.semantic_present for r in ok),
         "analysis_mode": next((r.analysis_mode for r in records if r.analysis_mode), "local_only"),
         "strongest": [
-            {"filename": r.filename, "score": r.scores.get("routing_score", 0), "class": r.route_class}
+            {
+                "filename": r.filename,
+                "score": r.final_score,
+                "class": r.category or r.route_class,
+                "stage3_delta": (r.final_score_detail or {}).get("stage3_delta", 0),
+            }
             for r in strongest
         ],
     }
@@ -393,16 +445,48 @@ def format_summary(summary: dict, language: str = "en") -> str:
     lines.append(_row(t("summary.total", language), summary.get("total", 0)))
     lines.append(_row(t("summary.photos", language), summary.get("photos", 0)))
     lines.append(_row(t("summary.videos", language), summary.get("videos", 0)))
+
+    # The categories lead, and every one of them is printed even at zero -- an
+    # absent line reads as "none", and so does a zero, but only the zero is
+    # something the reader can rely on.
+    by_category = summary.get("by_category") or {}
+    if by_category:
+        lines.append("")
+        lines.append(f"  {t('summary.categories', language)}")
+        for category, count in by_category.items():
+            lines.append(_row("  " + t(f"category.{category}", language), count))
+        if not by_category.get("TOP"):
+            lines.append(
+                "  "
+                + t(
+                    "summary.top_gap",
+                    language,
+                    best=summary.get("best_final_score", 0),
+                    threshold=summary.get("top_threshold", 85),
+                )
+            )
+
     lines.append("")
+    lines.append(f"  {t('summary.route_classes', language)}")
     for route_class, count in sorted(
         (summary.get("by_class") or {}).items(), key=lambda kv: -kv[1]
     ):
-        lines.append(_row(t(f"class.{route_class}", language), count))
+        lines.append(_row("  " + t(f"class.{route_class}", language), count))
     lines.append("")
     lines.append(_row(t("summary.clusters", language), summary.get("duplicate_clusters", 0)))
     lines.append(_row(t("summary.low_confidence", language), summary.get("low_confidence", 0)))
 
     semantic_ran = bool(summary.get("semantic_ran"))
+    if summary.get("semantic_partial"):
+        lines.append(
+            "  "
+            + t(
+                "summary.semantic_partial",
+                language,
+                count=summary.get("not_semantically_checked", 0),
+                total=summary.get("total", 0),
+            )
+        )
     if semantic_ran:
         lines.append(_row(t("summary.missing_releases", language), summary.get("missing_releases", 0)))
     else:
@@ -431,12 +515,21 @@ def format_summary(summary: dict, language: str = "en") -> str:
         lines.append("")
         lines.append(f"  {t('summary.top_genres', language)}: " + ", ".join(f"{g} ({n})" for g, n in genres))
 
+    top_photos = summary.get("top_photos") or []
+    if top_photos:
+        lines.append("")
+        lines.append(f"  {t('summary.top_photos', language)}:")
+        for item in top_photos[:12]:
+            lines.append(f"    [{item['score']:>3}] {item['filename']}  ({item['genre']})")
+
     strongest = summary.get("strongest") or []
     if strongest:
         lines.append("")
         lines.append(f"  {t('summary.strongest', language)}:")
         for item in strongest[:8]:
-            lines.append(f"    [{item['score']:>3}] {item['filename']}  ({item['class']})")
+            delta = item.get("stage3_delta") or 0
+            moved = f"  stage3 {delta:+d}" if delta else ""
+            lines.append(f"    [{item['score']:>3}] {item['filename']}  ({item['class']}){moved}")
 
     lines.append("")
     lines.extend(_wrap(t("warn.disclaimer", language)))
@@ -453,6 +546,15 @@ def _wrap(text: str, width: int = 64) -> list[str]:
 
 # --- HTML -------------------------------------------------------------------
 
+
+# The five categories, in the order the eye should meet them.
+CATEGORY_COLORS = {
+    "TOP": "#6b2e7a",
+    "GOOD_STOCK": "#2e7a55",
+    "GOOD_PERSONAL": "#2e5a7a",
+    "NEEDS_DECISION": "#7a682e",
+    "WEAK": "#5a5a5a",
+}
 
 CLASS_COLORS = {
     "trash": "#7a2e2e",
@@ -480,9 +582,11 @@ def write_html(
     path.parent.mkdir(parents=True, exist_ok=True)
     summary = summary or summarise(records)
 
-    cards = []
-    for record in sorted(records, key=lambda r: -r.scores.get("routing_score", 0)):
-        cards.append(_card(record, path.parent, language))
+    # Ranked by the photographic score. The page used to open with whatever was
+    # most saleable, which on a personal archive is not what anybody came to see.
+    ordered = sorted(records, key=lambda r: -r.final_score)
+    cards = [_card(record, path.parent, language) for record in ordered]
+    top_section = _top_photos_html(ordered, path.parent, language)
 
     document = f"""<!doctype html>
 <html lang="{language}">
@@ -524,6 +628,13 @@ ul {{ margin:6px 0; padding-left:18px; font-size:12px; }}
 .banner b {{ display:block; font-size:15px; letter-spacing:0.04em; }}
 .banner span {{ color:#e0b5b5; font-size:13px; }}
 .stat[title] {{ cursor:help; border-bottom:1px dotted #555; }}
+.top {{ background:#1b1420; border:1px solid #46284f; border-radius:10px;
+       padding:16px; margin-bottom:24px; }}
+.top h2 {{ font-size:16px; margin:0 0 12px; color:#d9b8e6; }}
+.top .grid {{ grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); }}
+.top .card {{ border-color:#46284f; }}
+.delta-up {{ color:#6fcf97; }} .delta-down {{ color:#e08585; }}
+.blocker {{ color:#c8a06a; font-size:12px; margin-top:6px; }}
 details summary {{ cursor:pointer; color:#9a9a9a; font-size:12px; }}
 </style>
 </head>
@@ -532,6 +643,7 @@ details summary {{ cursor:pointer; color:#9a9a9a; font-size:12px; }}
 {_mode_banner(summary, language)}
 <p class="disclaimer">{html.escape(t("warn.disclaimer", language))}</p>
 <div class="summary">{_summary_html(summary, language)}</div>
+{top_section}
 <div class="grid">
 {"".join(cards)}
 </div>
@@ -540,6 +652,28 @@ details summary {{ cursor:pointer; color:#9a9a9a; font-size:12px; }}
 """
     path.write_text(document, encoding="utf-8")
     return path
+
+
+def _top_photos_html(records: list[AssetRecord], base: Path, language: str) -> str:
+    """The TOP pile, above everything else and visually separated.
+
+    Empty is a legitimate result and says so out loud rather than vanishing: a
+    shoot with no top photographs in it is a normal thing, and a missing section
+    reads as a bug in the report.
+    """
+    top = [r for r in records if r.category == "TOP"]
+    if not top:
+        return (
+            f'<div class="top"><h2>{html.escape(t("summary.top_photos", language))}</h2>'
+            f'<p class="disclaimer" style="margin:0">'
+            f"{html.escape(t('summary.no_top_photos', language))}</p></div>"
+        )
+    cards = "".join(_card(record, base, language) for record in top)
+    return (
+        f'<div class="top"><h2>{html.escape(t("summary.top_photos", language))}'
+        f" &mdash; {len(top)}</h2>"
+        f'<div class="grid">{cards}</div></div>'
+    )
 
 
 def _mode_banner(summary: dict, language: str) -> str:
@@ -648,6 +782,38 @@ def _card(record: AssetRecord, base: Path, language: str) -> str:
 
     img = f'<img src="{html.escape(preview)}" alt="" loading="lazy">' if preview else ""
     darkroom_html = _darkroom_html(record, base, language)
+
+    category_html = ""
+    if record.category:
+        delta = (record.final_score_detail or {}).get("stage3_delta") or 0
+        # Signed, and only shown when it is non-zero -- "stage3 +0" on every card
+        # of a local-only run says nothing and reads as though Stage 3 ran.
+        moved = (
+            f' <span class="{"delta-up" if delta > 0 else "delta-down"}">stage3 {delta:+d}</span>'
+            if delta
+            else ""
+        )
+        category_html = (
+            f'<span class="badge" style="background:'
+            f'{CATEGORY_COLORS.get(record.category, "#444")}">'
+            f'{html.escape(t(f"category.{record.category}", language))} '
+            f"{record.final_score}</span>{moved}"
+        )
+
+    blockers_html = (
+        f'<div class="blocker">{html.escape(t("misc.not_for_stock", language))}: '
+        + html.escape("; ".join(record.commercial_blockers))
+        + "</div>"
+        if record.commercial_blockers
+        else ""
+    )
+    category_reasons_html = (
+        "<ul>"
+        + "".join(f"<li>{html.escape(str(r))}</li>" for r in record.category_reasons)
+        + "</ul>"
+        if record.category_reasons
+        else ""
+    )
     class_label = html.escape(t(f"class.{record.route_class}", language))
     route_label = html.escape(t(f"route.{record.route}", language) if record.route else "")
     score_rows = rows(
@@ -661,8 +827,11 @@ def _card(record: AssetRecord, base: Path, language: str) -> str:
 {img}
 <div class="body">
 <div class="name">{html.escape(record.filename)}</div>
+{category_html}
+{category_reasons_html}
 <span class="badge" style="background:{color}">{class_label}</span>
 <span class="badge" style="background:#333">{route_label}</span>
+{blockers_html}
 <div class="scores">{score_rows}{gain_html}</div>
 {issue_list("unrecoverable", "bad")}{issue_list("partially_fixable", "mid")}{issue_list("fixable", "ok")}
 {darkroom_html}

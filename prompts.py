@@ -131,6 +131,35 @@ Rank the frames against EACH OTHER on three independent axes. Never average them
 Rank within genre where the genre differs: street loses to landscape on any shared
 scale because landscape is tidier, and that comparison is meaningless.
 
+ALSO ANSWER, PER FRAME, INDEPENDENTLY OF THE RANKING
+
+These four are absolute judgements, not ranks. They exist because a rank cannot
+say that a frame should not have been taken -- the worst frame in a group of good
+photographs still ranks last, and so does an accidental shot of the pavement.
+
+  intended_frame            Did a person raise the camera and choose this? False
+                            only for genuine accidents: a shot of the ground or
+                            the photographer's feet, a frame taken while the
+                            camera was being carried, a lens cap, a test frame.
+                            An odd, dark, tilted or apparently pointless frame
+                            that someone composed is INTENDED. When unsure: true.
+  subject_strength          0-100. Is there something to look at, and is it
+                            legible? Not "is it pretty" and not "is it centred".
+                            Empty space, a wall, a gesture at the edge can all be
+                            strong subjects. A frame of nothing in particular,
+                            where no crop would create a subject, is weak.
+  accidental_probability    0-100. How likely this frame was not meant to exist.
+                            Reserve anything above 60 for frames you would bet on.
+  dead_moment_probability   0-100. A photograph of people where the moment is
+                            empty: a blank face between expressions, everyone
+                            looking away with nothing happening, a posed group
+                            caught before they were ready. NOT a quiet or still
+                            photograph -- stillness is a subject. 0 when there
+                            are no people.
+
+Each of these can write a photograph off, so answer them conservatively. The cost
+of a false "accidental" is a photograph nobody ever looks at again.
+
 OUTPUT
 Return ONLY a JSON array, one object per input frame, in the order the frames were
 given. No prose, no markdown, no explanation outside the JSON.
@@ -144,6 +173,10 @@ Each object:
  "recover": "easy|moderate|hopeless",
  "faces": <true if any recognisable face is present>,
  "logos": <true if any readable brand mark or trademark is present>,
+ "intended_frame": <true|false>,
+ "subject_strength": <0-100>,
+ "accidental_probability": <0-100>,
+ "dead_moment_probability": <0-100>,
  "note": "<max 12 words: what to do in the edit>"}
 
 Each axis is a strict ranking: every rank from 1 to N used exactly once per axis.
@@ -310,8 +343,11 @@ Answer specifically:
 - is the face itself sharp, or only the background?
 - is the face obstructed?
 - would a person be happy to see this picture of themselves published?
-- OR is an apparently "bad" expression clearly deliberate and effective? Say so
-  explicitly in artistic_reasoning if it is, using the word "deliberate".
+- OR is an apparently "bad" expression clearly deliberate and effective? If it
+  is, put it in `intent_reading` as {"expression": "deliberate"}. That field is
+  the only place this is read from; a sentence in artistic_reasoning is prose and
+  will not be parsed for it. Use "deliberate" only when you would defend the
+  claim -- it is what allows an otherwise unusable face through.
 
 Do not answer these from the whole frame's attractiveness. A beautiful photograph
 of a bad moment is a bad moment.
@@ -362,7 +398,21 @@ cannot tell, say so through `uncertainty` and the confidence fields rather than 
 inventing a number you do not believe."""
 
 
-STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME = 220
+# Measured, not guessed. A live call on this archive returned 315 output tokens
+# per frame with no portrait object and no reasoning included; a frame carrying
+# the sixteen-field portrait block costs roughly 120 more. 480 leaves headroom
+# for a long `artistic_reasoning` without being so generous that a runaway reply
+# is paid for in full.
+#
+# The previous value was 220, which was under half of what a frame actually
+# costs. Groups of six truncated mid-JSON, the parser reported "no JSON array in
+# the reply", and the retry sent the identical request twice more -- two minutes
+# per group, three times the tokens, and the same failure.
+STAGE3_MAX_OUTPUT_TOKENS_PER_FRAME = 480
+
+# Reasoning tokens are drawn from the same budget as the answer, so the base has
+# to cover them before a single frame is described.
+STAGE3_BASE_OUTPUT_TOKENS = 900
 
 
 def stage3_user_content(frames: list[dict]) -> list[dict]:
