@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-12
+
+Two systems, deliberately kept apart: a darkroom assistant that proposes edits,
+and an adaptive culling loop that learns when it is allowed to stop asking.
+
+### Added — darkroom assistant
+
+- `raw_measurements.py` reads the **sensor plane** through LibRaw -- black level,
+  white level, per-channel percentiles -- and reports real highlight headroom.
+  Measured on this archive it varies from 0.69 to 3.65 stops between frames,
+  which is information a 512px rendered preview cannot contain: the preview has
+  already spent whatever headroom there was.
+- `edit_schema.py` -- an editor-neutral recipe bound to the source checksum, with
+  a `preserve` list so "do not lift the shadows enough to flatten this" travels
+  with the numbers.
+- `recipe_generator.py` derives candidates from measurement rather than from a
+  model's impression, and refuses to propose a highlight recovery when nothing
+  is measurably clipped.
+- `renderers/` -- a deterministic built-in engine on LibRaw plus darktable and
+  RawTherapee adapters. The built-in one is preferred because it has no external
+  dependency; the adapters report themselves unavailable rather than crashing,
+  and are marked unverified since neither could be executed here.
+- `recipe_validator.py` compares the rendered edit against the rendered original
+  and **vetoes** damage: new clipping, a flattened low-key frame, sharpening
+  applied to intentional blur, halos, an over-large or low-confidence crop, skin
+  hue drift.
+- `recipe_optimizer.py` keeps the Pareto-non-dominated candidates instead of
+  collapsing four criteria into one score, because a weighted sum lets a
+  candidate win by excelling at one thing while ruining another.
+- `exporters/` writes Adobe XMP, darktable XMP and RawTherapee PP3 as **separate
+  schemas**, always under `suggestions/` with an `.ai-suggested` infix.
+  `apply-recipe` is dry-run by default, shows a slider-level diff, and refuses a
+  recipe whose source checksum no longer matches.
+
+### Added — adaptive culling
+
+- `preference_store.py` records comparisons rather than ratings, and weights
+  signals by what they prove: a restore from quarantine counts 3.0, a quick
+  reject 0.4, and "not opened in three months" counts zero.
+- `preference_model.py` fits Bradley-Terry over those comparisons and abstains
+  far more often than it acts -- unfamiliar genre, unfamiliar camera, too few
+  decisions, or a prediction too close to a coin toss.
+- `active_learning.py` asks the questions whose answers change the model most,
+  in four-button form.
+- `selective_policy.py` -- eight decision buckets and ten gates. Automatic
+  quarantine on a personal aesthetic model requires all ten simultaneously,
+  including 3000 holdout checks, because with zero observed errors that is the
+  order of magnitude needed to bound a 0.1% false-trash rate at all.
+- `model_monitoring.py` tracks false-trash rate, drift and calibration, and
+  switches automation **off by itself** when any of them slips.
+
+### Changed
+
+- The goal is not "discard 70%" but "70% need no full human decision", and most
+  of that comes from auto-keep, burst consolidation and routing -- none of which
+  destroys anything.
+- Rotation now crops to the largest inscribed rectangle. The black corners it
+  used to leave were being counted as newly crushed shadows, which vetoed every
+  candidate containing a straighten.
+- Shadows get a looser new-clipping threshold than highlights: setting a black
+  point is a normal deliberate edit, blowing a highlight is not.
+
+### Verification
+
+62 new tests covering all eighteen required guarantees; 997 total, ruff clean.
+Run live on real RAW files: recipes generated, rendered, validated and written
+as sidecars, with every original untouched.
+
 ## [2.0.0] - 2026-08-12
 
 Turns the scoring tool into a culling, assessment and distribution system for
