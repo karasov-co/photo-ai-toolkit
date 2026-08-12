@@ -27,12 +27,22 @@ OTHER_KEY = "another-test-placeholder"
 
 @pytest.fixture(autouse=True)
 def clean_environment(monkeypatch, tmp_path):
-    """Never touch the real project `.env`, and never inherit a real key."""
+    """Never touch the real project `.env`, and never inherit a real key.
+
+    The working directory is redirected as well as the project root. Without
+    that, `load_project_environment` still found `<cwd>/.env` -- and since
+    pytest runs from the repository, that was the developer's own file. The
+    socket guard caught the resulting call, but the test was reading a real
+    credential to get there.
+    """
     monkeypatch.delenv(bootstrap.API_KEY_VAR, raising=False)
     monkeypatch.delenv(bootstrap.MODEL_VAR, raising=False)
     monkeypatch.setattr(bootstrap, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(bootstrap, "PROJECT_ENV", tmp_path / ".env")
     monkeypatch.setattr(bootstrap, "_loaded_from", None)
+    isolated = tmp_path / "cwd"
+    isolated.mkdir(exist_ok=True)
+    monkeypatch.chdir(isolated)
     yield
 
 

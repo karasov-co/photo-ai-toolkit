@@ -346,7 +346,8 @@ def build_contact_sheet(
 # the archive, `RouteClass` is what the frame is.
 
 CLASS_TREE = {
-    "trash": "trash_quarantine",
+    # Navigation only. The physical quarantine lives in `<output>/quarantine`.
+    "trash": "proposed_for_removal",
     "review": "manual_review",
     "archive_only": "archive",
     "duplicate_candidate": "duplicate_review",
@@ -367,6 +368,7 @@ def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
     counts: dict[str, int] = {}
     extra = ("stock/editorial", "stock/by_genre", "portfolio/by_genre",
              "stock/marketplace_packages", "archive", "duplicate_review")
+    # Never clear or write inside the physical quarantine, whatever it is called.
     for folder in (*CLASS_TREE.values(), *extra):
         target = out_dir / folder
         target.mkdir(parents=True, exist_ok=True)

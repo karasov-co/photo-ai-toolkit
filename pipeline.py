@@ -96,7 +96,16 @@ class PipelineOptions:
     shadow_mode: bool = True
 
     def resolved_quarantine(self) -> Path:
-        return self.quarantine_dir or (self.output_dir / "trash_quarantine")
+        """The *physical* quarantine directory, deliberately not the farm folder.
+
+        These used to be the same path. `build_class_farm` writes navigation
+        symlinks into `<output>/trash_quarantine`, and quarantine planning used
+        the same directory as its destination -- so a link pointing back at the
+        source sat exactly where the file was about to be moved, and containment
+        refused the move. Keeping the physical store separate removes the
+        collision at its source rather than teaching the check to tolerate it.
+        """
+        return self.quarantine_dir or (self.output_dir / "quarantine")
 
 
 @dataclass

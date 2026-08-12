@@ -136,16 +136,53 @@ def _now() -> str:
 
 
 def assert_within(root: Path, candidate: Path) -> Path:
-    """Resolve, then prove containment. Refusing is the only failure mode.
+    """Prove containment without following the destination itself.
 
-    Resolution has to happen first: `root/../../etc/passwd` and a symlink into
-    `/` both look innocent as strings and are the same problem once resolved.
+    The **parent** is resolved and the leaf name appended, rather than resolving
+    the whole path. That distinction is the fix for a real failure: the symlink
+    farm wrote a navigation link into the physical quarantine directory, and
+    that link pointed back at the source file. `candidate.resolve()` then
+    returned the *source* path, which is of course outside the quarantine root,
+    and planning refused two perfectly ordinary videos with
+
+        .../trash_quarantine/P1019374.MP4 resolves outside .../trash_quarantine
+
+    Resolving only the parent still catches everything containment is for --
+    `../../etc/passwd`, a symlinked parent directory, an absolute path
+    elsewhere -- because those are all properties of the directory chain. What
+    it no longer does is treat a pre-existing file at the destination as though
+    it were the destination.
     """
     resolved_root = root.resolve()
-    resolved = candidate.resolve() if candidate.exists() else (candidate.parent.resolve() / candidate.name)
+    # Always resolve the parent, existing or not. `Path.resolve()` normalises
+    # `..` even for a path that is not on disk; skipping it when the parent was
+    # missing let `<root>/../../etc/passwd` pass a purely lexical containment
+    # check, because Path does not collapse `..` on its own.
+    resolved = candidate.parent.resolve() / candidate.name
+
     if resolved != resolved_root and not resolved.is_relative_to(resolved_root):
         raise UnsafePath(f"{candidate} resolves outside {resolved_root}")
     return resolved
+
+
+def is_generated_link(path: Path, source_roots: list[Path] | None = None) -> bool:
+    """Whether this is one of our own navigation symlinks rather than a file.
+
+    The farm links point back into the archive. A link at a quarantine
+    destination is therefore ours and stale -- it cannot be a quarantined file,
+    because quarantined files are real bytes that were moved here.
+    """
+    if not path.is_symlink():
+        return False
+    try:
+        target = path.readlink()
+        target = target if target.is_absolute() else (path.parent / target)
+        target = target.resolve()
+    except OSError:
+        return True
+    if not source_roots:
+        return True
+    return any(target.is_relative_to(Path(root).resolve()) for root in source_roots)
 
 
 class Manifest:
@@ -304,11 +341,23 @@ class Quarantine:
         Preserving the relative structure is what makes a restore possible even
         if the manifest is lost -- the quarantine tree alone tells you where
         each file belonged.
+
+        A stale navigation symlink sitting at the destination is stepped around
+        with a collision-safe name rather than followed, removed, or treated as
+        a containment violation.
         """
         self._assert_source_allowed(source)
         relative = self._relative_to_root(source)
         candidate = destination_dir / relative
-        return assert_within(self.quarantine_dir, candidate)
+        destination = assert_within(self.quarantine_dir, candidate)
+
+        if destination.is_symlink():
+            logger.info(
+                "A stale link occupies %s; choosing a collision-safe name instead",
+                destination.name,
+            )
+            destination = assert_within(self.quarantine_dir, _next_free_name(destination))
+        return destination
 
     def _assert_source_allowed(self, source: Path) -> None:
         if not self.source_roots:

@@ -87,16 +87,37 @@ def test_an_absolute_path_elsewhere_is_refused(tmp_path):
         assert_within(root, tmp_path / "somewhere_else" / "file.jpg")
 
 
-def test_a_symlink_pointing_outside_the_root_is_refused(tmp_path):
-    """Checked after resolve(), so a link and a `..` are the same rejected case."""
+def test_a_destination_symlink_is_not_followed(tmp_path):
+    """The leaf is never resolved, so a link there cannot redirect the write.
+
+    This is the fix for a real failure: the symlink farm left a link inside the
+    quarantine directory pointing back at the source, `.resolve()` returned the
+    source path, and two ordinary videos were refused as "outside the
+    quarantine root".
+    """
     root = tmp_path / "root"
     root.mkdir()
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "target.jpg").write_bytes(b"x")
     (root / "link.jpg").symlink_to(outside / "target.jpg")
+
+    resolved = assert_within(root, root / "link.jpg")
+
+    assert resolved.parent == root.resolve()
+    assert resolved.name == "link.jpg"
+
+
+def test_a_symlinked_parent_directory_is_still_refused(tmp_path):
+    """Containment is a property of the directory chain, and that still holds."""
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "escape").symlink_to(outside, target_is_directory=True)
+
     with pytest.raises(UnsafePath):
-        assert_within(root, root / "link.jpg")
+        assert_within(root, root / "escape" / "file.jpg")
 
 
 def test_a_source_outside_every_configured_root_is_not_planned(tmp_path, archive, bin_dir):

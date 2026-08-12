@@ -553,7 +553,13 @@ def test_a_rescued_file_disappears_from_the_quarantine_plan(archive, tmp_path, c
 
     cli.main(["analyze", "--input", str(archive), "--output", str(out), "--force"])
     printed = capsys.readouterr().out
-    assert "would move" not in printed
+
+    # A genuinely blurred frame legitimately stays in the plan; the point is
+    # that the rescued one does not.
+    rows, _ = pipeline.reports.read_json(pipeline.Path(analysis))
+    rescued = next(r for r in rows if r["filename"] == "lens_cap.jpg")
+    assert rescued["route_class"] == "review"
+    assert "lens_cap.jpg" not in printed.split("would move")[-1]
 
 
 def test_the_profiles_command_lists_the_built_ins(capsys):
