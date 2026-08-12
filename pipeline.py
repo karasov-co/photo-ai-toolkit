@@ -43,6 +43,7 @@ import marketplaces
 import media
 import provenance as provenance_module
 import quarantine as quarantine_module
+import raw_measurements
 import reports
 import scoring
 import stock_metadata
@@ -174,6 +175,17 @@ class Measurement:
     blur_ratio: float = 0.0
     clipped_highlights: float = 0.0
     clipped_shadows: float = 0.0
+    # Where the clipping figures above came from. A rendered preview has already
+    # spent whatever headroom the RAW held, so calling its numbers "RAW ground
+    # truth" to a model is a lie the model has no way to catch.
+    measurement_domain: str = "rendered_image"
+    raw_available: bool = False
+    raw_highlight_headroom_stops: float = 0.0
+    raw_shadow_headroom_stops: float = 0.0
+    raw_clipped_any_channel: float = 0.0
+    raw_clipped_all_channels: float = 0.0
+    raw_noise_floor_fraction: float = 0.0
+    raw_measurement_version: str = ""
     width: int = 0
     height: int = 0
     megapixels: float = 0.0
@@ -236,6 +248,19 @@ def measure_photo(asset: media.Asset, previews_dir: Path) -> Measurement:
     out.uplift = round(recipe.uplift, 2)
     out.recipe = recipe.human_readable()
     out.crop_keep = recipe.crop_keep_fraction
+
+    # The sensor plane, not the render. Stage 2 is told which of the two it is
+    # looking at, and the prompt words itself accordingly.
+    raw_stats = raw_measurements.measure_or_empty(asset.path, asset.is_raw)
+    out.raw_available = raw_stats.available
+    if raw_stats.available:
+        out.measurement_domain = "raw_sensor"
+        out.raw_highlight_headroom_stops = raw_stats.highlight_headroom_stops
+        out.raw_shadow_headroom_stops = raw_stats.shadow_headroom_stops
+        out.raw_clipped_any_channel = raw_stats.clipped_any_channel
+        out.raw_clipped_all_channels = raw_stats.clipped_all_channels
+        out.raw_noise_floor_fraction = raw_stats.noise_floor_fraction
+        out.raw_measurement_version = raw_measurements.MEASUREMENT_VERSION
 
     out.exif = extract_exif(asset.path, _legacy_file_type(asset))
 
@@ -436,11 +461,22 @@ def semantic_pass(
             measurement = measurements[name]
             with open(measurement.preview_path, "rb") as f:
                 encoded = base64.standard_b64encode(f.read()).decode()
+            # For a RAW, hand over what the *sensor* saturated at. For anything
+            # else, hand over the rendered figure and say so. The two mean
+            # different things and the prompt must not conflate them.
+            if measurement.raw_available:
+                highlights = measurement.raw_clipped_all_channels
+                shadows = measurement.clipped_shadows
+            else:
+                highlights = measurement.clipped_highlights
+                shadows = measurement.clipped_shadows
             frames.append(
                 {
                     "filename": name,
-                    "clipped_highlights": measurement.clipped_highlights,
-                    "clipped_shadows": measurement.clipped_shadows,
+                    "clipped_highlights": highlights,
+                    "clipped_shadows": shadows,
+                    "measurement_domain": measurement.measurement_domain,
+                    "headroom_stops": measurement.raw_highlight_headroom_stops,
                     "encoded": encoded,
                 }
             )
@@ -583,10 +619,18 @@ def _apply_policy(records, options: PipelineOptions) -> None:
     import artistic
     import preference_model
     import selective_policy
+    from model_monitoring import Monitor, Observation
     from preference_store import PreferenceStore
 
     store = PreferenceStore(options.output_dir / "preferences.jsonl")
     model = preference_model.fit(store)
+
+    # The monitor is the tenth gate. Reading its state here is what connects the
+    # `monitor` command to the pipeline: without it, switching automation off
+    # after a false trash would have had no effect on the next run.
+    monitor = Monitor(options.output_dir / "model_monitoring.json")
+    health = monitor.evaluate()
+    holdout = health["resolved_cases"]
 
     for record in records:
         scores = artistic.ArtisticScores(
@@ -594,7 +638,9 @@ def _apply_policy(records, options: PipelineOptions) -> None:
             intentionality_likelihood=record.artistic.get("intentionality_likelihood", 0),
             curatorial_uncertainty=record.artistic.get("curatorial_uncertainty", 100),
         )
-        prediction = model.predict(record.asset_id, genre=record.genre, camera="")
+        prediction = model.predict(
+            record.asset_id, genre=record.genre, camera=record.camera
+        )
         decision = selective_policy.decide(
             asset_id=record.asset_id,
             route_class=record.route_class,
@@ -606,6 +652,8 @@ def _apply_policy(records, options: PipelineOptions) -> None:
             is_best_in_cluster=record.best_in_cluster,
             cluster_size=record.cluster_size,
             shadow_mode=options.shadow_mode,
+            holdout_checks=holdout,
+            monitor_healthy=health["automation_enabled"],
         )
         record.decision_bucket = decision.bucket
         record.abstained = decision.abstained
@@ -617,6 +665,24 @@ def _apply_policy(records, options: PipelineOptions) -> None:
             prediction, scores.has_any_artistic_signal
         )
         record.policy_evidence = decision.reasons + decision.failed_gates
+
+        # Every prediction becomes an observation. It stays unresolved until the
+        # photographer does something that settles it -- a restore, an override,
+        # a portfolio pick -- which is what closes the loop the monitor needs.
+        monitor.observe(
+            Observation(
+                asset_id=record.asset_id,
+                predicted=decision.bucket,
+                confidence=(
+                    0.0 if prediction.abstained else abs(prediction.probability - 0.5) * 2
+                ),
+                in_distribution=prediction.in_distribution,
+                genre=record.genre,
+                camera=record.camera,
+            )
+        )
+
+    monitor.save()
 
 
 def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> None:
@@ -647,6 +713,9 @@ def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> N
                 asset, measurement, scores,
                 out_dir=options.output_dir,
                 renderer_name=options.darkroom_renderer,
+                faces_present=record.semantic_present and (
+                    "needs_model_release" in (record.tags or [])
+                ),
             )
         except Exception as e:
             logger.warning("Darkroom failed for %s: %s", record.filename, reports.redact(str(e)))
@@ -655,6 +724,10 @@ def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> N
         record.rendered_variants = produced["rendered_variants"]
         record.recipe_confidence = produced["recipe_confidence"]
         record.preserve_intent = produced["preserve_intent"]
+        record.suggested_sidecars = produced["sidecars"]
+        record.darkroom_rejections = produced["rejected"]
+        record.darkroom_engine = produced.get("engine", "")
+        record.darkroom_engine_version = produced.get("engine_version", "")
 
 
 def _semantics(assets, measurements, options: PipelineOptions, client) -> dict[str, Semantic]:
@@ -873,6 +946,7 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         strengths=scored.strengths,
         reasons=scored.reasons,
         genre=inp.semantic.genre,
+        camera=_camera_key(measurement.exif),
         concepts=list(inp.semantic.concepts),
         description=inp.semantic.description,
         stock_metadata=metadata.to_dict(),
@@ -895,6 +969,20 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         status="error" if measurement.error else "ok",
         error=measurement.error,
     )
+
+
+def _camera_key(exif: dict) -> str:
+    """`Make Model`, normalised. Empty when EXIF does not say.
+
+    An empty key reads as "no camera information", and `knows_camera` treats
+    that as familiar rather than as a new body -- the alternative would abstain
+    on every scan and every file with stripped metadata.
+    """
+    make = str(exif.get("camera_make") or "").strip()
+    model = str(exif.get("camera_model") or "").strip()
+    if model.lower().startswith(make.lower()) and make:
+        model = model[len(make):].strip()
+    return " ".join(part for part in (make, model) if part).strip()
 
 
 def _artistic_for(asset, measurement, inp):

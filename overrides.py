@@ -164,6 +164,34 @@ def apply_to(records: list, store: OverrideStore) -> int:
     return applied
 
 
+def resolve_observations(records: list, store: OverrideStore, monitor_path) -> int:
+    """Tell the monitor what the photographer actually decided.
+
+    Without this the monitor is a command whose state somebody has to fill in by
+    hand, and the false-trash rate it reports is the rate over an empty set --
+    which is 0% and means nothing. An override *is* the ground truth: it is the
+    photographer contradicting the tool in writing.
+    """
+    from model_monitoring import Monitor
+
+    monitor = Monitor(monitor_path)
+    resolved = 0
+    for record in records:
+        override = store.get(record.asset_id)
+        if override is None:
+            continue
+        if override.excluded:
+            continue
+        actual = "keep" if override.route_class not in ("trash", None, "") else "trash"
+        if override.route_class == "flagship":
+            actual = "portfolio"
+        resolved += monitor.resolve(record.asset_id, actual)
+    if resolved:
+        monitor.evaluate()
+        monitor.save()
+    return resolved
+
+
 def _action_for(route_class: str) -> str:
     if route_class == "trash":
         return "quarantine"

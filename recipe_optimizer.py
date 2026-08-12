@@ -57,6 +57,7 @@ def evaluate(
     *,
     renderer=None,
     max_px: int = PREVIEW_PX,
+    faces_present: bool | None = None,
 ) -> tuple[list[Candidate], Image.Image | None]:
     """Render every candidate, validate it, and score the survivors."""
     engine = renderer or renderer_base.get()
@@ -78,7 +79,9 @@ def evaluate(
             candidates.append(candidate)
             continue
 
-        candidate.validation = recipe_validator.validate(original, candidate.image, recipe)
+        candidate.validation = recipe_validator.validate(
+            original, candidate.image, recipe, faces_present=faces_present
+        )
         if not candidate.validation.ok:
             candidate.rejected_for = candidate.validation.reasons
         else:

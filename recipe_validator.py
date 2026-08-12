@@ -51,8 +51,21 @@ MAX_NEW_CRUSHING = 0.06
 # more than this much of it out, the frame is no longer low key.
 LOW_KEY_MASS_LOSS = 0.30
 
-# Halo: mean brightening in a narrow band beside strong edges, 0..1.
-MAX_HALO = 0.045
+# Halo: growth in local deviation within a narrow band beside strong edges.
+#
+# The first version measured mean *brightening* in that band, which turned out
+# to detect almost nothing it was meant to and one thing it was not. Measured on
+# a generated scene:
+#
+#   unsharp mask x400   +0.074      unsharp mask x150   +0.037
+#   uniform +15% bright +0.005      pure hue rotation   +0.001
+#
+# Under the old metric the x400 over-sharpen scored *negative* -- unsharp mask
+# overshoots bright on one side of an edge and dark on the other, so the two
+# cancel in a mean -- while a global brightening scored +0.076 and was reported
+# as over-sharpening. Local deviation captures the overshoot regardless of sign
+# and ignores anything applied evenly across the frame.
+MAX_HALO = 0.020
 
 # Skin hue is roughly 15-35 degrees. Drift beyond this is visible and wrong.
 MAX_SKIN_HUE_DRIFT_DEG = 8.0
@@ -90,8 +103,18 @@ def _luma(rgb: np.ndarray) -> np.ndarray:
     return rgb @ np.array([0.299, 0.587, 0.114])
 
 
-def validate(original: Image.Image, edited: Image.Image, recipe) -> ValidationResult:
-    """Compare the two renders and refuse anything that did damage."""
+def validate(
+    original: Image.Image, edited: Image.Image, recipe, *, faces_present: bool | None = None
+) -> ValidationResult:
+    """Compare the two renders and refuse anything that did damage.
+
+    `faces_present` decides how much authority the skin check has. The detector
+    is an HSV heuristic and warm surfaces -- sand, wood, brick, a sunset, an
+    orange wall -- land in the same hue band as skin. Vetoing a landscape
+    because its sandstone shifted three degrees would be a false veto on a frame
+    with no skin in it at all, so without confirmation the finding is recorded
+    as advisory and does not block the candidate.
+    """
     result = ValidationResult()
 
     # Geometry may legitimately change the size; compare on a common grid.
@@ -103,7 +126,7 @@ def validate(original: Image.Image, edited: Image.Image, recipe) -> ValidationRe
     _check_sharpening_of_intentional_blur(recipe, result)
     _check_halos(before, after, result)
     _check_crop(recipe, result)
-    _check_skin_hue(before, after, result)
+    _check_skin_hue(before, after, result, faces_present=faces_present)
     return result
 
 
@@ -192,12 +215,32 @@ def _check_halos(before: np.ndarray, after: np.ndarray, result: ValidationResult
     if not band.any():
         return
 
-    halo = float((_luma(after)[band] - luma_before[band]).mean())
+    luma_after = _luma(after)
+    halo = _local_deviation(luma_after, band) - _local_deviation(luma_before, band)
     result.measurements["halo"] = round(halo, 5)
+    result.measurements["global_luma_shift"] = round(
+        float((luma_after - luma_before).mean()), 5
+    )
     if halo > MAX_HALO:
         result.violations.append(
             Violation("halos", f"edges have gained a {halo:.3f} bright rim; the edit is over-sharpened")
         )
+
+
+def _local_deviation(luma: np.ndarray, band: np.ndarray) -> float:
+    """How far the band departs from its own local average.
+
+    Over-sharpening pushes pixels away from their neighbourhood in both
+    directions at once. Any measure that averages the signed difference cancels
+    the two halves out; the absolute deviation does not.
+    """
+    smoothed = np.asarray(
+        Image.fromarray(np.clip(luma * 255, 0, 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(2)
+        ),
+        dtype=np.float64,
+    ) / 255.0
+    return float(np.abs(luma - smoothed)[band].mean())
 
 
 def _check_crop(recipe, result: ValidationResult) -> None:
@@ -220,7 +263,10 @@ def _check_crop(recipe, result: ValidationResult) -> None:
         )
 
 
-def _check_skin_hue(before: np.ndarray, after: np.ndarray, result: ValidationResult) -> None:
+def _check_skin_hue(
+    before: np.ndarray, after: np.ndarray, result: ValidationResult,
+    *, faces_present: bool | None = None,
+) -> None:
     """Skin drifting green or magenta is worse than the cast it replaced."""
     import colorsys
 
@@ -244,6 +290,13 @@ def _check_skin_hue(before: np.ndarray, after: np.ndarray, result: ValidationRes
     drift = abs(hue_after - hue_before)
     result.measurements["skin_hue_drift_deg"] = round(drift, 2)
     if drift > MAX_SKIN_HUE_DRIFT_DEG:
+        result.measurements["skin_check_authoritative"] = bool(faces_present)
         result.violations.append(
-            Violation("skin_hue_drift", f"skin hue moves {drift:.1f} degrees")
+            Violation(
+                "skin_hue_drift",
+                f"warm-tone hue moves {drift:.1f} degrees"
+                + ("" if faces_present else " (no face confirmed; this may be sand, wood or sunset)"),
+                # Only a confirmed face makes this a veto. Otherwise it is a note.
+                fatal=bool(faces_present),
+            )
         )

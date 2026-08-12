@@ -12,10 +12,14 @@ second is gone forever.
 
 Two mechanical points that matter as much as the wording:
 
-- **Clipping is supplied, not guessed.** Stage 0 already measured the blown and
-  crushed fractions exactly. Handing the model a number and forbidding it to
-  penalise below the threshold removes an entire category of hallucinated
-  judgement -- the model cannot see a JPEG preview and know what the RAW holds.
+- **Clipping is supplied, not guessed -- and labelled with where it came from.**
+  Handing the model a number and forbidding it to penalise below the threshold
+  removes a whole category of hallucinated judgement. But the number itself has
+  to be honest: for a RAW it is measured on the sensor plane, and for a JPEG or
+  HEIC it is measured on the developed image, which is a lower bound. An earlier
+  version passed the rendered figure under the label "RAW ground truth", which
+  told the model the preview's clipping was the sensor's verdict. It is not, and
+  the model had no way to catch the substitution.
 
 - **Stage 2 ranks, it does not score.** An absolute 0-100 scale collapses: every
   live call made against this archive came back 548, 560, 694, 762. Comparison
@@ -87,9 +91,23 @@ DO PENALISE -- none of this is recoverable:
 - the key element severed by the frame edge
 
 CLIPPING IS MEASURED, NOT GUESSED
-Each frame arrives with its exact measured clipping fractions. Use those numbers.
-If clipped highlights are below 3%, you may NOT penalise highlights at all. You
-cannot see the RAW's headroom in a preview; the number is the ground truth.
+Each frame arrives with a measured clipping fraction AND with the domain that
+measurement came from. The two mean different things and you must read the label:
+
+  raw_sensor       measured on the sensor plane before any development. This is
+                   what genuinely saturated. A frame can look blown in the
+                   preview and still have one to two stops of recoverable
+                   highlight behind it, and the headroom figure says how much.
+  rendered_image   measured on an already developed JPEG, HEIC or TIFF. This is
+                   what the *renderer* clipped, which is a lower bound on what
+                   is recoverable and nothing more. It is NOT the sensor's
+                   verdict, and you should treat a high figure here as
+                   inconclusive rather than as proof of damage.
+
+For either domain: if clipped highlights are below 3%, you may NOT penalise
+highlights at all. Above that, penalise only what the measurement supports --
+and for rendered_image, hold back, because you are looking at a number that
+describes the preview rather than the file.
 
 HOW TO RANK
 You are NOT applying a composition textbook. Rule of thirds, level horizons and
@@ -139,14 +157,21 @@ def stage2_user_content(frames: list[dict]) -> list[dict]:
     `frames` carries one dict per photograph with `filename`,
     `clipped_highlights`, `clipped_shadows` and `encoded` (base64 JPEG).
     """
-    facts = ["Measured for each frame (ground truth, do not re-estimate):"]
+    facts = ["Measured for each frame (do not re-estimate; read the domain label):"]
     for i, f in enumerate(frames, start=1):
-        facts.append(
-            f"{i}. highlights clipped {f['clipped_highlights'] * 100:.1f}%, "
+        domain = f.get("measurement_domain", "rendered_image")
+        line = (
+            f"{i}. [{domain}] highlights clipped {f['clipped_highlights'] * 100:.1f}%, "
             f"shadows crushed {f['clipped_shadows'] * 100:.1f}%"
-            + ("  [below 3% -- penalising highlights is forbidden]"
-               if f["clipped_highlights"] < 0.03 else "")
         )
+        if domain == "raw_sensor":
+            headroom = f.get("headroom_stops") or 0.0
+            line += f", {headroom:.2f} stops of highlight headroom remain"
+        else:
+            line += " -- measured on the developed image, so this is a lower bound"
+        if f["clipped_highlights"] < 0.03:
+            line += "  [below 3% -- penalising highlights is forbidden]"
+        facts.append(line)
     facts.append(f"\nRank these {len(frames)} frames. Return {len(frames)} JSON objects.")
 
     content: list[dict] = [{"type": "input_text", "text": "\n".join(facts)}]
