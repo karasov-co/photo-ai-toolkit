@@ -283,10 +283,16 @@ def test_a_corrupt_file_is_trash(profile):
     assert routed(profile, issues=blocking(IssueCode.CORRUPT_FILE)).route_class is RouteClass.TRASH
 
 
-def test_a_weaker_burst_sibling_is_trash(profile):
+def test_a_weaker_burst_sibling_is_a_comparison_not_a_deletion(profile):
+    """Sharpness picks the winner and cannot see which take has the better face."""
     result = routed(profile, issues=blocking(IssueCode.WEAKER_DUPLICATE), is_best_in_cluster=False)
-    assert result.route_class is RouteClass.TRASH
+    assert result.route_class is RouteClass.DUPLICATE_CANDIDATE
     assert AssetTag.WEAKER_DUPLICATE in result.tags
+
+
+def test_a_duplicate_says_whether_a_content_check_ran(profile):
+    without = routed(profile, issues=blocking(IssueCode.WEAKER_DUPLICATE), is_best_in_cluster=False)
+    assert any("no content check ran" in r for r in without.reasons)
 
 
 def test_a_clip_with_no_usable_segment_is_trash(profile):

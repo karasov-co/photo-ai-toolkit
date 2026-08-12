@@ -49,6 +49,10 @@ class RouteClass(StrEnum):
     # Keep, but do nothing with. The class that exists so that "not worth
     # selling" never has to be expressed as "worth destroying".
     ARCHIVE_ONLY = "archive_only"
+    # A near-identical sibling scored higher. A proposal for a person to compare,
+    # never a deletion: the difference between two takes is usually a gesture or
+    # an expression, and nothing local can see either.
+    DUPLICATE_CANDIDATE = "duplicate_candidate"
     STOCK_STANDARD = "stock_standard"
     STOCK_STRONG = "stock_strong"
     FLAGSHIP = "flagship"
@@ -64,6 +68,10 @@ class AssetTag(StrEnum):
     NEEDS_PROPERTY_RELEASE = "needs_property_release"
     LEGAL_REVIEW = "legal_review"
     ARCHIVE_ONLY = "archive_only"
+    # A near-identical sibling scored higher. A proposal for a person to compare,
+    # never a deletion: the difference between two takes is usually a gesture or
+    # an expression, and nothing local can see either.
+    DUPLICATE_CANDIDATE = "duplicate_candidate"
     LOW_STOCK_DEMAND = "low_stock_demand"
     BEST_IN_CLUSTER = "best_in_cluster"
     WEAKER_DUPLICATE = "weaker_duplicate"
@@ -81,12 +89,21 @@ FATAL_CODES = frozenset(
         IssueCode.ENCODING_CORRUPTION,
         IssueCode.EMPTY_FRAME,
         IssueCode.NO_USABLE_SEGMENT,
-        IssueCode.WEAKER_DUPLICATE,
         IssueCode.INSUFFICIENT_RESOLUTION,
-        IssueCode.UNUSABLE_DURATION,
         IssueCode.LEGAL_BLOCKER,
     }
 )
+
+# Deliberately NOT fatal, and each for its own reason:
+#
+#   WEAKER_DUPLICATE   two takes of one moment. Which is better depends on an
+#                      expression or a gesture, and the local measurement that
+#                      picks a winner cannot see either.
+#   SHORT_CLIP         below a marketplace's duration floor, which is a
+#                      submission rule and not a property of the footage.
+#   UNUSABLE_DURATION  a fragment of a second. Still routed for review rather
+#                      than destroyed, because the frame count is the only thing
+#                      wrong with it.
 
 # One unrecoverable issue ceilings potential here; each further one lowers it.
 # Set below every profile's `trash_potential` (30 for photos, 24 for video) so
@@ -225,7 +242,36 @@ class ScoreInput:
     cluster_size: int = 1
     is_best_in_cluster: bool = True
     cluster_similarity: float = 0.0
+    cluster_margin: float = 0.0
     evidence_completeness: float = 1.0
+    # Without a content check, a duplicate decision rests on sharpness alone --
+    # which cannot see the expression, the gesture or the moment that usually
+    # decides which of two takes is the keeper.
+    semantic_ran: bool = False
+
+
+@dataclass
+class Reason:
+    """A stable key plus its numbers, so the same reason renders in any language.
+
+    The English sentence stays in `text` for the JSON, where other software
+    reads it; the console and the HTML render `key` through the catalogue. That
+    is what stops a Russian run from printing a paragraph of English next to a
+    Russian summary.
+    """
+
+    key: str
+    params: dict = field(default_factory=dict)
+    text: str = ""
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "params": self.params, "text": self.text}
+
+    def localise(self, language: str = "en") -> str:
+        from i18n import t as translate
+
+        rendered = translate(self.key, language, **self.params)
+        return self.text or rendered if rendered == self.key else rendered
 
 
 @dataclass
@@ -238,6 +284,7 @@ class ScoredAsset:
     route: Route
     tags: list[AssetTag] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
+    reason_keys: list[Reason] = field(default_factory=list)
     strengths: list[str] = field(default_factory=list)
     schema_version: int = SCHEMA_VERSION
     analyzer_version: str = ANALYZER_VERSION
@@ -469,6 +516,7 @@ def classify(
     # is not why a corrupt clip is being quarantined.
     class_reasons: list[str] = []
     reasons: list[str] = []
+    keys: list[Reason] = []
     tags: list[AssetTag] = []
     semantic = inp.semantic
     route = route_for(semantic)
@@ -498,7 +546,7 @@ def classify(
     tags.append(AssetTag.BEST_IN_CLUSTER if inp.is_best_in_cluster else AssetTag.WEAKER_DUPLICATE)
 
     fatal = [i for i in inp.issues.unrecoverable if i.code in FATAL_CODES]
-    route_class = _decide(inp, scores, profile, fatal, flagship_selected, class_reasons)
+    route_class = _decide(inp, scores, profile, fatal, flagship_selected, class_reasons, keys)
     reasons = class_reasons + reasons
 
     if route_class is RouteClass.FLAGSHIP:
@@ -518,6 +566,7 @@ def classify(
         route=route,
         tags=tags,
         reasons=reasons,
+        reason_keys=keys,
         strengths=_strengths(inp, scores),
     )
 
@@ -529,11 +578,37 @@ def _decide(
     fatal: list,
     flagship_selected: bool,
     reasons: list[str],
+    keys: list[Reason] | None = None,
 ) -> RouteClass:
     """Precedence, top to bottom. Order here *is* the policy."""
     if fatal:
         reasons.append("unrecoverable: " + "; ".join(i.describe() for i in fatal))
+        _key(keys, "reason.unrecoverable", {"detail": "; ".join(i.describe() for i in fatal)}, reasons[-1])
         return RouteClass.TRASH
+
+    # A near-identical sibling is a comparison for a person, not a deletion.
+    # Sharpness picks the winner, and sharpness cannot see which take has the
+    # better expression. Without a content check it is barely a signal at all.
+    if not inp.is_best_in_cluster:
+        # The number, taken from the measurement rather than parsed back out of
+        # an English sentence -- the regex that did that picked the frame number
+        # out of "cluster P1019370.JPG" and reported a margin of 1019370.
+        margin = f"{inp.cluster_margin:.0f}" if inp.cluster_margin else "?"
+        reasons.append(
+            f"a sharper frame exists in this group ({margin} points higher); "
+            + (
+                "compare them by hand"
+                if inp.semantic_ran
+                else "no content check ran, so only sharpness separates them -- compare by hand"
+            )
+        )
+        _key(
+            keys,
+            "reason.duplicate_candidate" if inp.semantic_ran else "reason.duplicate_unchecked",
+            {"margin": margin},
+            reasons[-1],
+        )
+        return RouteClass.DUPLICATE_CANDIDATE
 
     blockers = inp.issues.unrecoverable
     below_floor = scores.post_edit_potential < profile.threshold("trash_potential")
@@ -555,6 +630,11 @@ def _decide(
             f"confidence {scores.confidence} below {profile.threshold('review_confidence'):.0f}: "
             "a human should decide"
         )
+        _key(
+            keys, "reason.low_confidence",
+            {"value": scores.confidence, "threshold": int(profile.threshold("review_confidence"))},
+            reasons[-1],
+        )
         return RouteClass.REVIEW
 
     if below_floor:
@@ -571,6 +651,12 @@ def _decide(
             f"{profile.threshold('trash_potential'):.0f}, but nothing about this frame is "
             "unrecoverable: keeping it"
         )
+        _key(
+            keys, "reason.below_trash",
+            {"value": scores.post_edit_potential,
+             "threshold": int(profile.threshold("trash_potential"))},
+            reasons[-1],
+        )
         return RouteClass.ARCHIVE_ONLY
 
     if flagship_selected:
@@ -578,21 +664,35 @@ def _decide(
             f"portfolio potential {scores.portfolio_potential} clears the absolute floor "
             f"and ranks near the top of its genre"
         )
+        _key(keys, "reason.flagship", {"value": scores.portfolio_potential}, reasons[-1])
         return RouteClass.FLAGSHIP
 
     if scores.stock_potential >= profile.threshold("stock_strong"):
         reasons.append(f"stock potential {scores.stock_potential} is strong")
+        _key(keys, "reason.stock_strong", {"value": scores.stock_potential}, reasons[-1])
         return RouteClass.STOCK_STRONG
 
     if scores.stock_potential >= profile.threshold("stock_standard"):
         reasons.append(f"stock potential {scores.stock_potential} is usable after the suggested edit")
+        _key(keys, "reason.stock_standard", {"value": scores.stock_potential}, reasons[-1])
         return RouteClass.STOCK_STANDARD
 
     reasons.append(
         f"recoverable ({scores.post_edit_potential} potential) but below the stock floor "
         f"({profile.threshold('stock_standard'):.0f}): keep for the archive or decide by hand"
     )
+    _key(
+        keys, "reason.archive",
+        {"value": scores.post_edit_potential,
+         "threshold": int(profile.threshold("stock_standard"))},
+        reasons[-1],
+    )
     return RouteClass.REVIEW
+
+
+def _key(keys: list[Reason] | None, name: str, params: dict, text: str) -> None:
+    if keys is not None:
+        keys.append(Reason(name, params, text))
 
 
 def eligible_for_flagship(scores: AssetScores, profile: CalibrationProfile) -> bool:

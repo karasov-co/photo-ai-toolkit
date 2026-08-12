@@ -41,6 +41,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "class.trash": "Trash / reject",
         "class.review": "Needs manual review",
         "class.archive_only": "Keep in the archive",
+        "class.duplicate_candidate": "Similar frame, compare by hand",
         "class.stock_standard": "Usable stock",
         "class.stock_strong": "Strong stock",
         "class.flagship": "Flagship / portfolio",
@@ -93,6 +94,87 @@ STRINGS: dict[str, dict[str, str]] = {
         "misc.none": "none",
         "misc.usable_segment": "Usable segment",
         "misc.poster_frame": "Best frame",
+        # credentials and analysis mode
+        "creds.environment": "Semantic credentials: found in environment",
+        "creds.dotenv": "Semantic credentials: loaded from {path}",
+        "creds.missing": "Semantic credentials: missing",
+        "creds.error": (
+            "Error: --semantic was requested but OPENAI_API_KEY was not found.\n"
+            "Add OPENAI_API_KEY to the .env file in the project root and run again.\n"
+            "Example: OPENAI_API_KEY=your_key_here"
+        ),
+        "creds.failed": "Error: the semantic pass could not run: {reason}",
+        "creds.fallback_hint": (
+            "Re-run with --allow-semantic-fallback to accept a local-only result instead."
+        ),
+        "mode.title": "Analysis mode",
+        "mode.local_only": "local-only",
+        "mode.local_and_semantic": "local + semantic",
+        "mode.local_only_after_semantic_failure": "local-only after semantic failure",
+        "mode.banner": "SEMANTIC ANALYSIS DID NOT RUN",
+        "mode.banner_detail": (
+            "Content, faces, logos and release status were not checked. Genres are "
+            "unknown, not 'other'."
+        ),
+        "summary.technically_usable": "Technically usable, needs checking",
+        "summary.fully_checked": "Fully checked and ready to export",
+        "summary.not_semantically_checked": "Not checked by semantic analysis",
+        "summary.technically_usable_help": (
+            "Past the technical thresholds. Content, faces, logos and releases may not "
+            "have been checked."
+        ),
+        "summary.fully_checked_help": (
+            "Everything checked and exportable: content, faces, logos, releases and "
+            "marketplace metadata. Requires the semantic pass."
+        ),
+        "summary.release_status": "Release status",
+        "summary.release_unchecked": "not checked",
+        "summary.export_blocked_reason": (
+            "Nothing is export-ready because content, faces, logos and metadata "
+            "have not been checked."
+        ),
+        # plan
+        "plan.would_move": "{count} file(s) would move, {mb} MB:",
+        "plan.nothing_to_move": "Nothing to move.",
+        "plan.dry_run": "Nothing has been moved. Re-run with --apply to carry this out.",
+        # reasons, localised for display; JSON keeps the English codes
+        "reason.unrecoverable": "unrecoverable problems: {detail}",
+        "reason.release_unchecked": (
+            "release status not checked (no semantic pass): commercial stock is blocked "
+            "until faces and trademarks have actually been checked"
+        ),
+        "reason.release_blocked": (
+            "{present} present: a release is required, so commercial stock is blocked"
+        ),
+        "reason.low_confidence": "confidence {value} is below {threshold}: a human should decide",
+        "reason.below_trash": (
+            "realistic post-edit potential {value} is below {threshold}, but nothing about "
+            "this frame is unrecoverable: keeping it"
+        ),
+        "reason.stock_strong": "stock potential {value} is strong",
+        "reason.stock_standard": "stock potential {value} is usable after the suggested edit",
+        "reason.flagship": (
+            "portfolio potential {value} clears the absolute floor and ranks near the top "
+            "of its genre"
+        ),
+        "reason.archive": (
+            "recoverable ({value} potential) but below the stock floor ({threshold}): keep "
+            "for the archive or decide by hand"
+        ),
+        "reason.duplicate_candidate": (
+            "a sharper frame exists in this group ({margin} points higher); compare them by hand"
+        ),
+        "reason.duplicate_unchecked": (
+            "a sharper frame exists in this group ({margin} points higher), but no content "
+            "check ran -- only sharpness separates them, so compare them by hand"
+        ),
+        "reason.short_clip": "only {seconds}s long: too short for most marketplaces",
+        # contact sheet
+        "sheet.candidate": "candidate",
+        "sheet.cluster_best": "best of group",
+        "sheet.margin": "difference",
+        "sheet.semantic_ran": "semantic analysis ran",
+        "sheet.semantic_missing": "NO semantic analysis -- check by hand",
     },
     "ru": {
         "summary.title": "СВОДКА ПО КОЛЛЕКЦИИ",
@@ -110,6 +192,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "class.trash": "Брак / в отказ",
         "class.review": "Нужен ручной просмотр",
         "class.archive_only": "Оставить в архиве",
+        "class.duplicate_candidate": "Похожий кадр, сравнить вручную",
         "class.stock_standard": "Пригодно для стока",
         "class.stock_strong": "Сильный сток",
         "class.flagship": "Флагман / портфолио",
@@ -155,6 +238,85 @@ STRINGS: dict[str, dict[str, str]] = {
         "misc.none": "нет",
         "misc.usable_segment": "Пригодный фрагмент",
         "misc.poster_frame": "Лучший кадр",
+        "creds.environment": "Ключ для semantic-анализа: найден в окружении",
+        "creds.dotenv": "Ключ для semantic-анализа: загружен из {path}",
+        "creds.missing": "Ключ для semantic-анализа: не найден",
+        "creds.error": (
+            "Ошибка: включён --semantic, но OPENAI_API_KEY не найден.\n"
+            "Добавьте OPENAI_API_KEY в файл .env в корне проекта и повторите запуск.\n"
+            "Пример: OPENAI_API_KEY=your_key_here"
+        ),
+        "creds.failed": "Ошибка: semantic-анализ не выполнен: {reason}",
+        "creds.fallback_hint": (
+            "Запустите с --allow-semantic-fallback, чтобы принять результат "
+            "только локального анализа."
+        ),
+        "mode.title": "Режим анализа",
+        "mode.local_only": "только локальный",
+        "mode.local_and_semantic": "локальный + semantic",
+        "mode.local_only_after_semantic_failure": "только локальный после сбоя semantic",
+        "mode.banner": "SEMANTIC-АНАЛИЗ НЕ ВЫПОЛНЯЛСЯ",
+        "mode.banner_detail": (
+            "Содержание, лица, логотипы и статус релизов не проверены. "
+            "Жанр неизвестен, а не «other»."
+        ),
+        "summary.technically_usable": "Технически пригодно, нужна проверка",
+        "summary.fully_checked": "Полностью проверено и готово к экспорту",
+        "summary.not_semantically_checked": "Не проверено semantic-анализом",
+        "summary.technically_usable_help": (
+            "Прошло технические пороги. Содержание, лица, логотипы и релизы могли "
+            "не проверяться."
+        ),
+        "summary.fully_checked_help": (
+            "Проверено полностью и готово к экспорту: содержание, лица, логотипы, "
+            "релизы и метаданные. Требует semantic-анализа."
+        ),
+        "summary.release_status": "Статус релизов",
+        "summary.release_unchecked": "не проверен",
+        "summary.export_blocked_reason": (
+            "Ничего не готово к экспорту, потому что содержание, лица, логотипы "
+            "и метаданные не проверены."
+        ),
+        "plan.would_move": "Будет перемещено файлов: {count}, {mb} МБ:",
+        "plan.nothing_to_move": "Перемещать нечего.",
+        "plan.dry_run": "Ничего не перемещено. Запустите с --apply, чтобы выполнить.",
+        "reason.unrecoverable": "неисправимые проблемы: {detail}",
+        "reason.release_unchecked": (
+            "статус релизов не проверен (semantic-анализ не выполнялся): коммерческий сток "
+            "заблокирован, пока лица и товарные знаки не проверены"
+        ),
+        "reason.release_blocked": (
+            "в кадре {present}: нужен релиз, поэтому коммерческий сток заблокирован"
+        ),
+        "reason.low_confidence": "уверенность {value} ниже {threshold}: решение за человеком",
+        "reason.below_trash": (
+            "реальный потенциал после обработки {value} ниже {threshold}, но ничего "
+            "неисправимого в кадре нет: оставляем"
+        ),
+        "reason.stock_strong": "стоковый потенциал {value} — высокий",
+        "reason.stock_standard": "стоковый потенциал {value} пригоден после обработки",
+        "reason.flagship": (
+            "потенциал для портфолио {value} проходит абсолютный порог и входит в топ "
+            "своего жанра"
+        ),
+        "reason.archive": (
+            "поправимо (потенциал {value}), но ниже стокового порога ({threshold}): "
+            "оставить в архиве или решить вручную"
+        ),
+        "reason.duplicate_candidate": (
+            "в этой группе есть более резкий кадр (на {margin} баллов выше); "
+            "сравните их вручную"
+        ),
+        "reason.duplicate_unchecked": (
+            "в этой группе есть более резкий кадр (на {margin} баллов выше), но содержание "
+            "не проверялось — их различает только резкость, сравните вручную"
+        ),
+        "reason.short_clip": "длина всего {seconds} с: слишком коротко для большинства стоков",
+        "sheet.candidate": "кандидат",
+        "sheet.cluster_best": "лучший в группе",
+        "sheet.margin": "разница",
+        "sheet.semantic_ran": "semantic-анализ выполнен",
+        "sheet.semantic_missing": "semantic-анализ НЕ выполнялся — проверьте вручную",
     },
 }
 

@@ -1,0 +1,12 @@
+# Proposed deletions. Nothing has been removed.
+# Look at contact_sheet_delete.jpg before acting on this.
+# 6 candidate(s).
+# Paths are JSON-encoded so a newline or a quote in a filename cannot
+# break a line or be mistaken for shell syntax.
+
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019369.JPG"	unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019370.JPG (quality 11 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4"	unrecoverable: unusable_duration: 2.5s is below 3.0s; no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019390.JPG"	unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019389.JPG (quality 16 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019391.JPG"	unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019389.JPG (quality 10 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4"	unrecoverable: unusable_duration: 1.0s is below 3.0s; no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019400.JPG"	unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019401.JPG (quality 17 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done

@@ -78,7 +78,10 @@ class PipelineOptions:
     profile_name: str | None = None
     profile_path: Path | None = None
     semantic: bool = False
-    semantic_model: str = "gpt-5.6-sol"
+    semantic_model: str | None = None
+    # Without this, a semantic failure ends the run. A report that looks like a
+    # full analysis but had no content check is worse than no report.
+    allow_semantic_fallback: bool = False
     include_video: bool = True
     video_samples: int = 9
     force: bool = False
@@ -103,6 +106,18 @@ class RunResult:
     planned_operations: list = field(default_factory=list)
     calibration: CalibrationSet = field(default_factory=CalibrationSet)
     cancelled: bool = False
+    semantic_requested: bool = False
+    semantic_completed: bool = False
+    semantic_model: str = ""
+    semantic_error: str = ""
+
+    @property
+    def analysis_mode(self) -> str:
+        if not self.semantic_requested:
+            return "local_only"
+        if self.semantic_completed:
+            return "local_and_semantic"
+        return "local_only_after_semantic_failure"
 
     def by_class(self, route_class: RouteClass) -> list[AssetRecord]:
         return [r for r in self.records if r.route_class == route_class.value]
@@ -143,6 +158,11 @@ class AnalysisCache:
 
     def key(self, checksum: str) -> str:
         return f"{checksum}:{self.version}"
+
+    @staticmethod
+    def is_local_only(payload: dict) -> bool:
+        """Cached entries never carry semantic state, by construction."""
+        return "semantic" not in payload
 
     def get(self, checksum: str) -> dict | None:
         return self._data.get(self.key(checksum))
@@ -438,9 +458,9 @@ def semantic_pass(
     import routing
 
     if client is None:
-        import openai
+        import bootstrap
 
-        client = openai.OpenAI()
+        client = bootstrap.make_client()
 
     photo_names = [
         a.key
@@ -454,6 +474,11 @@ def semantic_pass(
     groups = aggregate.build_groups(photo_names, size=group_size)
     parsed_groups: list[list[dict]] = []
     per_frame: dict[str, dict] = {}
+    # A per-group failure is survivable; every group failing is not. An
+    # authentication or model error hits all of them identically, and swallowing
+    # it per group turned a hard failure into a silent empty result.
+    first_error: Exception | None = None
+    succeeded = 0
 
     for index, group in enumerate(groups):
         frames = []
@@ -490,7 +515,9 @@ def semantic_pass(
                 reasoning={"effort": "low"},
             )
             items = batch_runner.parse_group_json(response.output_text or "")
+            succeeded += 1
         except Exception as e:
+            first_error = first_error or e
             logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
             continue
 
@@ -508,6 +535,12 @@ def semantic_pass(
         for item in placed:
             per_frame.setdefault(item["filename"], item)
             item["_group_size"] = len(group)
+
+    if first_error is not None and succeeded == 0:
+        # Nothing got through. Re-raise so the caller decides whether that ends
+        # the run, rather than returning an empty dict that reads like "the
+        # model had no opinion".
+        raise first_error
 
     scores = aggregate.aggregate_all_axes(parsed_groups)
 
@@ -542,7 +575,20 @@ def run(
     client=None,
 ) -> RunResult:
     """Discover, measure, cluster, score, select, and propose. Moves nothing."""
+    import bootstrap
+
     calibration = resolve(options.profile_name, options.profile_path)
+    model = bootstrap.resolve_model(options.semantic_model)
+
+    # Before a single file is opened. The original failure surfaced only when
+    # the client was constructed, which was after every photograph had been
+    # decoded and measured -- minutes of work thrown away, and a run that then
+    # carried on as though nothing had happened.
+    if options.semantic and client is None and not bootstrap.has_credentials():
+        raise bootstrap.SemanticCredentialsMissing(
+            f"{bootstrap.API_KEY_VAR} is not set in the environment or in a .env file"
+        )
+
     previews_dir = options.output_dir / PREVIEW_DIRNAME
     cache = AnalysisCache(options.output_dir / CACHE_NAME)
 
@@ -560,7 +606,11 @@ def run(
     if options.limit:
         assets = assets[: options.limit]
 
-    result = RunResult(calibration=calibration)
+    result = RunResult(
+        calibration=calibration,
+        semantic_requested=options.semantic,
+        semantic_model=model if options.semantic else "",
+    )
     measurements: dict[str, Measurement] = {}
 
     for index, asset in enumerate(assets, start=1):
@@ -590,12 +640,20 @@ def run(
     cache.save()
 
     clusters = _cluster(assets, measurements)
-    semantics = _semantics(assets, measurements, options, client)
+    semantics = _semantics(assets, measurements, options, client, result, model)
 
-    result.records = _score_all(assets, measurements, clusters, semantics, calibration, options)
+    result.records = _score_all(
+        assets, measurements, clusters, semantics, calibration, options, model
+    )
     _apply_policy(result.records, options)
     if options.darkroom:
         _darkroom_pass(assets, measurements, result.records, options)
+    for record in result.records:
+        record.analysis_mode = result.analysis_mode
+        record.semantic_requested = result.semantic_requested
+        record.semantic_completed = result.semantic_completed
+        record.semantic_error = result.semantic_error
+
     result.planned_operations = _plan_operations(assets, result.records, options)
     result.summary = reports.summarise(
         result.records,
@@ -730,14 +788,38 @@ def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> N
         record.darkroom_engine_version = produced.get("engine_version", "")
 
 
-def _semantics(assets, measurements, options: PipelineOptions, client) -> dict[str, Semantic]:
+def _semantics(
+    assets, measurements, options: PipelineOptions, client, result: RunResult, model: str
+) -> dict[str, Semantic]:
+    """Run the paid pass, or record precisely why it did not.
+
+    A failure is never swallowed. Either it ends the run, or -- with the
+    fallback explicitly allowed -- it is recorded on the result so that every
+    report says the content was not checked.
+    """
+    import bootstrap
+
     if not options.semantic:
         return {}
+
     try:
-        return semantic_pass(assets, measurements, model=options.semantic_model, client=client)
+        semantics = semantic_pass(
+            assets, measurements, model=model, client=client
+        )
     except Exception as e:
-        logger.error("Semantic pass failed, continuing without it: %s", reports.redact(str(e)))
+        kind, message = bootstrap.classify_api_error(e)
+        result.semantic_error = f"{kind}: {message}"
+        logger.error("Semantic pass failed: %s", message)
+        if not options.allow_semantic_fallback:
+            raise bootstrap.SemanticUnavailable(message, kind=kind) from e
         return {}
+
+    result.semantic_completed = bool(semantics)
+    if not semantics:
+        result.semantic_error = "the model returned nothing usable for any group"
+        if not options.allow_semantic_fallback:
+            raise bootstrap.SemanticUnavailable(result.semantic_error, kind="empty")
+    return semantics
 
 
 def _cluster(assets, measurements) -> dict[str, tuple[str, int, bool, float, float]]:
@@ -770,7 +852,9 @@ def _cluster(assets, measurements) -> dict[str, tuple[str, int, bool, float, flo
     return out
 
 
-def _score_all(assets, measurements, clusters, semantics, calibration, options) -> list[AssetRecord]:
+def _score_all(
+    assets, measurements, clusters, semantics, calibration, options, semantic_model: str = ""
+) -> list[AssetRecord]:
     """Score, then run the collection-level flagship pass, then classify."""
     prepared: list[tuple[media.Asset, Measurement, ScoreInput, object]] = []
 
@@ -814,7 +898,9 @@ def _score_all(assets, measurements, clusters, semantics, calibration, options) 
             cluster_size=size,
             is_best_in_cluster=is_best or not found.codes() & {issues_module.IssueCode.WEAKER_DUPLICATE},
             cluster_similarity=similarity,
+            cluster_margin=margin,
             evidence_completeness=completeness,
+            semantic_ran=semantic.present,
         )
         prepared.append((asset, measurement, inp, scoring.score(inp, profile)))
 
@@ -827,7 +913,9 @@ def _score_all(assets, measurements, clusters, semantics, calibration, options) 
             inp, scores, profile, flagship_selected=asset.key in flagship
         )
         records.append(
-            _build_record(asset, measurement, inp, scored, clusters, calibration, options)
+            _build_record(
+                asset, measurement, inp, scored, clusters, calibration, options, semantic_model
+            )
         )
     return records
 
@@ -880,7 +968,9 @@ def _select_flagship(prepared, measurements, clusters, calibration) -> set[str]:
     return set(chosen)
 
 
-def _build_record(asset, measurement, inp, scored, clusters, calibration, options) -> AssetRecord:
+def _build_record(
+    asset, measurement, inp, scored, clusters, calibration, options, semantic_model: str = ""
+) -> AssetRecord:
     cluster_id, size, is_best, _, _ = clusters[asset.key]
     record = provenance_module.read_provenance(asset.path, measurement.exif)
 
@@ -935,7 +1025,7 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         duration=measurement.duration,
         analyzer_version=scoring.ANALYZER_VERSION,
         calibration=calibration.fingerprint,
-        model_versions={"semantic": options.semantic_model if options.semantic else "none"},
+        model_versions={"semantic": semantic_model or "none"},
         analyzed_at=reports.datetime.now(reports.UTC).isoformat(timespec="seconds"),
         scores=scored.scores.to_dict(),
         route_class=scored.route_class.value,
@@ -945,7 +1035,11 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         issues=issues_module.summarise(inp.issues),
         strengths=scored.strengths,
         reasons=scored.reasons,
-        genre=inp.semantic.genre,
+        reason_keys=[r.to_dict() for r in scored.reason_keys],
+        # "other" is a genre the model can assign. When nothing looked, the
+        # honest value is that nobody knows -- reporting `other` presented an
+        # unexamined frame as a confidently classified one.
+        genre=inp.semantic.genre if inp.semantic.present else "unknown",
         camera=_camera_key(measurement.exif),
         concepts=list(inp.semantic.concepts),
         description=inp.semantic.description,
@@ -962,6 +1056,7 @@ def _build_record(asset, measurement, inp, scored, clusters, calibration, option
         cluster_margin=clusters[asset.key][4],
         phash=measurement.phash,
         semantic_present=inp.semantic.present,
+        semantic_model=semantic_model,
         video=measurement.video,
         preview_path=measurement.preview_path,
         proposed_action=_proposed_action(scored.route_class),
@@ -1058,6 +1153,8 @@ def _proposed_action(route_class: RouteClass) -> str:
         return "hold_for_review"
     if route_class is RouteClass.ARCHIVE_ONLY:
         return "keep_in_place"
+    if route_class is RouteClass.DUPLICATE_CANDIDATE:
+        return "compare_by_hand"
     return "keep_in_place"
 
 
@@ -1079,7 +1176,7 @@ def _plan_operations(assets, records, options: PipelineOptions) -> list:
                 asset_id=asset.asset_id,
                 files=asset.all_files,
                 destination_dir=options.resolved_quarantine(),
-                reason="; ".join(record.reasons) or "below every threshold",
+                reason=_plan_reason(record, options.language),
                 route_class=record.route_class,
                 scores=record.scores,
                 states=record.file_states,
@@ -1087,6 +1184,26 @@ def _plan_operations(assets, records, options: PipelineOptions) -> list:
             )
         )
     return quarantine.plan(moves)
+
+
+def _plan_reason(record, language: str) -> str:
+    """The single line a user reads beside a file proposed for removal.
+
+    Localised, and built from the structured keys so it never mixes languages.
+    """
+    from i18n import t
+    from scoring import Reason
+
+    for payload in record.reason_keys or []:
+        reason = Reason(payload.get("key", ""), payload.get("params") or {}, payload.get("text", ""))
+        if reason.key.startswith("reason.unrecoverable"):
+            return reason.localise(language)
+    if record.reason_keys:
+        first = record.reason_keys[0]
+        return Reason(first.get("key", ""), first.get("params") or {}, first.get("text", "")).localise(
+            language
+        )
+    return t("reason.unrecoverable", language, detail="?")
 
 
 def _record_for(records, key):

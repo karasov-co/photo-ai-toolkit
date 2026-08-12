@@ -55,8 +55,9 @@ PURGE_CONFIRMATION = "PERMANENTLY DELETE"
 
 # The only grounds on which a file may ever be permanently destroyed. Each is a
 # demonstrable property of the file rather than an opinion about the picture: it
-# does not decode, it holds no image, the clip is too short to use, or an
-# identical copy is being kept. Everything else -- low score, weak composition,
+# does not decode, it holds no image, there is no usable segment in it, or an
+# identical copy is being kept. `unusable_duration` is deliberately absent: a
+# short clip is short, which is a marketplace fact and not damage. Everything else -- low score, weak composition,
 # unappealing subject, a model's aesthetic judgement -- reaches quarantine at
 # most, and stays there.
 PURGEABLE_EVIDENCE = frozenset(
@@ -65,7 +66,6 @@ PURGEABLE_EVIDENCE = frozenset(
         "encoding_corruption",
         "empty_frame",
         "no_usable_segment",
-        "unusable_duration",
         "insufficient_resolution",
         "exact_duplicate",
     }
@@ -623,19 +623,23 @@ def _next_free_name(path: Path) -> Path:
     raise UnsafePath(f"could not find a free filename beside {path}")
 
 
-def summarise_plan(planned: list[FileOperation]) -> str:
-    """What a user sees before approving anything."""
+def summarise_plan(planned: list[FileOperation], language: str = "en") -> str:
+    """What a user sees before approving anything, in their language."""
+    from i18n import t
+
     if not planned:
-        return "Nothing to move."
+        return t("plan.nothing_to_move", language)
+
     by_reason: dict[str, int] = {}
     total = 0
     for op in planned:
         by_reason[op.reason] = by_reason.get(op.reason, 0) + 1
         total += op.size_bytes
+
     lines = [
-        f"{len(planned)} file(s) would move, {total / 1_048_576:.1f} MB:",
+        t("plan.would_move", language, count=len(planned), mb=f"{total / 1_048_576:.1f}"),
         *(f"  {count:>5}  {reason}" for reason, count in sorted(by_reason.items())),
         "",
-        "Nothing has been moved. Re-run with --apply to carry this out.",
+        t("plan.dry_run", language),
     ]
     return "\n".join(lines)

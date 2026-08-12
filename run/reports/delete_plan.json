@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-12T07:39:25+00:00",
+  "note": "Nothing has been removed. Review contact_sheet_delete.jpg first.",
+  "candidates": [
+    {
+      "asset_key": "P1019369.JPG",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019369.JPG",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019369.JPG"
+      ],
+      "checksum": "31695f85aaae438e80f572da0f6f6617e1cb3608e841453e296104d0acc016d8",
+      "reason": "unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019370.JPG (quality 11 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "weaker_duplicate"
+    },
+    {
+      "asset_key": "P1019374.MP4",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019374.MP4"
+      ],
+      "checksum": "bde02955294d735dc62e710f99db2b83d7eafee1806e9c22e94cbf2c0e335667",
+      "reason": "unrecoverable: unusable_duration: 2.5s is below 3.0s; no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "no_usable_segment,unusable_duration"
+    },
+    {
+      "asset_key": "P1019390.JPG",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019390.JPG",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019390.JPG"
+      ],
+      "checksum": "de86098529959181e0c724e769fdd50e88e6f8e7424647a2d2e5cb1b8c58a803",
+      "reason": "unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019389.JPG (quality 16 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "weaker_duplicate"
+    },
+    {
+      "asset_key": "P1019391.JPG",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019391.JPG",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019391.JPG"
+      ],
+      "checksum": "29f23147e849e2f9bb2d49e5a8c4543c7c101646d2e0ed296e7bd314ade388e4",
+      "reason": "unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019389.JPG (quality 10 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "weaker_duplicate"
+    },
+    {
+      "asset_key": "P1019398.MP4",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019398.MP4"
+      ],
+      "checksum": "dd2670889d0ef6a3e22bf16cae238175acbac86acba5d878ec42ac644a7e3ee0",
+      "reason": "unrecoverable: unusable_duration: 1.0s is below 3.0s; no_usable_segment: no run of 3.0s meets the quality floor; release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "no_usable_segment,unusable_duration"
+    },
+    {
+      "asset_key": "P1019400.JPG",
+      "source_path": "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019400.JPG",
+      "files": [
+        "/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019400.JPG"
+      ],
+      "checksum": "0894da92a9dc580e5ca2c80f4ef96c31ba94c491d1f28e7d672f7b20cc2b7e30",
+      "reason": "unrecoverable: weaker_duplicate: a sharper frame exists in cluster P1019401.JPG (quality 17 points higher); release status unchecked (no vision pass ran): commercial stock is blocked until a face and trademark check has actually been done",
+      "evidence": "weaker_duplicate"
+    }
+  ]
+}

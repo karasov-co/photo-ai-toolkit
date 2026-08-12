@@ -23,7 +23,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 from routing import Destination, Routed
 
@@ -46,6 +46,31 @@ MANIFEST_FIELDS = [
     "is_video",
     "technically_rejected_for",
 ]
+
+# PIL's built-in bitmap font has no Cyrillic, so a Russian label rendered as a
+# row of empty boxes. These are the usual system locations; the first one that
+# loads wins, and if none does the labels fall back to the bitmap font rather
+# than the sheet failing to render at all.
+FONT_CANDIDATES = (
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+)
+
+
+def load_font(size: int = 13):
+    """A TrueType face that covers Cyrillic, or the bitmap fallback."""
+    for candidate in FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(candidate, size)
+        except OSError:
+            continue
+    logger.info("No Unicode font found; contact sheet labels will use the bitmap font")
+    return ImageFont.load_default()
+
 
 CONTACT_COLUMNS = 5
 CONTACT_THUMB_PX = 320
@@ -188,6 +213,86 @@ def _delete_script(candidates: list[Routed], sources: dict[str, Path]) -> str:
     return "\n".join(lines)
 
 
+def build_comparison_sheet(
+    rows: list[dict],
+    out_path: Path,
+    *,
+    language: str = "en",
+    semantic_ran: bool = False,
+) -> Path | None:
+    """Each candidate beside the frame that beat it, with the margin and reason.
+
+    A grid of thumbnails answers "what am I about to lose". It does not answer
+    "and why is the other one better", which is the question that actually
+    decides a duplicate. Putting the pair side by side with the score gap does,
+    and it is the only way a person can catch the case where the sharper frame
+    has the worse expression.
+
+    Each row: `candidate_preview`, `best_preview`, `label`, `best_label`,
+    `margin`, `reason`.
+    """
+    from i18n import t
+
+    loaded: list[dict] = []
+    for row in rows:
+        pair = dict(row)
+        pair["candidate_image"] = _thumb(row.get("candidate_preview"))
+        pair["best_image"] = _thumb(row.get("best_preview"))
+        if pair["candidate_image"] is not None:
+            loaded.append(pair)
+
+    if not loaded:
+        return None
+
+    gap = 12
+    cell = CONTACT_THUMB_PX
+    text_height = 72
+    row_height = cell + text_height + gap
+    width = cell * 2 + gap * 3
+    sheet = Image.new("RGB", (width, row_height * len(loaded) + gap), (18, 18, 18))
+    draw = ImageDraw.Draw(sheet)
+
+    font = load_font(13)
+    warning = t("sheet.semantic_ran" if semantic_ran else "sheet.semantic_missing", language)
+    for index, pair in enumerate(loaded):
+        top = gap + index * row_height
+        sheet.paste(pair["candidate_image"], (gap, top))
+        if pair["best_image"] is not None:
+            sheet.paste(pair["best_image"], (gap * 2 + cell, top))
+
+        text_top = top + cell + 4
+        draw.text((gap, text_top), f"{t('sheet.candidate', language)}: {pair.get('label', '')}",
+                  fill=(230, 170, 170), font=font)
+        if pair.get("best_label"):
+            draw.text((gap * 2 + cell, text_top),
+                      f"{t('sheet.cluster_best', language)}: {pair['best_label']}",
+                      fill=(150, 210, 170), font=font)
+        draw.text((gap, text_top + 16),
+                  f"{t('sheet.margin', language)}: {pair.get('margin', '?')}",
+                  fill=(190, 190, 190), font=font)
+        draw.text((gap, text_top + 32), str(pair.get("reason", ""))[:120],
+                  fill=(160, 160, 160), font=font)
+        draw.text((gap, text_top + 48), warning,
+                  fill=(150, 210, 170) if semantic_ran else (235, 140, 140), font=font)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(out_path, "JPEG", quality=88)
+    return out_path
+
+
+def _thumb(path) -> Image.Image | None:
+    if not path:
+        return None
+    try:
+        with Image.open(path) as img:
+            thumb = img.convert("RGB")
+            thumb.thumbnail((CONTACT_THUMB_PX, CONTACT_THUMB_PX), Image.LANCZOS)
+            return thumb.copy()
+    except Exception as e:
+        logger.warning("Could not read preview %s: %s", path, e)
+        return None
+
+
 # --- looking at what you are about to lose ----------------------------------
 
 
@@ -220,12 +325,13 @@ def build_contact_sheet(
     cell_h = max(t.height for _, t in loaded) + CONTACT_LABEL_PX
 
     sheet = Image.new("RGB", (cell_w * columns, cell_h * rows), (18, 18, 18))
+    font = load_font(12)
     draw = ImageDraw.Draw(sheet)
     for i, (label, thumb) in enumerate(loaded):
         x = (i % columns) * cell_w
         y = (i // columns) * cell_h
         sheet.paste(thumb, (x, y))
-        draw.text((x + 4, y + thumb.height + 6), label[:38], fill=(230, 230, 230))
+        draw.text((x + 4, y + thumb.height + 6), label[:38], fill=(230, 230, 230), font=font)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(out_path, "JPEG", quality=88)
@@ -243,6 +349,7 @@ CLASS_TREE = {
     "trash": "trash_quarantine",
     "review": "manual_review",
     "archive_only": "archive",
+    "duplicate_candidate": "duplicate_review",
     "stock_standard": "stock/standard",
     "stock_strong": "stock/strong",
     "flagship": "portfolio/flagship",
@@ -259,7 +366,7 @@ def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
     """
     counts: dict[str, int] = {}
     extra = ("stock/editorial", "stock/by_genre", "portfolio/by_genre",
-             "stock/marketplace_packages", "archive")
+             "stock/marketplace_packages", "archive", "duplicate_review")
     for folder in (*CLASS_TREE.values(), *extra):
         target = out_dir / folder
         target.mkdir(parents=True, exist_ok=True)
