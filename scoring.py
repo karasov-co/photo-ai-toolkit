@@ -46,6 +46,9 @@ ANALYZER_VERSION = "2.0.0"
 class RouteClass(StrEnum):
     TRASH = "trash"
     REVIEW = "review"
+    # Keep, but do nothing with. The class that exists so that "not worth
+    # selling" never has to be expressed as "worth destroying".
+    ARCHIVE_ONLY = "archive_only"
     STOCK_STANDARD = "stock_standard"
     STOCK_STRONG = "stock_strong"
     FLAGSHIP = "flagship"
@@ -136,14 +139,46 @@ class Semantic:
         return self.faces or self.logos
 
 
-def semantic_from_assessment(assessment) -> Semantic:
-    """Adapter from the Stage 2 `routing.Assessment` this repo already produces."""
+UNKNOWN_AXIS = 50
+
+
+def rank_to_percentile(rank: int, group_size: int) -> int:
+    """A within-group rank (1 = best) onto the 0-100 scale (100 = best).
+
+    These two conventions are opposite, and mixing them silently inverts the
+    meaning of every axis. Stage 2 is *asked* for ranks because an absolute
+    scale collapses; scoring works in percentiles because thresholds need one.
+    The conversion belongs in exactly one place, which is here.
+    """
+    if group_size < 2:
+        return 100
+    clamped = max(1, min(group_size, int(rank)))
+    return int(round(100 * (group_size - clamped) / (group_size - 1)))
+
+
+def semantic_from_assessment(assessment, *, group_size: int | None = None) -> Semantic:
+    """Adapter from the Stage 2 `routing.Assessment` this repo already produces.
+
+    `group_size` is required to interpret the axes, because they arrive as
+    ranks. Without it the axes are set to "unknown" rather than to the raw rank:
+    a rank of 1 means *best*, and copying it into a field where 1 means *worst*
+    turned the strongest frame of a group into the weakest. That happened in the
+    fallback path whenever a group failed to aggregate -- a timeout or a
+    malformed reply -- which is precisely when nobody is watching.
+    """
+    if group_size is None:
+        axis_a = axis_b = axis_c = UNKNOWN_AXIS
+    else:
+        axis_a = rank_to_percentile(assessment.axis_a, group_size)
+        axis_b = rank_to_percentile(assessment.axis_b, group_size)
+        axis_c = rank_to_percentile(assessment.axis_c, group_size)
+
     return Semantic(
         present=True,
         genre=str(assessment.genre),
-        axis_a=int(assessment.axis_a),
-        axis_b=int(assessment.axis_b),
-        axis_c=int(assessment.axis_c),
+        axis_a=axis_a,
+        axis_b=axis_b,
+        axis_c=axis_c,
         recover=str(assessment.recover),
         faces=bool(assessment.faces),
         logos=bool(assessment.logos),
@@ -523,11 +558,20 @@ def _decide(
         return RouteClass.REVIEW
 
     if below_floor:
+        # A low score is not evidence of anything. Underexposure, flat contrast,
+        # softness, grain, an odd crop -- every one of these drags potential down
+        # and not one of them proves the photograph is worthless. A real
+        # reproduction: a dark frame with *only* fixable issues scored 16 and was
+        # routed to trash purely because 16 < 30.
+        #
+        # Destroying a file needs a demonstrable fact about it, which is what the
+        # unrecoverable-issue branch above requires. Everything else is kept.
         reasons.append(
             f"realistic post-edit potential {scores.post_edit_potential} is below "
-            f"{profile.threshold('trash_potential'):.0f}"
+            f"{profile.threshold('trash_potential'):.0f}, but nothing about this frame is "
+            "unrecoverable: keeping it"
         )
-        return RouteClass.TRASH
+        return RouteClass.ARCHIVE_ONLY
 
     if flagship_selected:
         reasons.append(

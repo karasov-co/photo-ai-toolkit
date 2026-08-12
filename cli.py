@@ -291,8 +291,13 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
             continue
         if record.proposed_action == "excluded_by_user":
             continue
-        source = Path(record.source_path)
-        files = [source] + [p for p in source.parent.glob(source.stem + ".*") if p != source]
+        # The exact group recorded at analysis time, never a glob. Globbing
+        # `stem.*` re-derives the group from whatever is on disk *now*: it
+        # sweeps in unrelated files that happen to share a stem -- an edited
+        # `P1042675.tif`, a `P1042675.mp4` from a different shoot -- and misses
+        # any sidecar named differently. Both directions move files nobody
+        # decided anything about.
+        files = [Path(p) for p in (record.all_files or [record.source_path])]
         moves.append(
             quarantine_module.PlannedMove(
                 asset_id=record.asset_id,
@@ -301,6 +306,8 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
                 reason="; ".join(record.reasons[:1]) or "below every threshold",
                 route_class=record.route_class,
                 scores=record.scores,
+                states=record.file_states,
+                evidence=record.evidence,
             )
         )
 
@@ -319,6 +326,28 @@ def cmd_quarantine(args: argparse.Namespace) -> int:
     print(f"Manifest: {quarantine.manifest.path}")
     print("Restore anything with:  python cli.py restore --quarantine <dir> --apply")
     return 1 if failed else 0
+
+
+def cmd_trash(args: argparse.Namespace) -> int:
+    """Carry out delete_plan.json in Python. Moves to Trash, never unlinks."""
+    plan = Path(args.plan).resolve()
+    if not plan.exists():
+        print(f"Error: no plan at {plan}", file=sys.stderr)
+        return 1
+
+    report = layout.move_to_trash(plan, dry_run=not args.apply, trash_dir=Path(args.trash) if args.trash else None)
+    if not args.apply:
+        print(f"{report['planned']} file(s) would move to {report['trash']}.")
+        for skip in report["skipped"][:20]:
+            print(f"  skip {skip['file']}: {skip['why']}")
+        print("\nNothing has been moved. Re-run with --apply.")
+        return 0
+
+    print(f"Moved {report['moved']} of {report['planned']} file(s) to {report['trash']}.")
+    for skip in report["skipped"]:
+        print(f"  skip {skip['file']}: {skip['why']}")
+    print("Nothing was permanently deleted; empty the Trash yourself when happy.")
+    return 0
 
 
 def cmd_restore(args: argparse.Namespace) -> int:
@@ -569,6 +598,12 @@ def build_parser() -> argparse.ArgumentParser:
     quarantine.add_argument("--input", help="source root, to fence the operation")
     quarantine.add_argument("--apply", action="store_true", help="actually move the files")
     quarantine.set_defaults(func=cmd_quarantine)
+
+    trash = sub.add_parser("trash", help="carry out delete_plan.json (dry run unless --apply)")
+    trash.add_argument("--plan", required=True)
+    trash.add_argument("--trash", help="target directory (default: ~/.Trash)")
+    trash.add_argument("--apply", action="store_true")
+    trash.set_defaults(func=cmd_trash)
 
     restore = sub.add_parser("restore", help="undo a quarantine operation")
     restore.add_argument("--quarantine", required=True)

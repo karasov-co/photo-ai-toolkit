@@ -53,6 +53,36 @@ LOCK_STALE_SECONDS = 3600
 DEFAULT_PURGE_AGE_DAYS = 30
 PURGE_CONFIRMATION = "PERMANENTLY DELETE"
 
+# The only grounds on which a file may ever be permanently destroyed. Each is a
+# demonstrable property of the file rather than an opinion about the picture: it
+# does not decode, it holds no image, the clip is too short to use, or an
+# identical copy is being kept. Everything else -- low score, weak composition,
+# unappealing subject, a model's aesthetic judgement -- reaches quarantine at
+# most, and stays there.
+PURGEABLE_EVIDENCE = frozenset(
+    {
+        "corrupt_file",
+        "encoding_corruption",
+        "empty_frame",
+        "no_usable_segment",
+        "unusable_duration",
+        "insufficient_resolution",
+        "exact_duplicate",
+    }
+)
+
+
+def is_purgeable_evidence(evidence: str) -> bool:
+    """Whether these grounds justify destroying the file, not merely filing it.
+
+    Deliberately a whitelist. A new issue code added later is not purgeable
+    until somebody decides it is, which is the safe direction for a list whose
+    failure mode is permanent.
+    """
+    if not evidence:
+        return False
+    return all(part.strip() in PURGEABLE_EVIDENCE for part in evidence.split(",") if part.strip())
+
 
 class OperationStatus(StrEnum):
     PLANNED = "planned"
@@ -86,9 +116,19 @@ class FileOperation:
     is_sidecar: bool = False
     scores: dict = field(default_factory=dict)
     error: str = ""
+    # Everything below exists so a move can be verified and undone as a group.
+    group_id: str = ""
+    expected: dict = field(default_factory=dict)
+    evidence: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @property
+    def expected_state(self):
+        from media import FileState
+
+        return FileState.from_dict(self.expected) if self.expected else None
 
 
 def _now() -> str:
@@ -199,6 +239,14 @@ class PlannedMove:
     reason: str
     route_class: str = ""
     scores: dict = field(default_factory=dict)
+    # What each file looked like when it was analysed. A move is refused if the
+    # file on disk no longer matches: between analysis and quarantine the user
+    # may have edited, replaced or re-exported it, and the decision was made
+    # about the old contents.
+    states: dict[str, dict] = field(default_factory=dict)
+    # Why this asset is proposed for removal, in a form the purge gate can read.
+    # An aesthetic judgement is never sufficient grounds for permanent deletion.
+    evidence: str = ""
 
 
 class Quarantine:
@@ -233,6 +281,7 @@ class Quarantine:
                     FileOperation(
                         op_id=op_id,
                         asset_id=move.asset_id,
+                        group_id=f"{op_id}:{move.asset_id}",
                         source=str(source),
                         destination=str(destination),
                         checksum="",
@@ -243,6 +292,8 @@ class Quarantine:
                         status=OperationStatus.PLANNED.value,
                         is_sidecar=i > 0,
                         scores=move.scores,
+                        expected=move.states.get(str(source), {}),
+                        evidence=move.evidence,
                     )
                 )
         return planned
@@ -276,66 +327,142 @@ class Quarantine:
     # --- applying -----------------------------------------------------------
 
     def apply(self, planned: list[FileOperation], *, dry_run: bool = True) -> list[FileOperation]:
-        """Carry out a plan. `dry_run=True` is the default and changes nothing."""
+        """Carry out a plan, one asset group at a time, all-or-nothing.
+
+        A RAW, its JPEG twin and its `.xmp` are one photograph. Moving them
+        independently means a failure partway -- a full disk, a permission
+        error, a file that vanished -- leaves the RAW in quarantine and the
+        sidecar in the archive. That orphan is not something the user can
+        interpret or the tool can restore, so a group either moves completely
+        or is put back exactly as it was.
+        """
         if dry_run:
             return planned
 
         results: list[FileOperation] = []
         with self.lock:
-            for op in planned:
-                results.append(self._move_one(op))
+            for group in self._grouped(planned):
+                results.extend(self._move_group(group))
         return results
 
-    def _move_one(self, op: FileOperation) -> FileOperation:
+    @staticmethod
+    def _grouped(planned: list[FileOperation]) -> list[list[FileOperation]]:
+        groups: dict[str, list[FileOperation]] = {}
+        for op in planned:
+            groups.setdefault(op.group_id or op.asset_id or op.source, []).append(op)
+        return list(groups.values())
+
+    def _move_group(self, ops: list[FileOperation]) -> list[FileOperation]:
+        """Verify the whole group, move it, and roll back if anything fails."""
+        refusal = self._verify_group(ops)
+        if refusal is not None:
+            return refusal
+
+        moved: list[FileOperation] = []
+        for op in ops:
+            outcome = self._move_one(op, record=False)
+            if outcome.status == OperationStatus.FAILED.value:
+                restored, failures = self._rollback(moved)
+                for done in moved:
+                    done.status = OperationStatus.SKIPPED.value
+                    done.error = (
+                        f"rolled back: {outcome.source} failed ({outcome.error})"
+                        if restored
+                        else f"ROLLBACK INCOMPLETE after {outcome.error}: {failures}"
+                    )
+                results = [*moved, outcome, *ops[len(moved) + 1 :]]
+                for remaining in ops[len(moved) + 1 :]:
+                    remaining.status = OperationStatus.SKIPPED.value
+                    remaining.error = "group aborted before this file was touched"
+                for row in results:
+                    self.manifest.append(row)
+                return results
+            moved.append(outcome)
+
+        for row in moved:
+            self.manifest.append(row)
+        return moved
+
+    def _verify_group(self, ops: list[FileOperation]) -> list[FileOperation] | None:
+        """Refuse the whole group if any member changed since it was analysed."""
+        for op in ops:
+            source = Path(op.source)
+            expected = op.expected_state
+            if expected is None or not source.exists():
+                continue
+            unchanged, why = expected.matches(source)
+            if unchanged:
+                continue
+            for row in ops:
+                row.status = OperationStatus.SKIPPED.value
+                row.error = (
+                    f"{Path(op.source).name} changed since analysis ({why}); "
+                    "re-analyse this asset before moving it"
+                )
+                self.manifest.append(row)
+            logger.warning("Refusing to move %s: %s", op.source, why)
+            return ops
+        return None
+
+    def _rollback(self, moved: list[FileOperation]) -> tuple[bool, list[str]]:
+        """Put back everything this group has already moved."""
+        failures: list[str] = []
+        for op in reversed(moved):
+            destination, source = Path(op.destination), Path(op.source)
+            if not destination.exists() or source.exists():
+                continue
+            try:
+                source.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(destination), str(source))
+            except OSError as e:
+                failures.append(f"{destination} -> {source}: {e}")
+                logger.error("Rollback failed for %s: %s", destination, e)
+        return not failures, failures
+
+    def _move_one(self, op: FileOperation, *, record: bool = True) -> FileOperation:
         source = Path(op.source)
         destination = Path(op.destination)
 
-        if source.is_symlink():
-            op.status = OperationStatus.SKIPPED.value
-            op.error = "source is a symlink; refusing to move what it points at"
-            self.manifest.append(op)
+        def done(status: OperationStatus, error: str = "") -> FileOperation:
+            op.status = status.value
+            op.error = error
+            if record:
+                self.manifest.append(op)
             return op
+
+        if source.is_symlink():
+            return done(
+                OperationStatus.SKIPPED,
+                "source is a symlink; refusing to move what it points at",
+            )
 
         if not source.exists():
             # Already moved by an interrupted earlier run, or moved by hand.
+            # Neither aborts the group: a resumed run must be a no-op, not a
+            # failure that rolls back the files it correctly moved last time.
             if destination.exists():
-                op.status = OperationStatus.SKIPPED.value
-                op.error = "already at the destination"
-            else:
-                op.status = OperationStatus.FAILED.value
-                op.error = "source no longer exists"
-            self.manifest.append(op)
-            return op
+                return done(OperationStatus.SKIPPED, "already at the destination")
+            return done(OperationStatus.SKIPPED, "source no longer exists")
 
         try:
-            op.checksum = checksum_file(source, full=True)
+            op.checksum = checksum_file(source)
         except OSError as e:
-            op.status = OperationStatus.FAILED.value
-            op.error = f"could not checksum: {e}"
-            self.manifest.append(op)
-            return op
+            return done(OperationStatus.FAILED, f"could not checksum: {e}")
 
         if destination.exists():
             if _same_file(destination, op.checksum):
-                op.status = OperationStatus.SKIPPED.value
-                op.error = "identical file already quarantined"
-                self.manifest.append(op)
-                return op
+                return done(OperationStatus.SKIPPED, "identical file already quarantined")
             destination = _next_free_name(destination)
             op.destination = str(destination)
 
         try:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(source), str(destination))
-            op.status = OperationStatus.MOVED.value
             op.timestamp = _now()
+            return done(OperationStatus.MOVED)
         except OSError as e:
-            op.status = OperationStatus.FAILED.value
-            op.error = str(e)
             logger.error("Move failed for %s: %s", source, e)
-
-        self.manifest.append(op)
-        return op
+            return done(OperationStatus.FAILED, str(e))
 
     # --- undo ---------------------------------------------------------------
 
@@ -419,6 +546,7 @@ class Quarantine:
 
         cutoff = time.time() - older_than_days * 86400
         eligible: list[FileOperation] = []
+        refused: list[dict] = []
         for op in self.manifest.latest_by_destination().values():
             if op.status != OperationStatus.MOVED.value:
                 continue
@@ -427,12 +555,23 @@ class Quarantine:
                 continue
             if destination.stat().st_mtime > cutoff:
                 continue
+            if not is_purgeable_evidence(op.evidence):
+                # A judgement about how a photograph *looks* is not grounds for
+                # destroying it, however old the file is and however confident
+                # the score was. Only demonstrable technical failure qualifies,
+                # and an unrecorded reason counts as not demonstrated.
+                refused.append({"file": op.destination, "why": op.evidence or "grounds not recorded"})
+                continue
+            if op.checksum and not _same_file(destination, op.checksum):
+                refused.append({"file": op.destination, "why": "checksum no longer matches manifest"})
+                continue
             eligible.append(op)
 
         report = {
             "eligible": len(eligible),
             "bytes": sum(Path(op.destination).stat().st_size for op in eligible),
             "files": [op.destination for op in eligible],
+            "refused": refused,
             "dry_run": dry_run,
             "purged": 0,
         }

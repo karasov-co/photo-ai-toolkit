@@ -29,3 +29,8 @@ stories_picks/
 
 # OS noise
 .DS_Store
+
+# Coverage output
+.coverage
+coverage.xml
+htmlcov/

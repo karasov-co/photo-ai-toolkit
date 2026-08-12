@@ -8,6 +8,7 @@ import json
 
 import pytest
 
+from media import FileState
 from quarantine import (
     PURGE_CONFIRMATION,
     Lock,
@@ -48,13 +49,18 @@ def photo(archive, name="P1042675.RW2", body=b"raw bytes", subdir=""):
     return path
 
 
-def move_for(path, bin_dir, reason="test", extra=()):
+def move_for(path, bin_dir, reason="test", extra=(), evidence="", states=None):
+    files = [path, *extra]
     return PlannedMove(
         asset_id="asset1",
-        files=[path, *extra],
+        files=files,
         destination_dir=bin_dir,
         reason=reason,
         route_class="trash",
+        evidence=evidence,
+        states=states if states is not None else {
+            str(p): FileState.of(p).to_dict() for p in files if p.exists()
+        },
     )
 
 
@@ -216,14 +222,15 @@ def test_replaying_the_whole_operation_changes_nothing(quarantine, archive, bin_
     assert sorted(p.name for p in bin_dir.rglob("*") if p.is_file()) == before
 
 
-def test_a_missing_source_is_recorded_rather_than_crashing_the_run(
+def test_a_missing_source_is_skipped_rather_than_failing_the_group(
     quarantine, archive, bin_dir
 ):
+    """A resumed run must be a no-op, not a failure that rolls back good work."""
     path = photo(archive)
     planned = quarantine.plan([move_for(path, bin_dir)])
     path.unlink()
     results = quarantine.apply(planned, dry_run=False)
-    assert results[0].status == OperationStatus.FAILED.value
+    assert results[0].status == OperationStatus.SKIPPED.value
 
 
 # --- restore ----------------------------------------------------------------
@@ -368,7 +375,10 @@ def test_purge_will_not_touch_a_recently_quarantined_file(quarantine, archive, b
 
 def test_purge_removes_only_what_the_manifest_records(quarantine, archive, bin_dir):
     """A file the user dropped into the folder by hand is not ours to delete."""
-    quarantine.apply(quarantine.plan([move_for(photo(archive), bin_dir)]), dry_run=False)
+    quarantine.apply(
+        quarantine.plan([move_for(photo(archive), bin_dir, evidence="corrupt_file")]),
+        dry_run=False,
+    )
     stranger = bin_dir / "not_ours.jpg"
     stranger.write_bytes(b"someone else's file")
 
