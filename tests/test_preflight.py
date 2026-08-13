@@ -822,3 +822,85 @@ def test_every_frame_appears_in_at_least_one_group():
     names = [f"f{i}.jpg" for i in range(101)]
     covered = {n for group in aggregate.build_groups(names, size=12) for n in group}
     assert covered == set(names)
+
+
+# --- the status code, not a substring -----------------------------------------
+
+
+class WithStatus(Exception):
+    def __init__(self, status, message=""):
+        self.status_code = status
+        self._message = message
+        super().__init__(message)
+
+    def __str__(self):
+        return self._message
+
+
+def test_the_attribute_is_believed_over_the_text():
+    """A request id containing 404 is not a missing model."""
+    error = WithStatus(401, "unauthorized, request req_a404b7c")
+    assert preflight.classify(error) == preflight.Failure.AUTH.value
+
+
+def test_a_number_inside_an_identifier_is_not_a_status():
+    error = Exception("request failed: req_9f404ab / trace 40311")
+    assert preflight.classify(error) != preflight.Failure.MODEL_ACCESS.value
+
+
+def test_a_number_inside_a_path_is_not_a_status():
+    error = Exception("POST https://api.example.com/v1/404/responses returned nothing")
+    assert preflight.classify(error) != preflight.Failure.MODEL_ACCESS.value
+
+
+def test_a_status_in_prose_is_still_read_when_there_is_no_attribute():
+    assert preflight.classify(Exception("Error code: 404 - not found")) == (
+        preflight.Failure.MODEL_ACCESS.value
+    )
+    assert preflight.classify(Exception("429 Too Many Requests")) == (
+        preflight.Failure.QUOTA.value
+    )
+
+
+def test_a_nested_response_object_is_read():
+    class Response:
+        status_code = 403
+
+    class Wrapped(Exception):
+        response = Response()
+
+        def __str__(self):
+            return "forbidden"
+
+    assert preflight.classify(Wrapped()) == preflight.Failure.PERMISSION.value
+
+
+def test_a_string_status_is_read_as_a_number():
+    error = WithStatus("429", "slow down")
+    assert preflight.classify(error) == preflight.Failure.QUOTA.value
+
+
+def test_the_message_still_wins_where_it_is_specific():
+    """A 400 saying the model does not exist is a model problem, not a bad request."""
+    error = WithStatus(400, "The requested model 'x' does not exist.")
+    assert preflight.classify(error) == preflight.Failure.MODEL_ACCESS.value
+
+
+def test_the_exception_class_is_read_when_the_message_is_bare():
+    """Real SDK errors sometimes stringify to little more than the code."""
+
+    class AuthenticationError(Exception):
+        def __str__(self):
+            return "401"
+
+    assert preflight.classify(AuthenticationError()) == preflight.Failure.AUTH.value
+
+
+def test_the_class_does_not_override_an_explicit_status():
+    class NotFoundError(Exception):
+        status_code = 429
+
+        def __str__(self):
+            return "slow down"
+
+    assert preflight.classify(NotFoundError()) == preflight.Failure.QUOTA.value

@@ -168,9 +168,12 @@ def classify(error: Exception) -> str:
     has run out of money, and those need different sentences.
     """
     text = str(error).lower()
-    status = getattr(error, "status_code", None) or getattr(
-        getattr(error, "response", None), "status_code", None
-    )
+    status = _status_of(error)
+
+    # The class the SDK raised, which is a stronger signal than anything in the
+    # message and weaker than an explicit status. Checked before the prose so a
+    # bare "401" body is still recognised by the exception that carried it.
+    by_class = _class_failure(error)
 
     if "does not exist" in text or "do not have access" in text or "model_not_found" in text:
         return Failure.MODEL_ACCESS.value
@@ -190,19 +193,87 @@ def classify(error: Exception) -> str:
         return Failure.UNREACHABLE.value
     if _code(text, status, 404):
         return Failure.MODEL_ACCESS.value
+    if by_class:
+        return by_class
     return Failure.UNKNOWN.value
 
 
-def _code(text: str, status, wanted: int) -> bool:
-    """Match an HTTP status from the attribute or from the message.
+# What the OpenAI SDK names its exceptions. Matched on a substring of the class
+# name so that subclasses and vendored variants are covered.
+_CLASS_FAILURES = (
+    ("authentication", Failure.AUTH.value),
+    ("permissiondenied", Failure.PERMISSION.value),
+    ("notfound", Failure.MODEL_ACCESS.value),
+    ("ratelimit", Failure.QUOTA.value),
+    ("apiconnection", Failure.UNREACHABLE.value),
+    ("apitimeout", Failure.UNREACHABLE.value),
+)
 
-    The SDK exposes `status_code`, but a wrapped or re-raised error often
-    carries the number only in its text -- and a 401 that reads as "unknown
-    failure" sends somebody looking at their network instead of their key.
+
+def _class_failure(error: Exception) -> str:
+    name = type(error).__name__.lower()
+    for fragment, failure in _CLASS_FAILURES:
+        if fragment in name:
+            return failure
+    return ""
+
+
+def _status_of(error: Exception) -> int | None:
+    """The HTTP status, from wherever the SDK put it.
+
+    Tried in order and preferred over the message every time: an attribute is
+    what the transport actually saw, while the text is prose that happens to
+    contain numbers.
     """
-    if status == wanted:
-        return True
-    return str(wanted) in text
+    for holder, attribute in (
+        (error, "status_code"),
+        (error, "status"),
+        (getattr(error, "response", None), "status_code"),
+        (getattr(error, "response", None), "status"),
+    ):
+        value = getattr(holder, attribute, None)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+    return None
+
+
+# A status code in prose has to look like one being reported, not merely be a
+# three-digit number somewhere in the string. Matched forms:
+#
+#   "Error code: 404 - ..."      a keyword introduces it
+#   "status 429"                 likewise
+#   "HTTP 403"                   likewise
+#   "404 Not Found"              at the start, with a reason phrase after it
+#
+# Deliberately unmatched: `req_9f404ab` (inside an identifier), `/v1/404/x` (a
+# path segment -- a slash is a word boundary, which is why a bare boundary rule
+# was not enough), `gpt-404` (a model name).
+_CODE_PATTERNS = (
+    r"(?:error\s+code|status(?:\s+code)?|http|code)\s*[:=]?\s*({code})\b",
+    r"^\s*({code})\s+[a-z]",
+)
+
+
+def _code(text: str, status, wanted: int) -> bool:
+    """Whether this error carries the given status.
+
+    The attribute wins outright. A different status on the exception means the
+    number in the text belongs to something else -- a request id, a path, a
+    quoted payload -- and reading it as the status is how a 200 with a bad body
+    came to be reported as a missing model.
+
+    Text is consulted only when no attribute exists at all, and then on a word
+    boundary rather than as a substring: `"404" in text` matched request ids.
+    """
+    import re
+
+    if status is not None:
+        return status == wanted
+    return any(
+        re.search(pattern.format(code=wanted), text) for pattern in _CODE_PATTERNS
+    )
 
 
 def run(model: str, *, client=None) -> PreflightResult:
