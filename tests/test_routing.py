@@ -23,7 +23,7 @@ def make(
     axis_c=50,
     recover=Recover.EASY,
     faces=False,
-    logos=False,
+    brand_mark=False,
     is_video=False,
     rejected=None,
     **kw,
@@ -36,7 +36,7 @@ def make(
         axis_c=axis_c,
         recover=recover,
         faces=faces,
-        logos=logos,
+        brand_mark=brand_mark,
         is_video=is_video,
         technically_rejected_for=list(rejected or []),
         **kw,
@@ -53,12 +53,12 @@ def route_one(assessment, config=None):
 
 
 @pytest.mark.parametrize(
-    ("faces", "logos"),
+    ("faces", "brand_mark"),
     [(True, False), (False, True), (True, True)],
     ids=["face", "logo", "both"],
 )
-def test_a_release_requiring_frame_never_reaches_commercial_stock(faces, logos):
-    routed = route_one(make(axis_a=AXIS_MAX, faces=faces, logos=logos))
+def test_a_release_requiring_frame_never_reaches_commercial_stock(faces, brand_mark):
+    routed = route_one(make(axis_a=AXIS_MAX, faces=faces, brand_mark=brand_mark))
     assert routed.destination is not Destination.STOCK_COMMERCIAL
     assert routed.destination is Destination.EDITORIAL
 
@@ -79,11 +79,11 @@ def test_the_block_overrides_what_the_model_asked_for():
 
 
 def test_a_release_requiring_frame_below_every_threshold_still_avoids_stock():
-    routed = route_one(make(axis_a=0, axis_b=0, axis_c=0, logos=True))
+    routed = route_one(make(axis_a=0, axis_b=0, axis_c=0, brand_mark=True))
     assert routed.destination is Destination.EDITORIAL
 
 
-def test_no_frame_with_faces_or_logos_lands_in_stock_across_a_whole_population():
+def test_no_frame_with_faces_or_brand_marks_lands_in_stock_across_a_whole_population():
     """Population-level guarantee, including frames picked as flagship."""
     population = []
     for i in range(60):
@@ -95,7 +95,7 @@ def test_no_frame_with_faces_or_logos_lands_in_stock_across_a_whole_population()
                 axis_b=(i * 7) % 101,
                 axis_c=(i * 3) % 101,
                 faces=(i % 2 == 0),
-                logos=(i % 3 == 0),
+                brand_mark=(i % 3 == 0),
             )
         )
     for routed in assign_destinations(population):
@@ -105,16 +105,16 @@ def test_no_frame_with_faces_or_logos_lands_in_stock_across_a_whole_population()
 
 def test_a_clean_frame_does_reach_stock():
     """The block must not be so broad that nothing is ever sellable."""
-    routed = route_one(make(axis_a=AXIS_MAX, faces=False, logos=False))
+    routed = route_one(make(axis_a=AXIS_MAX, faces=False, brand_mark=False))
     assert routed.destination is Destination.STOCK_COMMERCIAL
 
 
 @pytest.mark.parametrize(
-    ("faces", "logos", "expected"),
+    ("faces", "brand_mark", "expected"),
     [(False, False, False), (True, False, True), (False, True, True), (True, True, True)],
 )
-def test_blocks_commercial_stock(faces, logos, expected):
-    assert blocks_commercial_stock(make(faces=faces, logos=logos)) is expected
+def test_blocks_commercial_stock(faces, brand_mark, expected):
+    assert blocks_commercial_stock(make(faces=faces, brand_mark=brand_mark)) is expected
 
 
 # --- delete candidates ------------------------------------------------------
@@ -296,7 +296,7 @@ VALID = {
     "axis_c": 55,
     "recover": "easy",
     "faces": False,
-    "logos": False,
+    "brand_mark": False,
     "note": "lift shadows, crop left edge",
 }
 
@@ -309,7 +309,7 @@ def test_parses_a_well_formed_payload():
     assert a.faces is False
 
 
-@pytest.mark.parametrize("key", sorted({"genre", "axis_a", "axis_b", "axis_c", "recover", "faces", "logos"}))
+@pytest.mark.parametrize("key", sorted({"genre", "axis_a", "axis_b", "axis_c", "recover", "faces"}))
 def test_a_missing_required_key_is_an_error(key):
     payload = {k: v for k, v in VALID.items() if k != key}
     with pytest.raises(AssessmentParseError, match=key):

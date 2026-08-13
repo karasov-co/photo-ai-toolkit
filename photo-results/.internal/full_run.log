@@ -1,0 +1,550 @@
+INFO: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+LLM preflight
+  Provider: OpenAI
+  Model: gpt-5.6-sol
+  Authentication: verified
+  Model access: verified
+  Vision input: verified
+  Responses API: verified
+
+Analyzing /Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos
+
+Analyzing new assets:
+  [   1] P1019390.JPG
+  [   2] P1019391.JPG
+  [   3] P1019392.JPG
+  [   4] P1019393.JPG
+  [   5] P1019394.JPG
+  [   6] P1019395.JPG
+  [   7] P1019396.JPG
+  [   8] P1019397.JPG
+  [   9] P1019399.JPG
+  [  10] P1019400.JPG
+  [  11] P1019401.JPG
+  [  12] P1019402.JPG
+  [  13] P1019403.JPG
+  [  14] P1019404.JPG
+  [  15] P1019405.JPG
+  [  16] P1019406.JPG
+  [  17] P1019407.JPG
+  [  18] P1019408.JPG
+  [  19] P1019409.JPG
+  [  20] P1019410.JPG
+  [  21] P1019411.JPG
+  [  22] P1019412.JPG
+  [  23] P1019413.JPG
+  [  24] P1019414.JPG
+  [  25] P1019415.JPG
+  [  26] P1019416.JPG
+  [  27] P1019417.JPG
+  [  28] P1019418.JPG
+  [  29] P1019419.JPG
+  [  30] P1019420.JPG
+  [  31] P1019421.JPG
+  [  32] P1019422.JPG
+  [  33] P1019423.JPG
+  [  34] P1019424.JPG
+  [  35] P1019425.JPG
+  [  36] P1019426.JPG
+  [  37] P1019427.JPG
+  [  38] P1019428.JPG
+  [  39] P1019429.JPG
+  [  40] P1019430.JPG
+  [  41] P1019431.JPG
+  [  42] P1019432.JPG
+  [  43] P1019433.JPG
+  [  44] P1019434.JPG
+  [  45] P1019435.JPG
+  [  46] P1019436.JPG
+  [  47] P1019437.JPG
+  [  48] P1019438.JPG
+  [  49] P1019439.JPG
+  [  50] P1019440.JPG
+  [  51] P1019441.JPG
+  [  52] P1019442.JPG
+  [  53] P1019443.JPG
+  [  54] P1019444.JPG
+  [  55] P1019445.JPG
+  [  56] P1019446.JPG
+  [  57] P1019447.JPG
+  [  58] P1019448.JPG
+  [  59] P1019449.JPG
+  [  60] P1019450.JPG
+  [  61] P1019451.JPG
+  [  62] P1019452.JPG
+  [  63] P1019453.JPG
+  [  64] P1019454.JPG
+  [  65] P1019455.JPG
+  [  66] P1019456.JPG
+  [  67] P1019457.JPG
+  [  68] P1019458.JPG
+  [  69] P1019459.JPG
+  [  70] P1019460.JPG
+  [  71] P1019461.JPG
+  [  72] P1019462.JPG
+  [  73] P1019464.JPG
+  [  74] P1019465.JPG
+  [  75] P1019466.JPG
+  [  76] P1019467.JPG
+  [  77] P1019468.JPG
+  [  78] P1019469.JPG
+  [  79] P1019470.JPG
+  [  80] P1019471.JPG
+  [  81] P1019472.JPG
+  [  82] P1019473.JPG
+  [  83] P1019474.JPG
+  [  84] P1019475.JPG
+  [  85] P1019476.JPG
+  [  86] P1019477.JPG
+  [  87] P1019478.JPG
+  [  88] P1019479.JPG
+  [  89] P1019480.JPG
+  [  90] P1019481.JPG
+  [  91] P1019482.JPG
+  [  92] P1019483.JPG
+  [  93] P1019484.JPG
+  [  94] P1019485.JPG
+  [  95] P1019486.JPG
+  [  96] P1019487.JPG
+  [  97] P1019488.JPG
+  [  98] P1019489.JPG
+  [  99] P1019490.JPG
+  [ 100] P1019491.JPG
+  [ 101] P1019492.JPG
+  [ 102] P1019493.JPG
+  [ 103] P1019494.JPG
+  [ 104] P1019495.JPG
+  [ 105] P1019496.JPG
+  [ 106] P1019497.JPG
+  [ 107] P1019498.JPG
+  [ 108] P1019499.JPG
+  [ 109] P1019500.JPG
+  [ 110] P1019501.JPG
+  [ 111] P1019502.JPG
+  [ 112] P1019503.JPG
+  [ 113] P1019504.JPG
+  [ 114] P1019505.JPG
+  [ 115] P1019506.JPG
+  [ 116] P1019507.JPG
+  [ 117] P1019508.JPG
+  [ 118] P1019509.JPG
+  [ 119] P1019510.JPG
+  [ 120] P1019511.JPG
+  [ 121] P1019512.JPG
+  [ 122] P1019513.JPG
+  [ 123] P1019514.JPG
+  [ 124] P1019515.JPG
+  [ 125] P1019516.JPG
+  [ 126] P1019517.JPG
+  [ 127] P1019518.JPG
+  [ 128] P1019519.JPG
+  [ 129] P1019520.JPG
+  [ 130] P1019521.JPG
+  [ 131] P1019522.JPG
+  [ 132] P1019523.JPG
+  [ 133] P1019524.JPG
+  [ 134] P1019525.JPG
+  [ 135] P1019526.JPG
+  [ 136] P1019527.JPG
+  [ 137] P1019528.JPG
+  [ 138] P1019529.JPG
+  [ 139] P1019530.JPG
+  [ 140] P1019531.JPG
+  [ 141] P1019532.JPG
+  [ 142] P1019533.JPG
+  [ 143] P1019534.JPG
+  [ 144] P1019535.JPG
+  [ 145] P1019536.JPG
+  [ 146] P1019537.JPG
+  [ 147] P1019538.JPG
+  [ 148] P1019539.JPG
+  [ 149] P1019540.JPG
+  [ 150] P1019541.JPG
+  [ 151] P1019542.JPG
+  [ 152] P1019543.JPG
+  [ 153] P1019544.JPG
+  [ 154] P1019545.JPG
+  [ 155] P1019549.JPG
+  [ 156] P1019550.JPG
+  [ 157] P1019551.JPG
+  [ 158] P1019552.JPG
+  [ 159] P1019553.JPG
+  [ 160] P1019554.JPG
+  [ 161] P1019555.JPG
+  [ 162] P1019556.JPG
+  [ 163] P1019557.JPG
+  [ 164] P1019558.JPG
+  [ 165] P1019559.JPG
+  [ 166] P1019560.JPG
+  [ 167] P1019561.JPG
+  [ 168] P1019562.JPG
+  [ 169] P1019563.JPG
+  [ 170] P1019564.JPG
+  [ 171] P1019565.JPG
+  [ 172] P1019566.JPG
+  [ 173] P1019567.JPG
+  [ 174] P1019568.JPG
+  [ 175] P1019569.JPG
+  [ 176] P1019570.JPG
+  [ 177] P1019571.JPG
+  [ 178] P1019572.JPG
+  [ 179] P1019573.JPG
+  [ 180] P1019574.JPG
+  [ 181] P1019575.JPG
+  [ 182] P1019576.JPG
+  [ 183] P1019577.JPG
+  [ 184] P1019578.JPG
+  [ 185] P1019579.JPG
+  [ 186] P1019580.JPG
+  [ 187] P1019581.JPG
+  [ 188] P1019582.JPG
+  [ 189] P1019583.JPG
+  [ 190] P1019584.JPG
+  [ 191] P1019585.JPG
+  [ 192] P1019586.JPG
+  [ 193] P1019587.JPG
+  [ 194] P1019588.JPG
+  [ 195] P1019589.JPG
+  [ 196] P1019590.JPG
+  [ 197] P1019591.JPG
+  [ 198] P1019592.JPG
+  [ 199] P1019593.JPG
+  [ 200] P1019594.JPG
+  [ 201] P1019595.JPG
+  [ 202] P1019596.JPG
+  [ 203] P1019597.JPG
+  [ 204] P1019598.JPG
+  [ 205] P1019606.JPG
+  [ 206] P1019607.JPG
+  [ 207] P1019608.JPG
+  [ 208] P1019609.JPG
+  [ 209] P1019610.JPG
+  [ 210] P1019611.JPG
+  [ 211] P1019612.JPG
+  [ 212] P1019613.JPG
+  [ 213] P1019614.JPG
+  [ 214] P1019615.JPG
+  [ 215] P1019616.JPG
+  [ 216] P1019617.JPG
+  [ 217] P1019618.JPG
+  [ 218] P1019619.JPG
+  [ 219] P1019620.JPG
+  [ 220] P1019621.JPG
+  [ 221] P1019622.JPG
+  [ 222] P1019623.JPG
+  [ 223] P1019624.JPG
+  [ 224] P1019625.JPG
+  [ 225] P1019626.JPG
+  [ 226] P1019627.JPG
+  [ 227] P1019628.JPG
+  [ 228] P1019629.JPG
+  [ 229] P1019630.JPG
+  [ 230] P1019631.JPG
+  [ 231] P1019632.JPG
+  [ 232] P1019633.JPG
+  [ 233] P1019634.JPG
+  [ 234] P1019635.JPG
+  [ 235] P1019636.JPG
+  [ 236] P1019637.JPG
+  [ 237] P1019638.JPG
+  [ 238] P1019639.JPG
+  [ 239] P1019640.JPG
+  [ 240] P1019641.JPG
+  [ 241] P1019642.JPG
+  [ 242] P1019643.JPG
+  [ 243] P1019644.JPG
+  [ 244] P1019645.JPG
+  [ 245] P1019646.JPG
+  [ 246] P1019647.JPG
+  [ 247] P1019648.JPG
+  [ 248] P1019649.JPG
+  [ 249] P1019650.JPG
+  [ 250] P1019651.JPG
+  [ 251] P1019652.JPG
+  [ 252] P1019672.JPG
+  [ 253] P1019673.JPG
+  [ 254] P1019683.JPG
+  [ 255] P1019684.JPG
+  [ 256] P1019686.JPG
+  [ 257] P1019687.JPG
+  [ 258] P1019688.JPG
+  [ 259] P1019690.JPG
+  [ 260] P1019691.JPG
+  [ 261] P1019692.JPG
+2026-08-13 16:26:26,033 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:26:49,706 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:27:08,415 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:27:29,310 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:27:52,548 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:28:13,514 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:28:41,794 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:29:08,172 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:29:34,950 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:29:56,761 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:30:35,474 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:31:04,474 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:31:25,219 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:31:45,148 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:32:11,109 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:32:31,794 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:32:50,059 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:33:17,055 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:33:36,405 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:33:56,171 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:34:17,592 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:34:35,216 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:35:00,171 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:35:23,828 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:35:51,539 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:36:16,448 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:36:44,825 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:37:12,417 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:37:29,574 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:38:38,391 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:39:26,822 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:40:06,760 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:40:55,636 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:41:45,052 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:42:20,605 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:43:05,882 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:43:52,543 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:44:37,234 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:45:24,557 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:46:15,056 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:47:03,644 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:47:38,141 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:48:12,684 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:48:50,798 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:49:25,397 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:50:01,640 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:50:51,181 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:51:34,438 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+2026-08-13 16:51:35,363 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:35,394 [INFO] openai._base_client: Retrying request to /responses in 0.419715 seconds
+2026-08-13 16:51:36,571 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:36,593 [INFO] openai._base_client: Retrying request to /responses in 0.769498 seconds
+2026-08-13 16:51:38,493 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:38,524 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:38,525 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:39,205 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:39,239 [INFO] openai._base_client: Retrying request to /responses in 0.486273 seconds
+2026-08-13 16:51:40,287 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:40,318 [INFO] openai._base_client: Retrying request to /responses in 0.779925 seconds
+2026-08-13 16:51:42,199 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:42,230 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:42,230 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:43,225 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:43,260 [INFO] openai._base_client: Retrying request to /responses in 0.451141 seconds
+2026-08-13 16:51:44,349 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:44,372 [INFO] openai._base_client: Retrying request to /responses in 0.798216 seconds
+2026-08-13 16:51:45,875 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:45,901 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:45,902 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:47,718 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:47,743 [INFO] openai._base_client: Retrying request to /responses in 0.412474 seconds
+2026-08-13 16:51:48,823 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:48,891 [INFO] openai._base_client: Retrying request to /responses in 0.784240 seconds
+2026-08-13 16:51:50,401 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:50,425 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:50,426 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:51,039 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:51,059 [INFO] openai._base_client: Retrying request to /responses in 0.405625 seconds
+2026-08-13 16:51:52,136 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:52,159 [INFO] openai._base_client: Retrying request to /responses in 0.804188 seconds
+2026-08-13 16:51:53,463 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:53,476 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:53,476 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:54,199 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:54,237 [INFO] openai._base_client: Retrying request to /responses in 0.460279 seconds
+2026-08-13 16:51:55,347 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:55,391 [INFO] openai._base_client: Retrying request to /responses in 0.859710 seconds
+2026-08-13 16:51:56,878 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:56,883 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:56,883 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:51:57,468 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:57,506 [INFO] openai._base_client: Retrying request to /responses in 0.403305 seconds
+2026-08-13 16:51:58,683 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:51:58,684 [INFO] openai._base_client: Retrying request to /responses in 0.828588 seconds
+2026-08-13 16:52:00,526 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:00,527 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:00,527 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:01,332 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:01,386 [INFO] openai._base_client: Retrying request to /responses in 0.494619 seconds
+2026-08-13 16:52:02,574 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:02,575 [INFO] openai._base_client: Retrying request to /responses in 0.924543 seconds
+2026-08-13 16:52:04,212 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:04,232 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:04,232 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:04,856 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:04,888 [INFO] openai._base_client: Retrying request to /responses in 0.395850 seconds
+2026-08-13 16:52:05,924 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:05,973 [INFO] openai._base_client: Retrying request to /responses in 0.990835 seconds
+2026-08-13 16:52:07,627 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:07,647 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:07,647 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:08,513 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:08,514 [INFO] openai._base_client: Retrying request to /responses in 0.471236 seconds
+2026-08-13 16:52:09,538 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:09,545 [INFO] openai._base_client: Retrying request to /responses in 0.987648 seconds
+2026-08-13 16:52:11,381 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:11,382 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:11,383 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:12,816 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:12,832 [INFO] openai._base_client: Retrying request to /responses in 0.454351 seconds
+2026-08-13 16:52:14,145 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:14,146 [INFO] openai._base_client: Retrying request to /responses in 0.802332 seconds
+2026-08-13 16:52:15,716 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:15,743 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:15,743 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:16,415 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:16,443 [INFO] openai._base_client: Retrying request to /responses in 0.431350 seconds
+2026-08-13 16:52:17,525 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:17,526 [INFO] openai._base_client: Retrying request to /responses in 0.959676 seconds
+2026-08-13 16:52:19,330 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:19,352 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:19,353 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:20,203 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:20,297 [INFO] openai._base_client: Retrying request to /responses in 0.376728 seconds
+2026-08-13 16:52:21,246 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:21,294 [INFO] openai._base_client: Retrying request to /responses in 0.992279 seconds
+2026-08-13 16:52:22,983 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:23,010 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:23,010 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:23,694 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:23,720 [INFO] openai._base_client: Retrying request to /responses in 0.477091 seconds
+2026-08-13 16:52:24,723 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:24,735 [INFO] openai._base_client: Retrying request to /responses in 0.924555 seconds
+2026-08-13 16:52:26,406 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:26,407 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:26,407 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:27,124 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:27,124 [INFO] openai._base_client: Retrying request to /responses in 0.432677 seconds
+2026-08-13 16:52:31,650 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:31,691 [INFO] openai._base_client: Retrying request to /responses in 0.772759 seconds
+2026-08-13 16:52:33,020 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:33,046 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:33,046 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:33,848 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:33,939 [INFO] openai._base_client: Retrying request to /responses in 0.480220 seconds
+2026-08-13 16:52:34,989 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:35,009 [INFO] openai._base_client: Retrying request to /responses in 0.988941 seconds
+2026-08-13 16:52:36,753 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:36,790 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:36,791 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:37,763 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:37,791 [INFO] openai._base_client: Retrying request to /responses in 0.420598 seconds
+2026-08-13 16:52:39,084 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:39,182 [INFO] openai._base_client: Retrying request to /responses in 0.902065 seconds
+2026-08-13 16:52:40,669 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:40,756 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:40,756 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:41,901 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:41,932 [INFO] openai._base_client: Retrying request to /responses in 0.381857 seconds
+2026-08-13 16:52:43,068 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:43,185 [INFO] openai._base_client: Retrying request to /responses in 0.910386 seconds
+2026-08-13 16:52:44,604 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:44,630 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:44,630 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:45,473 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:45,482 [INFO] openai._base_client: Retrying request to /responses in 0.377345 seconds
+2026-08-13 16:52:46,523 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:46,533 [INFO] openai._base_client: Retrying request to /responses in 0.988778 seconds
+2026-08-13 16:52:48,143 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:48,144 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:48,145 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:48,764 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:48,789 [INFO] openai._base_client: Retrying request to /responses in 0.489117 seconds
+2026-08-13 16:52:50,193 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:50,221 [INFO] openai._base_client: Retrying request to /responses in 0.914917 seconds
+2026-08-13 16:52:51,764 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:51,764 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:51,764 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:52,628 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:52,646 [INFO] openai._base_client: Retrying request to /responses in 0.396060 seconds
+2026-08-13 16:52:53,879 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:53,920 [INFO] openai._base_client: Retrying request to /responses in 0.910651 seconds
+2026-08-13 16:52:55,369 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:55,394 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:55,394 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:56,292 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:56,292 [INFO] openai._base_client: Retrying request to /responses in 0.415447 seconds
+2026-08-13 16:52:57,422 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:57,454 [INFO] openai._base_client: Retrying request to /responses in 0.971015 seconds
+2026-08-13 16:52:59,176 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:52:59,207 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:52:59,208 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:00,094 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:00,129 [INFO] openai._base_client: Retrying request to /responses in 0.410339 seconds
+2026-08-13 16:53:01,967 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:01,968 [INFO] openai._base_client: Retrying request to /responses in 0.990125 seconds
+2026-08-13 16:53:03,810 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:03,811 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:03,811 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:04,558 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:04,570 [INFO] openai._base_client: Retrying request to /responses in 0.376498 seconds
+2026-08-13 16:53:05,590 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:05,645 [INFO] openai._base_client: Retrying request to /responses in 0.955486 seconds
+2026-08-13 16:53:07,293 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:07,325 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:07,326 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:08,180 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:08,182 [INFO] openai._base_client: Retrying request to /responses in 0.429070 seconds
+2026-08-13 16:53:09,762 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:09,781 [INFO] openai._base_client: Retrying request to /responses in 0.965863 seconds
+2026-08-13 16:53:11,387 [INFO] httpx: HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 429 Too Many Requests"
+2026-08-13 16:53:11,388 [WARNING] pipeline: Stage 3 group failed: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:11,389 [ERROR] pipeline: Stage 3 gave up after 1 attempt(s): attempt 1: Error code: 429 - {'error': {'message': 'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.', 'type': 'insufficient_quota', 'param': None, 'code': 'credit_balance_exhausted'}}
+2026-08-13 16:53:11,399 [INFO] pipeline: Stage 3: 134 completed, 145 failed, 2 not required
+
+  /private/tmp/claude-501/-Users-vitaliikarasov-Desktop-photo-ai-toolkit/954c0afd-0151-4fec-b352-19072911b25a/scratchpad/v2/report.html
+  /private/tmp/claude-501/-Users-vitaliikarasov-Desktop-photo-ai-toolkit/954c0afd-0151-4fec-b352-19072911b25a/scratchpad/v2/photographer_insights.html
+  top/ 0, good_stock/ 104, good_personal/ 146, needs_decision/ 0, weak/ 31
+  edit_recipes/ 44 edit recipe(s)
+  4 file(s) proposed for removal (nothing has been moved)
+
+==================================================================
+COLLECTION SUMMARY
+==================================================================
+  Analysis mode                               local + semantic
+
+  Total assets                                    281
+
+  What these photographs are:
+    Top                                             0
+    Good — stock                                  104
+    Good — personal                               146
+    Needs decision                                  0
+    Weak                                           31
+  (nothing reached TOP: the best photograph scored 82, and TOP needs 85)
+
+  Duplicate clusters                               43
+
+  Strongest assets:
+    [ 82] P1019467.JPG
+    [ 80] P1019471.JPG
+    [ 79] P1019468.JPG
+    [ 79] P1019470.JPG
+    [ 79] P1019516.JPG
+    [ 79] P1019517.JPG
+    [ 79] P1019518.JPG
+    [ 79] P1019519.JPG
+
+  These are suggestions, not verdicts -- a score is one opinion
+  about a photograph. Nothing has been moved, changed or deleted:
+  the folders hold links to your original files.
+==================================================================
+
+Run
+  New assets analysed:      261
+  Modified re-analysed:     0
+  Unchanged reused:         20
+  LLM calls:                29  (stage2 29)
+  Content check completed:  281
+  Artistic read completed:  134
+  Artistic read failed:     145
+  Report:                   /private/tmp/claude-501/-Users-vitaliikarasov-Desktop-photo-ai-toolkit/954c0afd-0151-4fec-b352-19072911b25a/scratchpad/v2/report.html
+
+4 file(s) would move, 24.5 MB:
+      4  unrecoverable problems: ?
+
+Nothing has been moved. Re-run with --apply to carry this out.

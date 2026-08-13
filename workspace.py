@@ -43,6 +43,7 @@ INSIGHTS_NAME = "photographer_insights.html"
 CATEGORY_DIRS: dict[str, str] = {
     "TOP": "top",
     "GOOD_STOCK": "good_stock",
+    "GOOD_EDITORIAL": "good_editorial",
     "GOOD_PERSONAL": "good_personal",
     "NEEDS_DECISION": "needs_decision",
     "WEAK": "weak",

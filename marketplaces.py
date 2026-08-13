@@ -205,7 +205,7 @@ def evaluate(
                 missing_releases.append("model release")
             if semantic.recognizable_property and not has_property_release:
                 missing_releases.append("property release")
-            if semantic.logos:
+            if semantic.brand_mark:
                 policy_notes.append(
                     "readable trademark present: editorial use only, and some buyers will still refuse it"
                 )

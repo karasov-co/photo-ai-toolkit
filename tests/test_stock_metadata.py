@@ -16,7 +16,7 @@ def semantic(**kwargs):
         "concepts": ["tourism", "agriculture"],
         "secondary_genres": ["travel"],
         "faces": False,
-        "logos": False,
+        "brand_mark": False,
         "identifiable_people": False,
     }
     return Semantic(**{**base, **kwargs})
@@ -173,7 +173,7 @@ def test_recognizable_property_sets_the_property_release_requirement():
 
 
 def test_a_logo_produces_a_warning():
-    assert "trademark" in generated(logos=True).logo_warning.lower()
+    assert "trademark" in generated(brand_mark=True).logo_warning.lower()
 
 
 def test_a_clean_frame_produces_no_logo_warning():

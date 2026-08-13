@@ -17,7 +17,7 @@ from routing import Assessment, Destination, Genre, Recover, assign_destinations
 def make(filename, **kw):
     base = {
         "genre": Genre.LANDSCAPE, "axis_a": 50, "axis_b": 50, "axis_c": 50,
-        "recover": Recover.EASY, "faces": False, "logos": False,
+        "recover": Recover.EASY, "faces": False, "brand_mark": False,
     }
     base.update(kw)
     return Assessment(filename=filename, **base)

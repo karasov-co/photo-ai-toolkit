@@ -1,0 +1,39 @@
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="photo-ai-toolkit">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+    xmlns:pat="https://github.com/karasov-co/photo-ai-toolkit/ns/1.0/"
+    crs:Version="15.0"
+    crs:ProcessVersion="11.0"
+    crs:Exposure2012="+0.35"
+    crs:Contrast2012="0"
+    crs:Highlights2012="-15"
+    crs:Shadows2012="6"
+    crs:Whites2012="0"
+    crs:Blacks2012="-4"
+    crs:Texture="0"
+    crs:Clarity2012="0"
+    crs:Dehaze="0"
+    crs:Vibrance="4"
+    crs:Saturation="0"
+    crs:LuminanceSmoothing="41"
+    crs:ColorNoiseReduction="82"
+    crs:Sharpness="20"
+    crs:SharpenEdgeMasking="75"
+    crs:ConvertToGrayscale="False"
+    pat:temperatureDeltaK="-308"
+    pat:tintDelta="4"
+    pat:suggestedBy="photo-ai-toolkit"
+    pat:variant="faithful"
+    pat:intent="correct_only_what_limits_the_frame"
+    pat:sourceChecksum="deea9e87acce0c29779ec117570aa7d18d992183cf67714ce1dcdfcde1e8e129"
+    pat:engine="">
+   <pat:preserve><rdf:Bag>
+
+   </rdf:Bag></pat:preserve>
+   <pat:warnings><rdf:Bag>
+
+   </rdf:Bag></pat:warnings>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>

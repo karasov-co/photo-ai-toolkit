@@ -289,7 +289,7 @@ def generate(
         property_release_required=bool(semantic.recognizable_property),
         logo_warning=(
             "Readable brand mark or trademark present: editorial only unless cleared"
-            if semantic.logos
+            if semantic.brand_mark
             else ""
         ),
         ai_label=provenance_label,

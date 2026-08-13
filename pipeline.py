@@ -1551,7 +1551,7 @@ def _build_record(
     legal_warnings = []
     if inp.semantic.faces or inp.semantic.identifiable_people:
         legal_warnings.append("Model release required before commercial licensing")
-    if inp.semantic.logos:
+    if inp.semantic.brand_mark:
         legal_warnings.append("Readable trademark present: editorial only unless cleared")
     if record.is_uncertain:
         legal_warnings.append("Provenance undeclared: confirm this is a camera original")
@@ -1819,7 +1819,8 @@ def reclassify(analysis_path: Path, calibration: CalibrationSet) -> list[dict]:
             present=bool(row.get("semantic_present", False)),
             genre=row.get("genre") or "other",
             faces="needs_model_release" in tags,
-            logos="legal_review" in tags,
+            brand_mark="legal_review" in tags,
+            signage_text="editorial_only" in tags and "needs_model_release" not in tags,
             identifiable_people="needs_model_release" in tags,
         )
         inp = ScoreInput(

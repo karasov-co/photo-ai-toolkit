@@ -71,7 +71,7 @@ def stage2_reply(count: int, **overrides) -> str:
             {
                 "n": i + 1, "genre": "landscape", "axis_a": i + 1,
                 "axis_b": count - i, "axis_c": i + 1, "recover": "easy",
-                "faces": False, "logos": False, "note": "lift shadows",
+                "faces": False, "brand_mark": False, "note": "lift shadows",
                 "intended_frame": True, "subject_strength": 75,
                 "accidental_probability": 2, "dead_moment_probability": 3,
                 **overrides,
@@ -451,7 +451,7 @@ def test_h_duplicate_status_alone_never_produces_weak():
     inp = scoring.ScoreInput(
         asset_id="a", filename="a.jpg", technical_quality=80, uplift=6, is_raw=True,
         semantic=scoring.Semantic(present=True, genre="landscape", axis_a=60, axis_b=60,
-                                  axis_c=55, faces=False, logos=False,
+                                  axis_c=55, faces=False, brand_mark=False,
                                   identifiable_people=False, subject_strength=70),
         artistic=art, is_best_in_cluster=False, cluster_margin=25, cluster_size=4,
     )

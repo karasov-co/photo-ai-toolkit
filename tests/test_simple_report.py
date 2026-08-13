@@ -163,7 +163,7 @@ def test_the_root_holds_only_what_a_photographer_opens(tmp_path):
     visible = {p.name for p in space.root.iterdir() if not p.name.startswith(".")}
     assert visible == {
         "report.html", "photographer_insights.html", "edit_recipes",
-        "top", "good_stock", "good_personal", "needs_decision", "weak",
+        *workspace.CATEGORY_DIRS.values(),
     }
 
 

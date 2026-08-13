@@ -565,7 +565,7 @@ def test_an_unknown_group_size_yields_unknown_axes_rather_than_a_raw_rank():
     assessment = routing.parse_assessment(
         {
             "n": 1, "genre": "street", "axis_a": 1, "axis_b": 1, "axis_c": 1,
-            "recover": "easy", "faces": False, "logos": False,
+            "recover": "easy", "faces": False, "brand_mark": False,
         },
         "best.RW2",
     )

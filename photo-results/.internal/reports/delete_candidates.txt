@@ -1,0 +1,10 @@
+# Proposed deletions. Nothing has been removed.
+# Look at contact_sheet_delete.jpg before acting on this.
+# 4 candidate(s).
+# Paths are JSON-encoded so a newline or a quote in a filename cannot
+# break a line or be mistaken for shell syntax.
+
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019499.JPG"	realistic potential is capped by unrecoverable problems: blown_highlights: 42.0% of the frame is pure white; faces and logos present: a release is required, so commercial stock is blocked in code
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019500.JPG"	realistic potential is capped by unrecoverable problems: blown_highlights: 39.4% of the frame is pure white; faces and logos present: a release is required, so commercial stock is blocked in code
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019505.JPG"	realistic potential is capped by unrecoverable problems: blown_highlights: 37.8% of the frame is pure white; faces and logos present: a release is required, so commercial stock is blocked in code
+"/Users/vitaliikarasov/Desktop/photo-ai-toolkit/photos/P1019507.JPG"	realistic potential is capped by unrecoverable problems: blown_highlights: 35.9% of the frame is pure white; faces and logos present: a release is required, so commercial stock is blocked in code

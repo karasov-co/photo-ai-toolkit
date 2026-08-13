@@ -98,7 +98,7 @@ def write_manifest(routed: list[Routed], sources: dict[str, Path], out_dir: Path
                     "axis_c": a.axis_c,
                     "recover": a.recover.value,
                     "faces": a.faces,
-                    "logos": a.logos,
+                    "logos": a.brand_mark,
                     "note": a.note,
                     "model_destination": a.model_destination or "",
                     "is_video": a.is_video,

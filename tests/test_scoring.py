@@ -44,7 +44,7 @@ def clean_semantic(**kwargs) -> Semantic:
     base = {
         "present": True,
         "faces": False,
-        "logos": False,
+        "brand_mark": False,
         "identifiable_people": False,
         "axis_a": 75,
         "axis_b": 70,
@@ -153,7 +153,7 @@ def test_a_face_blocks_commercial_stock():
 
 
 def test_a_logo_blocks_commercial_stock():
-    assert route_for(clean_semantic(logos=True)) is Route.EDITORIAL
+    assert route_for(clean_semantic(brand_mark=True)) is Route.EDITORIAL
 
 
 def test_a_clean_frame_is_commercial():
@@ -183,10 +183,19 @@ def test_no_score_can_route_a_face_to_commercial_stock(profile):
 
 def test_the_blocked_reason_names_what_was_found(profile):
     inp = ScoreInput(
-        asset_id="a", filename="a", technical_quality=70, semantic=clean_semantic(logos=True)
+        asset_id="a", filename="a", technical_quality=70, semantic=clean_semantic(brand_mark=True)
     )
     result = classify(inp, score(inp, profile), profile)
-    assert any("logos" in r for r in result.reasons)
+    assert any("brand mark" in r for r in result.reasons)
+
+
+def test_street_signs_do_not_block_commercial_stock(profile):
+    """The reported failure: shop signs read as brands and blocked the frame."""
+    signs = clean_semantic(brand_mark=False, signage_text=True)
+    inp = ScoreInput(asset_id="a", filename="a", technical_quality=70, semantic=signs)
+    assert not signs.blocks_commercial
+    assert signs.editorial_only
+    assert classify(inp, score(inp, profile), profile).route is not None
 
 
 def test_an_unexamined_frame_says_so_rather_than_claiming_a_face_was_seen(profile):
@@ -212,7 +221,7 @@ def test_a_face_costs_more_readiness_than_a_property():
 
 def test_unknown_is_not_scored_as_though_both_problems_were_confirmed():
     """Compounding 'we did not look' into every dimension collapsed the scale."""
-    confirmed_both = legal_readiness_score(clean_semantic(faces=True, logos=True))
+    confirmed_both = legal_readiness_score(clean_semantic(faces=True, brand_mark=True))
     unknown = legal_readiness_score(Semantic())
     assert unknown > confirmed_both
 

@@ -74,7 +74,7 @@ def semantic(**overrides) -> scoring.Semantic:
         "axis_b": 70,
         "axis_c": 60,
         "faces": False,
-        "logos": False,
+        "brand_mark": False,
         "identifiable_people": False,
         "subject_strength": 75,
     }
@@ -160,7 +160,7 @@ def test_4_losing_to_a_sibling_does_not_decide_a_category(profile):
     assert not any(d["code"] == "inferior_duplicate" for d in beaten.score.defects)
 
 
-def test_5_a_good_portrait_without_a_release_is_personal_not_weak(profile):
+def test_5_a_good_portrait_without_a_release_is_never_weak(profile):
     verdict = judge(
         profile,
         tech=85, uplift=7,
@@ -170,8 +170,55 @@ def test_5_a_good_portrait_without_a_release_is_personal_not_weak(profile):
         ),
         art=flat(78, artistic_confidence=80, portrait=face()),
     )
-    assert verdict.category == PhotoCategory.GOOD_PERSONAL.value
+    assert verdict.category in (
+        PhotoCategory.GOOD_PERSONAL.value, PhotoCategory.GOOD_EDITORIAL.value
+    )
     assert any("release" in b for b in verdict.commercial_blockers)
+
+
+def test_a_documentary_frame_behind_a_release_is_editorial_not_personal(profile):
+    """The reported failure, as a category.
+
+    Street signs and unreleased faces used to land a photojournalist's work in
+    the same pile as a snapshot of nothing. Editorial is a market; being told
+    you have no market is a different statement, and it was the wrong one.
+    """
+    verdict = judge(
+        profile, tech=84, uplift=7,
+        sem=semantic(genre="reportage", faces=True, identifiable_people=True,
+                     signage_text=True, axis_c=75, subject_strength=80),
+        art=flat(75, artistic_confidence=80, documentary_significance=82),
+    )
+    assert verdict.category == PhotoCategory.GOOD_EDITORIAL.value
+
+
+def test_a_dominant_brand_mark_is_still_not_editorial(profile):
+    verdict = judge(
+        profile, tech=84, uplift=7,
+        sem=semantic(genre="street", brand_mark=True, signage_text=True,
+                     axis_c=80, subject_strength=80),
+        art=flat(75, artistic_confidence=80, documentary_significance=85),
+    )
+    assert verdict.category != PhotoCategory.GOOD_EDITORIAL.value
+
+
+def test_signs_without_documentary_weight_are_not_editorial(profile):
+    """Editorial is earned by the document, not by containing a sign."""
+    verdict = judge(
+        profile, tech=80, uplift=6,
+        sem=semantic(genre="other", signage_text=True, axis_c=20, subject_strength=60),
+        art=flat(50, artistic_confidence=75, documentary_significance=25),
+    )
+    assert verdict.category != PhotoCategory.GOOD_EDITORIAL.value
+
+
+def test_without_stage3_the_content_axis_decides_editorial(profile):
+    verdict = judge(
+        profile, tech=80, uplift=6,
+        sem=semantic(genre="reportage", signage_text=True, faces=True,
+                     axis_c=78, subject_strength=70),
+    )
+    assert verdict.category == PhotoCategory.GOOD_EDITORIAL.value
 
 
 def test_6_a_commercially_usable_good_image_is_good_stock(profile):
@@ -359,7 +406,10 @@ def test_a_release_never_lowers_the_score(profile):
     sellable = judge(profile, sem=semantic(genre="portrait", faces=False,
                                            identifiable_people=False, subject_strength=80), **common)
     assert private.final_score == sellable.final_score
-    assert private.category == PhotoCategory.GOOD_PERSONAL.value
+    # Which market it belongs to may differ; how good the photograph is may not.
+    assert private.category in (
+        PhotoCategory.GOOD_PERSONAL.value, PhotoCategory.GOOD_EDITORIAL.value
+    )
     assert sellable.category in (PhotoCategory.GOOD_STOCK.value, PhotoCategory.TOP.value)
 
 
@@ -545,7 +595,7 @@ def stage2_reply(count: int, **overrides) -> str:
             {
                 "n": i + 1, "genre": "landscape", "axis_a": i + 1,
                 "axis_b": count - i, "axis_c": i + 1, "recover": "easy",
-                "faces": False, "logos": False, "note": "lift shadows",
+                "faces": False, "brand_mark": False, "note": "lift shadows",
                 "intended_frame": True, "subject_strength": 75,
                 "accidental_probability": 2, "dead_moment_probability": 3,
                 **overrides,

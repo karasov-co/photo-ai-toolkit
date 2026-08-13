@@ -258,7 +258,7 @@ def ranking_for(count: int) -> str:
             {
                 "n": i + 1, "genre": "landscape",
                 "axis_a": i + 1, "axis_b": count - i, "axis_c": i + 1,
-                "recover": "easy", "faces": False, "logos": False, "note": "lift shadows",
+                "recover": "easy", "faces": False, "brand_mark": False, "note": "lift shadows",
             }
             for i in range(count)
         ]
@@ -465,8 +465,9 @@ def test_the_default_summary_does_not_mention_releases_or_route_classes(archive,
     result = pipeline.run(pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out"))
     printed = reports.format_summary(reports.summarise(result.records), "en").lower()
 
+    # `stock` and `editorial` are exempt: they name piles, not legal statuses.
     for phrase in (
-        "release", "marketplace", "flagship", "editorial", "trademark",
+        "release", "marketplace", "flagship", "editorial only", "trademark",
         "stock potential", "routing", "confidence",
     ):
         assert phrase not in printed, phrase

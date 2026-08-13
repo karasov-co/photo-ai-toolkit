@@ -46,6 +46,7 @@ from i18n import t
 SECTIONS = (
     ("TOP", "#a978c4"),
     ("GOOD_STOCK", "#5fb98a"),
+    ("GOOD_EDITORIAL", "#7fb86a"),
     ("GOOD_PERSONAL", "#6aa9d8"),
     ("NEEDS_DECISION", "#d8c06a"),
     ("WEAK", "#8a8a8a"),
@@ -77,11 +78,15 @@ FORBIDDEN_IN_DEFAULT_UI = (
 LEGAL_WORDS = (
     "release",
     "licen",  # licence, license, licensing
-    "editorial",
     "commercial",
     "cleared",
     "rights",
 )
+
+# "editorial" is deliberately NOT on that list any more. It used to be legal
+# jargon here -- "editorial only", a restriction stated as a warning. It is now
+# the name of a pile, in a sentence that tells a photographer their picture has
+# a market. The legalistic phrasing is still filtered by the entry above.
 
 MAX_RECOMMENDATIONS = 3
 

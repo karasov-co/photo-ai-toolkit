@@ -69,6 +69,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "category.note.TOP": "The strongest work here. Edit these first.",
         "category.note.GOOD_STOCK": "Good photographs that also work as stock material.",
+        "category.note.GOOD_EDITORIAL": (
+            "Good photographs of real places and moments. Sellable as editorial — "
+            "news, travel, documentary — rather than as advertising."
+        ),
         "category.note.GOOD_PERSONAL": "Good photographs worth keeping and printing.",
         "category.note.NEEDS_DECISION": "Genuinely borderline. A quick look settles them.",
         "category.note.WEAK": (
@@ -122,12 +126,14 @@ STRINGS: dict[str, dict[str, str]] = {
         # categories
         "category.TOP": "Top",
         "category.GOOD_STOCK": "Good — stock",
+        "category.GOOD_EDITORIAL": "Good — editorial",
         "category.GOOD_PERSONAL": "Good — personal",
         "category.NEEDS_DECISION": "Needs decision",
         "category.WEAK": "Weak",
         "category.top": "final score {value}: a completed artistic read and no critical defect",
         "category.weak": "final score {value} is below the keep threshold",
         "category.good_stock": "final score {value}, no release needed and commercially usable",
+        "category.good_editorial": "final score {value}: a place and a moment, sellable as editorial",
         "category.good_personal": "final score {value}: worth keeping, but not stock material",
         "category.needs_decision": "on the boundary at {value} and the analysis is unsure",
         "category.defect.bad_expression": "the expression failed: {detail}",
@@ -338,6 +344,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "category.note.TOP": "Самое сильное здесь. Начните обработку с них.",
         "category.note.GOOD_STOCK": "Хорошие фотографии, которые годятся и для стока.",
+        "category.note.GOOD_EDITORIAL": (
+            "Хорошие снимки реальных мест и моментов. Продаются как редакционные — "
+            "новости, travel, документалистика, — а не как реклама."
+        ),
         "category.note.GOOD_PERSONAL": "Хорошие фотографии — оставить и напечатать.",
         "category.note.NEEDS_DECISION": "Действительно на грани. Одного взгляда хватит.",
         "category.note.WEAK": (
@@ -389,12 +399,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "summary.stage3_completed": "Художественный разбор выполнен",
         "category.TOP": "Лучшие",
         "category.GOOD_STOCK": "Хорошие — сток",
+        "category.GOOD_EDITORIAL": "Хорошие — редакционные",
         "category.GOOD_PERSONAL": "Хорошие — для себя",
         "category.NEEDS_DECISION": "Нужно решение",
         "category.WEAK": "Слабые",
         "category.top": "итоговая оценка {value}: художественный разбор выполнен, критических дефектов нет",
         "category.weak": "итоговая оценка {value} ниже порога сохранения",
         "category.good_stock": "итоговая оценка {value}, релиз не нужен, коммерчески пригодно",
+        "category.good_editorial": "итоговая оценка {value}: место и момент, годится для редакционного использования",
         "category.good_personal": "итоговая оценка {value}: стоит оставить, но не для стока",
         "category.needs_decision": "на границе ({value}), и разбор не уверен",
         "category.defect.bad_expression": "неудачное выражение лица: {detail}",

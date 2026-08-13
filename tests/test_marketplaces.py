@@ -27,7 +27,7 @@ def asset(route=Route.COMMERCIAL, stock=70, aesthetic=70):
 
 
 def clean(**kwargs):
-    base = {"present": True, "faces": False, "logos": False, "identifiable_people": False}
+    base = {"present": True, "faces": False, "brand_mark": False, "identifiable_people": False}
     return Semantic(**{**base, **kwargs})
 
 
@@ -184,7 +184,7 @@ def test_a_missing_property_release_is_named(rules):
 
 def test_a_trademark_is_reported_as_a_policy_concern(rules):
     recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(), clean(logos=True), CAMERA, rules=rules
+        asset(route=Route.EDITORIAL), photo_facts(), clean(brand_mark=True), CAMERA, rules=rules
     )
     assert any(any("trademark" in c for c in r.policy_conflicts) for r in recs)
 

@@ -132,7 +132,13 @@ class Semantic:
     axis_c: int = 50
     recover: str = "moderate"
     faces: bool = True
-    logos: bool = True
+    # A registered mark large enough that the photograph is partly about that
+    # brand. Defaults False: guessing "brand" on a frame nobody checked removes
+    # street photography from commercial use, which is the more expensive error.
+    brand_mark: bool = False
+    # Shop signs, neon, transit navigation -- the written texture of a place.
+    # Restricts a frame to editorial use, which is a category, not a fault.
+    signage_text: bool = False
     identifiable_people: bool = True
     recognizable_property: bool = False
     people_count: int = 0
@@ -172,8 +178,13 @@ class Semantic:
 
     @property
     def blocks_commercial(self) -> bool:
-        """The hard rule. A release is required for either, so neither sells."""
-        return self.faces or self.logos
+        """The hard rule for *commercial* stock: a release would be required."""
+        return self.faces or self.brand_mark
+
+    @property
+    def editorial_only(self) -> bool:
+        """Sellable as editorial, not as commercial. Not a defect."""
+        return self.signage_text or self.recognizable_property
 
 
 UNKNOWN_AXIS = 50
@@ -218,7 +229,8 @@ def semantic_from_assessment(assessment, *, group_size: int | None = None) -> Se
         axis_c=axis_c,
         recover=str(assessment.recover),
         faces=bool(assessment.faces),
-        logos=bool(assessment.logos),
+        brand_mark=bool(getattr(assessment, "brand_mark", False)),
+        signage_text=bool(getattr(assessment, "signage_text", False)),
         identifiable_people=bool(assessment.faces),
         intended_frame=bool(getattr(assessment, "intended_frame", True)),
         subject_strength=int(getattr(assessment, "subject_strength", 50)),
@@ -409,8 +421,11 @@ def legal_readiness_score(semantic: Semantic) -> int:
     score = 100.0
     if semantic.faces or semantic.identifiable_people:
         score -= 45.0
-    if semantic.logos:
+    if semantic.brand_mark:
         score -= 40.0
+    if semantic.signage_text:
+        # Editorial-only, which is a smaller restriction than a release.
+        score -= 12.0
     if semantic.recognizable_property:
         score -= 20.0
     return _clamp(score)
@@ -575,14 +590,17 @@ def classify(
                 "blocked until a face and trademark check has actually been done"
             )
         else:
-            present = [n for n, v in (("faces", semantic.faces), ("logos", semantic.logos)) if v]
+            present = [
+                n for n, v in (("faces", semantic.faces), ("a brand mark", semantic.brand_mark))
+                if v
+            ]
             reasons.append(
                 f"{' and '.join(present)} present: a release is required, "
                 "so commercial stock is blocked in code"
             )
             if semantic.faces or semantic.identifiable_people:
                 tags.append(AssetTag.NEEDS_MODEL_RELEASE)
-            if semantic.logos:
+            if semantic.brand_mark:
                 tags.append(AssetTag.LEGAL_REVIEW)
     else:
         tags.append(AssetTag.COMMERCIAL_OK)
