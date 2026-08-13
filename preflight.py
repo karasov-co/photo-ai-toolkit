@@ -129,7 +129,7 @@ class Check:
 class PreflightResult:
     ok: bool = False
     model: str = ""
-    provider: str = "OpenAI"
+    provider: str = "openai"
     checks: list[Check] = field(default_factory=list)
     failure: str = ""
     message: str = ""
@@ -276,7 +276,7 @@ def _code(text: str, status, wanted: int) -> bool:
     )
 
 
-def run(model: str, *, client=None) -> PreflightResult:
+def run(model: str, *, client=None, provider: str = "openai", base_url: str = "") -> PreflightResult:
     """One request, five verdicts. Nothing else in the toolkit runs before this.
 
     The checks are reported individually because "it failed" is not actionable
@@ -296,29 +296,23 @@ def run(model: str, *, client=None) -> PreflightResult:
     if client is None and not bootstrap.has_credentials():
         return _fail(result, Failure.NO_KEY.value)
 
+    import llm_provider
+
+    result.provider = provider
     try:
-        client = client or bootstrap.make_client()
+        engine = llm_provider.build(provider, model, base_url=base_url, client=client)
     except Exception as e:
         return _fail(result, Failure.AUTH.value, reports.redact(str(e)))
 
     try:
-        response = client.responses.create(
-            model=model,
-            instructions=PREFLIGHT_INSTRUCTIONS,
-            input=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": "Reply with the JSON array."},
-                        {
-                            "type": "input_image",
-                            "image_url": f"data:image/jpeg;base64,{test_image_base64()}",
-                            "detail": "low",
-                        },
-                    ],
-                }
-            ],
-            max_output_tokens=MAX_OUTPUT_TOKENS,
+        text = engine.complete_vision(
+            llm_provider.VisionRequest(
+                system=PREFLIGHT_INSTRUCTIONS,
+                texts=["Reply with the JSON array."],
+                images=[llm_provider.Image(test_image_base64(), detail="low")],
+                max_tokens=MAX_OUTPUT_TOKENS,
+                reasoning_effort=None,
+            )
         )
     except Exception as e:
         failure = classify(e)
@@ -340,7 +334,6 @@ def run(model: str, *, client=None) -> PreflightResult:
     model_check.detail = "verified"
     vision_check.detail = "verified"
 
-    text = getattr(response, "output_text", "") or ""
     if not _parses_as_expected(text):
         api_check.detail = "the reply was not the expected JSON"
         return _fail(result, Failure.STRUCTURED_OUTPUT.value, reports.redact(text[:200]))

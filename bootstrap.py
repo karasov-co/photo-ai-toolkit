@@ -55,29 +55,11 @@ MODEL_VAR = "OPENAI_MODEL"
 # product, and it is not portable across model generations.
 DEFAULT_SEMANTIC_MODEL = "gpt-5.6-terra"
 
-# Roughly what a run costs, so the CLI can say so before spending anything.
-# Measured on this archive: Stage 2 sends twelve 512px previews per call,
-# Stage 3 sends up to six frames with crops. These are order-of-magnitude
-# figures for a warning, not billing -- the run prints the calls it actually
-# made, and the provider's dashboard is the authority on money.
-APPROX_USD_PER_100_PHOTOS = {
-    "gpt-5.6-terra": 0.35,
-    "gpt-5.6-sol": 1.80,
-}
-
-
-def estimate_cost(model: str, photographs: int) -> float:
-    """A rough figure in dollars, for warning before a large run."""
-    per_hundred = APPROX_USD_PER_100_PHOTOS.get(model, 1.0)
-    return round(per_hundred * max(0, photographs) / 100.0, 2)
-
 # Families this toolkit will not fall back to, and will not name as a
 # workaround. Listed so a test can assert their absence from the fallback paths
 # rather than trusting that nobody adds one back.
 LEGACY_MODEL_PREFIXES = (
     "gpt-4",
-    "gpt-4o",
-    "gpt-4.1",
     "gpt-3",
     "gpt-5-",
     "chatgpt-4o",
@@ -91,12 +73,24 @@ def is_legacy_model(name: str) -> bool:
 
     Used to refuse a *silent* substitution, never to block an operator who has
     typed one deliberately: `--model` is an explicit instruction from somebody
-    who can see what they asked for, and second-guessing that would be its own
-    kind of dishonesty. What it must never be is a default, a fallback, or a
-    suggestion in an error message.
+    who can see what they asked for. What it must never be is a default, a
+    fallback, or a suggestion in an error message.
     """
     lowered = str(name or "").strip().lower()
     return any(lowered.startswith(prefix) for prefix in LEGACY_MODEL_PREFIXES)
+
+
+# Cost estimation moved to `llm_provider`, which reads data/pricing.json --
+# prices go stale on the vendor's schedule and belong in a file with the date
+# somebody last checked them, not in a constant nobody revisits.
+
+
+def estimate_cost(model: str, photographs: int) -> float:
+    """Kept as the name every caller already uses. See llm_provider."""
+    import llm_provider
+
+    return llm_provider.estimate_cost(model, photographs)
+
 
 _loaded_from: Path | None = None
 _load_attempted = False

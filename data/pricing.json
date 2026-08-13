@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "Rough cost of analysing 100 photographs: Stage 2 sends twelve 512px",
+    "previews per call, Stage 3 up to six frames with crops. These are",
+    "order-of-magnitude figures for the confirmation prompt, not billing.",
+    "The provider's dashboard is the authority on money.",
+    "Re-check these when a vendor changes prices; the date below is when",
+    "somebody last did."
+  ],
+  "checked": "2026-08-13",
+  "default_usd_per_100_photos": 1.0,
+  "models": {
+    "gpt-5.6-terra": {"usd_per_100_photos": 0.35, "provider": "openai"},
+    "gpt-5.6-sol":   {"usd_per_100_photos": 1.80, "provider": "openai"}
+  }
+}

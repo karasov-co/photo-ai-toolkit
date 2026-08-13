@@ -42,6 +42,7 @@ import curation
 import duplicates
 import edit_recipe
 import issues as issues_module
+import llm_provider
 import marketplaces
 import media
 import provenance as provenance_module
@@ -635,14 +636,14 @@ def semantic_pass(
             )
 
         try:
-            response = client.responses.create(
-                model=model,
-                instructions=prompts.STAGE2_SYSTEM,
-                input=[{"role": "user", "content": prompts.stage2_user_content(frames)}],
-                max_output_tokens=900 + 260 * len(frames),
-                reasoning={"effort": "low"},
+            text = _provider(model, client).complete_vision(
+                llm_provider.from_openai_content(
+                    prompts.STAGE2_SYSTEM,
+                    prompts.stage2_user_content(frames),
+                    max_tokens=900 + 260 * len(frames),
+                )
             )
-            items = batch_runner.parse_group_json(response.output_text or "")
+            items = batch_runner.parse_group_json(text)
             succeeded += 1
             if calls is not None:
                 calls["stage2"] = calls.get("stage2", 0) + 1
@@ -916,6 +917,24 @@ def _stage3_views(asset, preview: Path, hint: dict) -> list[tuple[str, str]]:
         return [(name, encode(view)) for name, view in stage3_module.face_crops(image)]
 
 
+def _provider(model: str, client=None):
+    """The provider for this run.
+
+    A client passed in wins: the tests inject a fake, and so does anything that
+    wants to reuse a configured connection. Otherwise the name comes from the
+    environment, so a run can be pointed at a local server without touching the
+    pipeline.
+    """
+    import os
+
+    name = os.environ.get("PHOTO_AI_PROVIDER", "openai")
+    if client is not None:
+        return llm_provider.OpenAIProvider(model, client=client)
+    return llm_provider.build(
+        name, model, base_url=os.environ.get("PHOTO_AI_BASE_URL", "")
+    )
+
+
 def _truncated(response) -> bool:
     """Whether the reply stopped because it ran out of output budget.
 
@@ -951,22 +970,21 @@ def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float =
 
     for attempt in range(stage3_module.MAX_RETRIES + 1):
         try:
-            response = client.responses.create(
-                model=model,
-                instructions=prompts.STAGE3_SYSTEM,
-                input=[{"role": "user", "content": prompts.stage3_user_content(frames)}],
-                max_output_tokens=budget,
-                reasoning={"effort": "low"},
-            )
-            if _truncated(response):
-                errors.append(f"attempt {attempt + 1}: the reply hit the {budget}-token limit")
+            try:
+                text = _provider(model, client).complete_vision(
+                    llm_provider.from_openai_content(
+                        prompts.STAGE3_SYSTEM,
+                        prompts.stage3_user_content(frames),
+                        max_tokens=budget,
+                    )
+                )
+            except llm_provider.Truncated as e:
+                errors.append(f"attempt {attempt + 1}: {e}")
                 return _split_or_widen(
                     frames, model=model, client=client, stage3_module=stage3_module,
                     budget_factor=budget_factor, errors=errors,
                 )
-            parsed = stage3_module.parse_group(
-                response.output_text or "", group, model=model
-            )
+            parsed = stage3_module.parse_group(text, group, model=model)
             if parsed:
                 for assessment in parsed.values():
                     assessment.retries = attempt

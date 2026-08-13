@@ -119,8 +119,28 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
     # --- nothing above this line has touched a file, and nothing below it runs
     # --- until the model has proved it works.
     if semantic:
+        import os as _os
+
+        import llm_provider
+
         model = bootstrap.resolve_model(args.model)
-        result = preflight.run(model)
+        provider_name = args.provider or _os.environ.get("PHOTO_AI_PROVIDER", "openai")
+        base_url = args.base_url or _os.environ.get("PHOTO_AI_BASE_URL", "")
+        # The environment is what the pipeline reads, so a --provider flag has
+        # to reach it or the preflight would check one endpoint and the run
+        # would use another.
+        _os.environ["PHOTO_AI_PROVIDER"] = provider_name
+        if base_url:
+            _os.environ["PHOTO_AI_BASE_URL"] = base_url
+
+        engine = llm_provider.PROVIDERS.get(provider_name)
+        if engine is not None and not engine.verified:
+            print(
+                f"Note: the {provider_name} provider has never been run against a "
+                "live endpoint. It is written from the documented request shape.",
+                flush=True,
+            )
+        result = preflight.run(model, provider=provider_name, base_url=base_url)
         print(preflight.format_result(result), flush=True)
         if not result.ok:
             print(preflight.format_failure(result), file=sys.stderr)
@@ -1134,6 +1154,21 @@ def build_parser() -> argparse.ArgumentParser:
             "against your account before any photograph is opened, and never "
             "silently replaced"
         ),
+    )
+    analyze.add_argument(
+        "--provider",
+        choices=sorted(__import__("llm_provider").PROVIDERS),
+        default=None,
+        help=(
+            "which API to call (default: openai, or PHOTO_AI_PROVIDER). Only "
+            "openai has been run against a live endpoint; the others are "
+            "written from the documented request shape and say so"
+        ),
+    )
+    analyze.add_argument(
+        "--base-url",
+        default=None,
+        help="for --provider openai-compatible: a vLLM or Ollama endpoint",
     )
     analyze.add_argument(
         "--no-stage3",
