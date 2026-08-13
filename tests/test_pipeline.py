@@ -7,6 +7,7 @@ tool.
 """
 
 import json
+from concurrent.futures import ProcessPoolExecutor
 
 import pytest
 from synthetic import blurred, dark_but_recoverable, near_black, photo_like, write_jpeg
@@ -660,3 +661,46 @@ def test_progress_still_reports_every_asset_in_order(tmp_path):
         progress=lambda name, i, total, reused=False: seen.append(name),
     )
     assert seen == sorted(seen), "results arrived out of order"
+
+
+# --- the socket guard blocks the network, not IPC -----------------------------
+
+
+def test_the_guard_still_refuses_a_real_network_connection():
+    """Loosening it for AF_UNIX must not loosen it for anything that can leave."""
+    import socket as socket_module
+
+    with pytest.raises(RuntimeError, match="network access is not allowed"):
+        socket_module.socket(socket_module.AF_INET, socket_module.SOCK_STREAM).connect(
+            ("example.com", 80)
+        )
+    with pytest.raises(RuntimeError, match="network access is not allowed"):
+        socket_module.create_connection(("example.com", 80))
+
+
+def test_the_guard_refuses_localhost_too():
+    """A test that needs a local server should say so, not get one silently."""
+    import socket as socket_module
+
+    with pytest.raises(RuntimeError, match="network access is not allowed"):
+        socket_module.socket(socket_module.AF_INET, socket_module.SOCK_STREAM).connect(
+            ("127.0.0.1", 8080)
+        )
+
+
+@pytest.mark.parametrize("method", ["spawn", "forkserver"])
+def test_the_pool_works_under_every_start_method(method, tmp_path):
+    """Python 3.14 changed the Linux default to forkserver, which talks to its
+    worker factory over a Unix socket -- and the guard was refusing that.
+
+    Both methods are exercised here so the next default change is caught by a
+    test rather than by CI on one of three Python versions.
+    """
+    import multiprocessing
+
+    if method not in multiprocessing.get_all_start_methods():
+        pytest.skip(f"{method} is not available on this platform")
+
+    context = multiprocessing.get_context(method)
+    with ProcessPoolExecutor(max_workers=2, mp_context=context) as pool:
+        assert list(pool.map(abs, [-1, -2, -3])) == [1, 2, 3]

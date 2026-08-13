@@ -49,14 +49,43 @@ EXPECTED_EXIF = {
 
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
-    """Turn any outbound connection into a loud failure."""
+    """Turn any outbound *network* connection into a loud failure.
 
-    def deny(*args, **kwargs):
+    A Unix domain socket is exempt, and that is the whole subtlety here. It
+    cannot reach anything off this machine -- it is a filesystem path -- so it
+    was never what this guard was for, and blocking it broke the process pool
+    on Python 3.14: the default multiprocessing start method on Linux became
+    `forkserver`, and forkserver talks to its worker factory over AF_UNIX. The
+    guard fired on that handshake, and two parallel-decoding tests failed with
+    "network access is not allowed" on 3.14 while passing on 3.12 and 3.13,
+    and on macOS, where the default is still `spawn`.
+
+    So the family is inspected instead of the call being refused outright.
+    AF_INET and AF_INET6 are the ones that can leave the machine, and they are
+    still refused -- including to localhost, because a test that needs a local
+    HTTP server is a test that should say so.
+    """
+    allowed_families = {getattr(socket, "AF_UNIX", None)}
+
+    def deny(self, *args, **kwargs):
+        if getattr(self, "family", None) in allowed_families:
+            return _real_connect(self, *args, **kwargs)
         raise RuntimeError("network access is not allowed in the test suite")
 
+    def deny_ex(self, *args, **kwargs):
+        if getattr(self, "family", None) in allowed_families:
+            return _real_connect_ex(self, *args, **kwargs)
+        raise RuntimeError("network access is not allowed in the test suite")
+
+    def deny_create(*args, **kwargs):
+        raise RuntimeError("network access is not allowed in the test suite")
+
+    _real_connect = socket.socket.connect
+    _real_connect_ex = socket.socket.connect_ex
+
     monkeypatch.setattr(socket.socket, "connect", deny)
-    monkeypatch.setattr(socket.socket, "connect_ex", deny)
-    monkeypatch.setattr(socket, "create_connection", deny)
+    monkeypatch.setattr(socket.socket, "connect_ex", deny_ex)
+    monkeypatch.setattr(socket, "create_connection", deny_create)
 
 
 @pytest.fixture(autouse=True)
