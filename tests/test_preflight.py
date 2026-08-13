@@ -737,3 +737,88 @@ def test_the_estimate_counts_only_what_is_billable(archive, tmp_path, monkeypatc
     printed = capsys.readouterr().out
     assert "Reused:   2" in printed
     assert "Nothing new to analyse." in printed
+
+
+# --- one report, one scale ----------------------------------------------------
+#
+# Stage 2 ranks twelve frames against each other; turning that into a 0-100
+# figure needs a population. Caching the *percentile* froze one run's population
+# into an asset that outlived it, so a later report put old percentiles beside
+# percentiles computed over a different set, on the same axis, as though they
+# were the same scale.
+
+
+def test_the_cache_stores_ranks_rather_than_percentiles(archive, tmp_path, monkeypatch):
+    out = tmp_path / "run"
+    with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    assert analyze(archive, out) == 0
+
+    cache = pipeline.AnalysisCache(out / ".internal" / "analysis_cache.json")
+    stored = [v for k, v in cache._data.items() if k.startswith("stage2:")]
+    assert stored, "nothing was cached"
+    for entry in stored:
+        assert "item" in entry and "group" in entry, "the stitched result was cached"
+        assert "axis_a" in entry["item"], "the raw rank is what must survive"
+        assert entry["group"], "the frames it was ranked against are part of the fact"
+
+
+def test_two_batches_end_up_on_one_scale(archive, tmp_path, monkeypatch):
+    """The failure: half the report on last run's scale, half on this one's."""
+    out = tmp_path / "run"
+    client = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    assert analyze(archive, out) == 0
+
+    for i in range(4):
+        write_jpeg(photo_like(1200, 900, seed=30 + i), archive / f"n{i}.jpg")
+    client.responses.stage2_text = stage2_reply(4)
+    client.responses.stage3_text = stage3_reply(4)
+    assert analyze(archive, out) == 0
+
+    rows = records_by_name(out)
+    axes = [r["scores"] for r in rows.values()]
+    assert len(rows) == 6
+    # Every frame has an axis figure, and they span one range rather than two
+    # disjoint ones -- a cached frame stuck on an old scale shows up as a value
+    # no fresh frame could take.
+    assert all(0 <= s["stock_potential"] <= 100 for s in axes)
+    genres = {r["genre"] for r in rows.values()}
+    assert genres == {"landscape"}, genres
+
+
+def test_a_reused_frame_is_rescored_against_the_new_population(archive, tmp_path, monkeypatch):
+    """Its rank is fixed; its percentile is not, and must not be."""
+    out = tmp_path / "run"
+    client = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    assert analyze(archive, out) == 0
+    before = records_by_name(out)["a.jpg"]
+
+    write_jpeg(photo_like(1200, 900, seed=40), archive / "z.jpg")
+    client.responses.stage2_text = stage2_reply(1)
+    client.responses.stage3_text = stage3_reply(1)
+    assert analyze(archive, out) == 0
+    after = records_by_name(out)["a.jpg"]
+
+    # No second API call was spent on it, and its own judgements are unchanged.
+    assert client.responses.stage2_calls == 2
+    assert after["genre"] == before["genre"]
+    assert after["stage3"] == before["stage3"]
+
+
+def test_stage2_groups_overlap_so_the_ranking_is_not_islands():
+    """Bradley-Terry needs shared frames or every group is its own scale."""
+    import aggregate
+
+    names = [f"f{i}.jpg" for i in range(60)]
+    groups = aggregate.build_groups(names, size=12)
+    assert len(groups) > 1
+    for earlier, later in zip(groups, groups[1:], strict=False):
+        assert set(earlier) & set(later), "adjacent groups share no frames"
+    assert aggregate.DEFAULT_OVERLAP >= 2
+
+
+def test_every_frame_appears_in_at_least_one_group():
+    import aggregate
+
+    names = [f"f{i}.jpg" for i in range(101)]
+    covered = {n for group in aggregate.build_groups(names, size=12) for n in group}
+    assert covered == set(names)

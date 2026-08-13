@@ -568,7 +568,6 @@ def semantic_pass(
     import aggregate
     import batch_runner
     import prompts
-    import routing
 
     if client is None:
         import bootstrap
@@ -577,6 +576,10 @@ def semantic_pass(
 
     by_name = {a.key: a for a in assets}
     out: dict[str, Semantic] = {}
+    # Raw model replies, keyed by asset. Both the ones answered from store and
+    # the ones just fetched end up here, and the scale is computed over all of
+    # them together so that one report never mixes two populations.
+    cached_raw: dict[str, dict] = {}
     photo_names: list[str] = []
 
     for asset in assets:
@@ -586,12 +589,12 @@ def semantic_pass(
             continue
         stored = cache.get_semantic(asset.checksum, model) if cache is not None else None
         if stored is not None:
-            out[asset.key] = Semantic.from_dict(stored)
+            cached_raw[asset.key] = stored
             continue
         photo_names.append(asset.key)
 
     if not photo_names:
-        return out
+        return _stitch(cached_raw, by_name, out)
     groups = aggregate.build_groups(photo_names, size=group_size)
     parsed_groups: list[list[dict]] = []
     per_frame: dict[str, dict] = {}
@@ -674,29 +677,74 @@ def semantic_pass(
         # model had no opinion".
         raise first_error
 
-    scores = aggregate.aggregate_all_axes(parsed_groups)
+    # Store the raw reply and the group it was ranked in, never the stitched
+    # result. Percentiles are a property of the population, so caching them
+    # freezes one run's population into an asset that outlives it -- and the
+    # next run then puts those old percentiles beside percentiles computed over
+    # a different set, in one report, on one axis, as though they were the same
+    # scale. The ranks are the durable fact; the scale is rebuilt below.
+    for group in parsed_groups:
+        members = [item.get("filename", "") for item in group]
+        for item in group:
+            name = item.get("filename", "")
+            asset = by_name.get(name)
+            if asset is None:
+                continue
+            entry = {"item": item, "group": members}
+            # The same record in memory and on disk: a frame keeps the group it
+            # was ranked against, which is what Bradley-Terry needs to place it
+            # against everything else in a later run.
+            cached_raw.setdefault(name, entry)
+            if cache is not None:
+                cache.put_semantic(asset.checksum, model, entry)
 
-    # NOT re-initialised: `out` already holds every asset answered from
-    # store. Assigning a fresh dict here threw those away and silently
-    # un-analysed every unchanged photograph in an incremental run.
-    for name, item in per_frame.items():
+    return _stitch(cached_raw, by_name, out)
+
+
+def _stitch(raw: dict[str, dict], by_name: dict, out: dict[str, Semantic]) -> dict[str, Semantic]:
+    """Rebuild one scale over every asset in the run, cached and fresh alike.
+
+    This is the whole point of storing ranks instead of percentiles. The model
+    ranks twelve frames against each other; turning that into a 0-100 figure
+    requires a population, and the population changes every time somebody adds
+    photographs. Recomputing here costs no API call and keeps a single report
+    on a single scale.
+
+    Groups are reconstructed from what was stored, so Bradley-Terry still sees
+    the comparison structure it needs -- an asset remembers which frames it was
+    ranked against, not merely where it came.
+    """
+    import aggregate
+    import routing
+
+    if not raw:
+        return out
+
+    groups: dict[tuple, list[dict]] = {}
+    for name, entry in raw.items():
+        item = dict(entry.get("item") or {})
+        item.setdefault("filename", name)
+        members = entry.get("group") or [name]
+        groups.setdefault(tuple(members), []).append(item)
+
+    scores = aggregate.aggregate_all_axes(list(groups.values()))
+
+    for name, entry in raw.items():
+        item = entry.get("item") or {}
         try:
             assessment = routing.parse_assessment(item, name)
         except routing.AssessmentParseError as e:
             logger.warning("Unusable model output for %s: %s", name, e)
             continue
-        semantic = scoring.semantic_from_assessment(assessment, group_size=item.get("_group_size"))
-        # Replace the within-group rank with the stitched global percentile.
+        members = entry.get("group") or []
+        semantic = scoring.semantic_from_assessment(
+            assessment, group_size=len(members) or item.get("_group_size")
+        )
         semantic.axis_a = scores["axis_a"].get(name, semantic.axis_a)
         semantic.axis_b = scores["axis_b"].get(name, semantic.axis_b)
         semantic.axis_c = scores["axis_c"].get(name, semantic.axis_c)
         semantic.description = str(item.get("note") or "")
-        asset = by_name.get(name)
-        if asset is not None:
-            semantic.secondary_genres = []
         out[name] = semantic
-        if cache is not None and asset is not None:
-            cache.put_semantic(asset.checksum, model, semantic.to_dict())
     return out
 
 
@@ -1314,11 +1362,11 @@ def _semantics(
     if not options.semantic:
         return {}
 
+    cache = AnalysisCache(options.internal / CACHE_NAME)
     try:
         semantics = semantic_pass(
             assets, measurements, model=model, client=client,
-            cache=AnalysisCache(options.internal / CACHE_NAME),
-            calls=result.llm_calls,
+            cache=cache, calls=result.llm_calls,
         )
     except Exception as e:
         kind, message = bootstrap.classify_api_error(e)
@@ -1329,13 +1377,11 @@ def _semantics(
         return {}
 
     # Saved immediately: a Stage 3 failure after this point must not throw away
-    # content results that were already paid for.
+    # content results that were already paid for. `semantic_pass` has already
+    # put the raw replies in; re-deriving entries from the stitched Semantic
+    # here would overwrite them with percentiles from this run's population,
+    # which is the thing the raw storage exists to avoid.
     if semantics:
-        cache = AnalysisCache(options.internal / CACHE_NAME)
-        for asset in assets:
-            found = semantics.get(asset.key)
-            if found is not None:
-                cache.put_semantic(asset.checksum, model, found.to_dict())
         cache.save()
 
     result.semantic_completed = bool(semantics)
