@@ -560,7 +560,7 @@ def test_a_rank_of_one_becomes_the_top_of_the_scale_not_the_bottom():
 
 def test_an_unknown_group_size_yields_unknown_axes_rather_than_a_raw_rank():
     """A raw rank of 1 in a 0-100 field turns the best frame into the worst."""
-    import routing
+    import assessment_parser as routing
 
     assessment = routing.parse_assessment(
         {

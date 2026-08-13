@@ -715,7 +715,7 @@ def _stitch(raw: dict[str, dict], by_name: dict, out: dict[str, Semantic]) -> di
     ranked against, not merely where it came.
     """
     import aggregate
-    import routing
+    import assessment_parser as routing
 
     if not raw:
         return out
