@@ -4,24 +4,29 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 
-A culling, assessment and distribution tool for photo and video archives.
+**You came back from a trip with 2,000 frames and you have opened the folder
+four times without editing anything.** This sorts them into five piles, ranks
+every pile by how good each photograph can *become* after a normal edit, tells
+you in one sentence why, and writes a Lightroom starting point for the ones
+worth your evening.
 
-It answers one question that ordinary quality scoring gets wrong: **what is this
-file worth after a normal edit?** A dark, tilted, flat, noisy RAW is not a bad
-photograph — it is an unedited one. A sharp, bright, perfectly exposed frame
-whose subject missed focus is finished, and no amount of processing changes
-that. Those two files score almost identically on any single "quality" number,
-and they belong in opposite piles.
+It never moves, changes or deletes a single original file.
 
 ---
 
-## What it does
+## Try it in three commands
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # put your OpenAI key in it, once
+python cli.py analyze --input ~/Pictures/japan --output ./run
+```
+
+Then open `run/report.html`.
+
+Real output from the 47-frame archive this was built against — not a mock-up:
 
 ```
-$ python cli.py analyze --input ~/Pictures/japan --output ./run
-
-  [   1/47] P1019368.JPG
-  ...
 ==================================================================
 COLLECTION SUMMARY
 ==================================================================
@@ -30,18 +35,20 @@ COLLECTION SUMMARY
   Total assets                                     47
 
   What these photographs are:
-    Top                                             3
-    Good — stock                                   13
-    Good — personal                                26
+    Top                                             0
+    Good — stock                                   14
+    Good — personal                                27
     Needs decision                                  0
-    Weak                                            5
+    Weak                                            6
+  (nothing reached TOP: the best photograph scored 75, and TOP needs 85)
 
   Duplicate clusters                                8
 
-  Top photos:
-    [ 88] P1019412.JPG
-    [ 86] P1019389.JPG
-    [ 85] P1019399.JPG
+  Strongest assets:
+    [ 75] P1019399.JPG
+    [ 72] P1019412.JPG
+    [ 71] P1019389.JPG
+    [ 70] P1019396.JPG
 
   These are suggestions, not verdicts -- a score is one opinion
   about a photograph. Nothing has been moved, changed or deleted:
@@ -49,92 +56,228 @@ COLLECTION SUMMARY
 ==================================================================
 ```
 
-and an output directory holding what you came for and nothing else:
+An empty top pile is a normal result and the tool says so plainly rather than
+promoting the best of a mediocre shoot. That bar is absolute, and it is one
+number you can move.
 
 ```
 run/
-  report.html                  the five piles, ranked
-  photographer_insights.html   what the collection says about your photography
+  report.html                  ← open this
+  photographer_insights.html   ← and this
   top/  good_stock/  good_personal/  needs_decision/  weak/
-  edit_recipes/                one XMP sidecar per photograph worth editing
-  .internal/                   previews, JSON, CSV, log, cache, diagnostics
+  edit_recipes/                one .xmp per photograph worth editing
+  .internal/                   everything the tool keeps for itself
 ```
 
-The folders hold **symlinks**. Analysis never copies, moves, alters or deletes
-an original.
+The five folders hold **shortcuts to your originals**, not copies. Delete the
+whole `run/` directory and your photographs are exactly where they were.
+
+No API key? It still runs — measuring, clustering and ranking locally — and says
+plainly what that costs you.
 
 ---
 
-## One number: potential after editing
+## The thing it gets right that scoring tools get wrong
 
-Everything is ranked by one question -- *how good can this photograph become
-after a normal edit?* -- and never by how the untouched file looks right now. A
-dark, flat, tilted RAW that will come back beautifully outranks a bright JPEG
-that will not, which is the entire point of the tool. Current quality is shown
-beside it in small text, because you still want to know whether you are looking
-at a finished frame or a raw one.
+Almost every "photo culling AI" rates the file in front of it. That is the wrong
+question, because **nobody publishes a RAW as shot.**
 
-| Category | Meaning |
+A dark, flat, tilted, noisy frame is not a bad photograph. It is an *unedited*
+one, and two sliders away it may be the best thing you shot that week. A bright,
+sharp, perfectly exposed frame whose subject missed focus is finished, and no
+amount of processing will change that.
+
+Those two files score almost identically on any single "quality" number, and
+they belong in opposite piles.
+
+So this tool asks one question and ranks everything by the answer:
+
+> **How good can this photograph become after a normal edit?**
+
+It does not guess. It actually applies a bounded set of plausible,
+non-destructive edits to a working copy — exposure, white balance, highlight and
+shadow recovery, straightening, several crops — re-scores each result and keeps
+the best, then charges the result for what the edit cost: a heavy crop loses
+resolution, a big exposure push loses latitude, and a JPEG gets far less credit
+than a RAW because the data the recovery would use has already been thrown away
+by the encoder.
+
+On a real 45-frame RAW sample, editing gained a median of **12 points** and up
+to **53**. Those are the frames a "current quality" score files in the bin.
+
+---
+
+## Your five piles
+
+| | What it means |
 |---|---|
-| `TOP` | The strongest work here. Shown first, and linked in `top/` |
-| `GOOD — STOCK` | A good photograph that also works as stock material |
-| `GOOD — PERSONAL` | A good photograph worth keeping. Not stock material |
-| `WEAK` | Blinks, dead moments, accidental frames, weaker takes of a shot you already have |
-| `NEEDS DECISION` | Genuinely borderline, and rare by design |
+| **Top** | The strongest work in the shoot. Start here. |
+| **Good — stock** | A good photograph that also happens to be sellable |
+| **Good — personal** | A good photograph worth keeping and printing |
+| **Needs decision** | Genuinely borderline. A glance settles it. Rare by design |
+| **Weak** | Blinks, dead moments, accidental frames, the weaker of two near-identical takes |
 
-Three things the score deliberately does **not** contain: whether the photograph
-can be licensed, whether anyone would buy it, and whether a stranger walked into
-the frame. Those checks still run, and all they do is separate `GOOD — STOCK`
-from `GOOD — PERSONAL`. They never lower a score, never block `TOP`, and never
-make a photograph `WEAK`. Somebody photographing their own family should never
-be told their picture has a licensing problem, so the default report contains no
-legal vocabulary at all -- no releases, no trademarks, no editorial-only. It is
-in `.internal/reports/analysis.json` and behind the report's *Expert details*
-block for whoever actually sells work.
+**Weak is a shelf, not a bin.** Nothing is deleted, ever, by an analysis run.
+Deleting requires a separate command, a demonstrable unrecoverable fault, a
+contact sheet you have to look at, and a script that moves files to the Trash
+rather than calling `rm`. That ritual exists because an early version of the
+technical filter marked four good photographs for deletion, and the only thing
+that caught it was looking at them.
 
-`WEAK` is a shelf, not a bin. No category is grounds for deletion; that still
-requires a demonstrable unrecoverable fault recorded as evidence.
+**A missing model release never makes a photograph worse.** Whether a picture
+can be licensed decides *stock* from *personal* and nothing else — it never
+lowers a score, never blocks the top pile, never makes anything weak. The report
+contains no legal vocabulary at all: no releases, no trademarks, no
+editorial-only. Somebody photographing their own family should not be told their
+picture has a licensing problem. (All of it is still computed, and it is one
+click away under *Expert details* for whoever actually sells work.)
 
 ---
 
-## Edit recipes
+## What a card tells you
 
-Every photograph scoring 70 or above gets its own Camera Raw sidecar in
-`edit_recipes/`, built from that photograph's own measurements. One preset
-cannot fit a collection -- the whole premise of the analysis is that these
-frames differ -- so there is no single "look" to apply.
+```
+┌──────────────────────────────┐
+│         [ preview ]          │
+│                              │
+│ P1019399.JPG           75    │
+│              after editing   │
+│ technical quality now: 58    │
+│                              │
+│ a clean, legible photograph  │
+│ that also works as stock     │
+│                              │
+│ • Adjust exposure: +0.4 EV   │
+│ • Neutralise the cast        │
+│ • Recover highlights, lift   │
+│   shadows: moderate          │
+│                              │
+│ Edit recipe → edit_recipes/  │
+└──────────────────────────────┘
+```
+
+One number, one sentence, three things to do. Nothing else — no confidence
+interval, no routing class, no marketplace table. The two numbers measure
+different things and are labelled so: how good the *photograph* is, and how
+clean the *file* currently is.
+
+---
+
+## Edit recipes you can actually use
+
+Every photograph scoring 70 or above gets its own **Camera Raw sidecar** in
+`edit_recipes/`, built from that frame's own measurements. There is no single
+"look" to apply, because the whole premise of the analysis is that these frames
+differ — one is two stops under, one has a cast, one is three degrees off level
+and one is fine.
+
+In Lightroom Classic: copy the `.xmp` next to the photograph, select it, then
+**Metadata → Read Metadata from File**. The sliders move. Undo works normally.
+`edit_recipes/HOW-TO-USE.txt` covers Camera Raw, Capture One, darktable and
+RawTherapee too.
 
 They are a **starting point, not a finished edit**: they undo what the camera
-got wrong (exposure, colour cast, a tilted horizon, clipped highlights) and stop
-there. `edit_recipes/HOW-TO-USE.txt` explains the Lightroom Classic import
-(*Metadata > Read Metadata from File*) and what to do in Camera Raw, Capture
-One, darktable and RawTherapee.
+got wrong and stop there. Every creative decision is still yours.
 
-Nothing here writes beside your originals. A converter looks for `<stem>.xmp`
-next to the file, so writing there would silently replace work you had already
-done; these stay in the output directory until you choose to copy one across.
+Nothing is ever written beside your originals — a converter looks for
+`<name>.xmp` next to the file, so writing there would silently replace work you
+had already done.
 
-Where the analysis supports it, a frame is also offered up to three creative
-directions -- documentary neutral, cinematic low key, warm autumn, cool winter,
-restrained black and white. Each has to be *earned* by something measured: a
-season applied to an unrelated photograph is a lie about the picture, so a frame
-that earns none is offered none. No extra model calls are made for any of this.
+Where the frame supports it you also get up to three creative directions —
+documentary neutral, cinematic low key, warm autumn, cool winter, restrained
+black and white. Each has to be *earned* by something measured: a season applied
+to an unrelated photograph is a lie about the picture, so a frame that earns
+none is offered none.
 
 ---
 
-## Photographer insights
+## And a page about your photography, not your photographs
 
-`photographer_insights.html` reports patterns across the whole collection:
-strongest genres, recurring visual habits, what you do reliably well, what is
-costing you frames, and the three things most worth changing next -- each with
-the count and the filenames behind it.
+`photographer_insights.html` looks across the whole collection. Real output from
+a real run:
 
-Per-file feedback teaches you about that file. "Eleven of your fourteen
-portraits put the subject dead centre" teaches you something you can use on the
-next shoot. Nothing is reported unless enough frames support it, there are no
-invented quotations, and the reading list is a small fixed table of real
-photographers and books to look up rather than a paragraph of invented
-commentary about them.
+> **Your visual habits**
+> You photograph people inside their surroundings rather than close in on the
+> face — the setting is doing as much work as the subject.
+> *22 of 27 portraits put the face under 4% of the frame*
+>
+> **What is costing you frames**
+> You shoot several near-identical frames of the same thing and keep them all.
+> The extra takes are not adding a better version — they are adding work later.
+> *10 of 47 frames lost to a sharper sibling*
+>
+> **The three things worth changing next**
+> 1. Before you press the shutter on the obvious view, take two steps in any
+>    direction and look again. *distinctiveness averages 46 of 100*
+> 2. Wait longer in the good light. Most of these frames record a place
+>    correctly; the strongest ones caught something happening in it.
+
+Every line names the number and the filenames behind it. Nothing is reported
+unless enough frames support it, and there is no generic advice — you will not
+be told to use the rule of thirds. The reading list is a short fixed table of
+real photographers and books to look up, with no invented commentary about them.
+
+---
+
+## For the engineer reading this
+
+The design is defensive in one direction on purpose, and the asymmetry runs
+through every decision:
+
+**A false "weak" is unrecoverable; a false "keep" costs a folder.** So a
+photograph is never destroyed on a low score. Destruction requires a
+*demonstrable* fault — missed focus, a corrupt file, no usable video segment —
+recorded as machine-readable evidence, and aesthetic judgements are deliberately
+not representable in that field.
+
+**Missing data is never a low score.** Every model output is either a validated
+number or an explicit status saying why there is not one. A frame cannot reach
+the top pile because the analysis that would have judged it timed out — an
+unfinished artistic read is itself a blocker.
+
+**Defects apply a ceiling, not a penalty.** A penalty can be outvoted by a big
+enough number elsewhere; a ceiling cannot. That is the only reliable way to stop
+a technically immaculate photograph of a blink from ranking well.
+
+**Evidence can rescue, opinion cannot.** A confident artistic read applies a
+floor that keeps an unconventional frame out of the weak pile — but it only ever
+overrules a *guess* ("this looks like a dead moment"), never an *observation*
+("the subject's eyes are closed").
+
+Concretely, the pipeline is ordered so the cheapest thing that can eliminate
+work runs first — checksum and grouping, then local decoding and measurement,
+then clustering, and only then the paid vision passes. Everything after scoring
+reads stored numbers, which is what makes `reclassify` free: change a threshold
+and redo the routing in milliseconds without decoding a pixel or spending a
+token.
+
+Some of the load-bearing details, each of which exists because the naive version
+failed on a real archive:
+
+- Tilt from a **block structure tensor** with a coherence gate, not per-pixel
+  gradients — the latter returned 0.5° for every input.
+- Camera motion by **phase correlation** between frames, which separates a pan
+  from shake; anything scoring raw inter-frame difference calls a good pan
+  unusable. Bursts are analysed independently, because measuring across a burst
+  boundary reported 22.5px of shake on a clean pan.
+- Halo detection by **local-deviation growth**, not mean brightening — unsharp
+  overshoot cancels out in the mean.
+- Assets keyed on **relative path**, not basename: two memory cards both hold
+  `P1000001.RW2`, and keying by filename merged two different photographs.
+- Stage 2 **ranks within a group** rather than scoring absolutely, because every
+  live absolute call against this archive came back 548, 560, 694, 762. A
+  near-ranking with one duplicated rank is repaired rather than discarded —
+  discarding one cost twelve photographs their content analysis.
+- Stage 3 is cached separately from Stage 2, keyed by checksum, model *and*
+  prompt version, so a valid content result can never stand in for a missing
+  artistic one.
+- Deletion plans are **JSON executed by Python**, never a generated shell
+  script: a filename containing a quote character was enough to inject commands
+  into the first version.
+
+**1,316 tests**, no network, no API key: `conftest.py` turns any outbound socket
+into a loud failure and redirects the project root so the suite cannot read a
+real `.env`. Every fixture image is generated.
 
 ---
 
@@ -581,39 +724,52 @@ report.
 
 ## Two modes, and the difference matters
 
-| Mode | What runs | What you get |
+| Mode | When it runs | What you get |
 |---|---|---|
-| **local-only** (default) | Decoding, technical metrics, edit-potential search, duplicate clustering | Technical routing. **Genre is `unknown`. Faces, logos and releases are not checked.** |
-| **local + semantic** (`--semantic`) | The above, plus a vision model over 512px previews | Genre, concepts, faces, logos, release requirements, marketplace eligibility |
+| **local + semantic** (default, needs a key) | Whenever `OPENAI_API_KEY` is set | Everything: content, faces, genre, the artistic read, the top pile |
+| **local-only** | No key, or `--no-semantic` | Technical measurement, edit potential, duplicate clustering. **Genre is `unknown`, and nothing can reach the top pile** |
 
-**What is sent to the API:** 512px JPEG previews of your photographs, in groups
-of twelve, plus the measured clipping figures. No original file is uploaded. No
-video frames are sent.
+The vision passes are on by default because they *are* the analysis: without
+them every artistic field is empty, no photograph can be ranked as a top one,
+and the subject of each frame is unknown. A run without a key says exactly that,
+in those words, rather than presenting a weaker result as a finished one.
 
-**Semantic costs money.** It is opt-in for that reason, and off by default.
+- `--semantic` makes a missing key an **error** instead of a downgrade.
+- `--no-semantic` turns them off deliberately.
+- `--no-stage3` keeps the content check and skips the artistic read.
+
+**What is sent to the API:** 512px JPEG previews, in groups of twelve, plus the
+measured clipping figures. No original file is uploaded. No video frames are
+sent. **This costs money** — a few cents per hundred photographs, and the
+run prints where your credential came from (never the key itself).
 
 ### When the semantic pass fails
 
-`--semantic` **fails fast**. If the key is missing, the run stops with a non-zero
-exit code *before any photograph is decoded* — it does not spend minutes
-measuring files and then present a local-only result as a finished analysis.
+It **fails fast**. If `--semantic` was asked for and the key is missing, the run
+stops with a non-zero exit code *before any photograph is decoded* — it does not
+spend minutes measuring files and then present a local-only result as a finished
+analysis.
 
 If the key exists but the API rejects it, the model is unavailable, or the reply
-is unusable, the run also stops with a non-zero exit code. To accept a
-local-only result instead, ask for it explicitly:
+is unusable, the run also stops. To accept a local-only result instead, ask for
+it explicitly:
 
 ```bash
 python cli.py analyze --input ./photos --output ./run --semantic --allow-semantic-fallback
 ```
 
-That report is stamped `SEMANTIC ANALYSIS DID NOT RUN` in the console and at the
-top of the HTML, and every record carries
+That report is stamped `NOBODY LOOKED AT THESE PHOTOGRAPHS` in the console and
+at the top of the HTML, and every record carries
 `analysis_mode=local_only_after_semantic_failure`.
+
+If a single group of twelve comes back unusable, only that group is affected —
+and the summary says how many files went unchecked rather than reporting the
+run as complete.
 
 ### Re-running after adding a key
 
 Just run the same command again. Local measurements come from the cache; the
-semantic pass runs. `--force` is not needed, and a local-only cache entry can
+vision passes run. `--force` is not needed, and a local-only cache entry can
 never be mistaken for a semantic result.
 
 ---
@@ -623,11 +779,11 @@ never be mistaken for a semantic result.
 `analyze` only ever writes reports, symlinks and proposals. Moving files is a
 separate command, and it is a dry run unless you pass `--apply`.
 
-**The default pipeline is entirely local, offline and free.** It needs no API
-key and makes no network calls; a culling tool that cannot run without a network
-is not a culling tool. The paid vision pass is opt-in via `--semantic`, and
-without it confidence is reduced — which the confidence score states rather than
-hides.
+**The tool still works completely offline.** With `--no-semantic` — or simply
+with no key — it decodes, measures, searches for edit potential, clusters
+duplicates and ranks everything, making no network calls at all; a culling tool
+that cannot run without a network is not a culling tool. What you lose is the
+content and artistic passes, which the summary states rather than hides.
 
 
 
@@ -670,7 +826,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 - **The calibration is provisional.** Thresholds have not been fitted against a hand-labelled set. Verify against your own archive before trusting the classes.
 - **No direct marketplace upload.** Export packages only. No platform in the matrix offers a contributor upload API this project is authorised to use, so implementing one would mean inventing it.
-- **Genre and concepts require the vision pass.** Offline, everything is `other`, and stock/portfolio scoring falls back to technical potential at reduced confidence.
+- **Genre, content and the artistic read require the vision pass.** Offline the genre is `unknown` rather than `other`, nothing can reach the top pile, and scoring falls back to technical potential at reduced confidence.
+- **The top pile can be empty, and that is not a bug.** It starts at 85, an absolute bar rather than a top 5%: on a weak shoot the top 5% is still weak. On the 47-frame archive this was built against, the strongest photograph scored 75 and the report says so in those words. If you would rather the bar were calibrated to your own archive, it is one number in `curation.CurationThresholds`.
 - **No learned quality models.** PyIQA, Q-Align, TOPIQ, MUSIQ, CLIP-IQA, DOVER and COVER were evaluated and not integrated: their weight licences are inconsistent and several are research-only. The provider interfaces exist; the integrations do not, and the tool does not pretend otherwise.
 - **No CLIP/SigLIP embeddings.** Duplicate and diversity similarity uses perceptual hashing plus genre. `duplicates.embedding_similarity` is the injection point for a real embedding.
 - **Tilt estimation declines on scenes without straight lines.** Foliage and open water have a dominant direction only by accident; the estimator returns "no tilt" rather than a confident wrong angle.
