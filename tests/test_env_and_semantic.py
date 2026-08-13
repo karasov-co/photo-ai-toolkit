@@ -134,8 +134,13 @@ def test_the_status_line_never_contains_the_key(tmp_path, language):
 
     assert FAKE_KEY not in status
     assert FAKE_KEY[:8] not in status
-    assert str(len(FAKE_KEY)) not in status
     assert ".env" in status
+
+    # The length must not be disclosed either -- but the status quotes a path,
+    # and asserting a bare number is absent from a path fails whenever pytest's
+    # own run counter happens to contain it. Check the part that is ours.
+    without_path = status.replace(str(tmp_path), "")
+    assert str(len(FAKE_KEY)) not in without_path
 
 
 def test_the_missing_status_says_so_in_both_languages():

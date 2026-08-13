@@ -89,7 +89,7 @@ class EditStep:
 
 
 @dataclass
-class EditRecipe:
+class SearchResult:
     steps: list[EditStep] = field(default_factory=list)
     current_score: float = 0.0
     best_score: float = 0.0
@@ -413,14 +413,14 @@ def _box_for_ratio(
 # --- the search -------------------------------------------------------------
 
 
-def search(image: Image.Image, *, is_raw: bool = False, noisy: bool = False) -> EditRecipe:
+def search(image: Image.Image, *, is_raw: bool = False, noisy: bool = False) -> SearchResult:
     """Try the plausible edits, keep the best, and charge it for what it cost."""
     work = image.copy()
     work.thumbnail((WORK_PX, WORK_PX), Image.LANCZOS)
     base = _as_array(work)
 
     current = frame_quality(base)
-    recipe = EditRecipe(current_score=current, best_score=current)
+    recipe = SearchResult(current_score=current, best_score=current)
 
     ev = suggest_ev(base)
     tilt = estimate_tilt(base)

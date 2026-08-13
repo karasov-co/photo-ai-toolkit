@@ -153,12 +153,12 @@ def test_denoising_is_charged_for():
 
 
 def test_penalties_come_off_the_uplift():
-    recipe = edit_recipe.EditRecipe(raw_uplift=20.0, penalties=8.0)
+    recipe = edit_recipe.SearchResult(raw_uplift=20.0, penalties=8.0)
     assert recipe.uplift == 12.0
 
 
 def test_penalties_cannot_make_uplift_negative():
-    assert edit_recipe.EditRecipe(raw_uplift=2.0, penalties=50.0).uplift == 0.0
+    assert edit_recipe.SearchResult(raw_uplift=2.0, penalties=50.0).uplift == 0.0
 
 
 # --- geometry and crops -----------------------------------------------------
@@ -271,3 +271,17 @@ def test_the_search_survives_every_defect_without_raising(builder):
     recipe = edit_recipe.search(builder(), is_raw=True, noisy=True)
     assert 0 <= recipe.best_score <= 100
     assert recipe.uplift >= 0
+
+
+def test_the_two_recipe_types_are_named_apart():
+    """One is the output of a search, the other a declarative edit.
+
+    They were both called EditRecipe, in modules one import apart, and the
+    only way to tell which you had was to look at its fields.
+    """
+    import edit_schema
+
+    assert edit_recipe.SearchResult is not edit_schema.EditRecipe
+    assert not hasattr(edit_recipe, "EditRecipe")
+    assert hasattr(edit_recipe.SearchResult(), "raw_uplift")
+    assert hasattr(edit_schema.EditRecipe(), "global_adjustments")

@@ -770,7 +770,6 @@ def stage3_pass(
     `FAILED` rather than dropped, so a frame can never end up looking like it
     was never a candidate when in fact the analysis broke.
     """
-    import base64
 
     import stage3 as stage3_module
 
@@ -834,7 +833,6 @@ def stage3_pass(
             if cache is not None and out[key].completed:
                 cache.put_stage3(by_key[key].checksum, model, out[key].to_dict())
 
-    del base64
     return out
 
 

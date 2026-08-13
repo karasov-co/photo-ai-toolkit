@@ -79,11 +79,29 @@ class PersonalModel:
         return None if strength is None else round(strength, 5)
 
     def probability_kept(self, asset_id: str) -> float:
-        """Logistic on the fitted strength. 0.5 when the asset is unknown."""
+        """Logistic on the fitted strength, against the population's own centre.
+
+        Bradley-Terry strengths are identified only up to a common factor:
+        multiply every strength by three and the model describes exactly the
+        same preferences. So an absolute threshold on one strength is
+        meaningless -- 0.5 and DECISION_MARGIN were drifting with whatever
+        scale the fit happened to land on, which made "confident" mean
+        something different after every refit.
+
+        Normalising to a mean log-strength of zero fixes the scale to the
+        population: 0.5 is now "average for this photographer", which is what
+        the threshold was always meant to say.
+        """
         strength = self.strengths.get(asset_id)
         if strength is None:
             return 0.5
-        return round(1.0 / (1.0 + math.exp(-(math.log(max(strength, 1e-6))))), 5)
+        centred = math.log(max(strength, 1e-6)) - self._mean_log_strength()
+        return round(1.0 / (1.0 + math.exp(-centred)), 5)
+
+    def _mean_log_strength(self) -> float:
+        """The scale the fit happened to produce, so it can be divided out."""
+        values = [math.log(max(v, 1e-6)) for v in self.strengths.values()]
+        return sum(values) / len(values) if values else 0.0
 
     def predict(self, asset_id: str, *, genre: str = "", camera: str = "") -> Prediction:
         """Predict, or say why not. Abstaining is the common case by design."""

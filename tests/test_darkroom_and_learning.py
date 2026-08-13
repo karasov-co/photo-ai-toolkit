@@ -678,3 +678,40 @@ def test_a_no_op_recipe_says_so():
 def test_recipes_are_json_serialisable(tmp_path):
     proposal = recipe(preserve=["shadows"], warnings=["careful"])
     json.dumps(proposal.to_dict())
+
+
+# --- the Bradley-Terry scale is fixed before it is thresholded ----------------
+
+
+def test_the_probability_is_measured_against_the_population():
+    """BT strengths are identified only up to a common factor.
+
+    Multiply every strength by ten and the model describes exactly the same
+    preferences -- so an absolute threshold on one strength drifts with
+    whatever scale the fit landed on, and "confident" meant something
+    different after every refit.
+    """
+    import preference_model
+
+    model = preference_model.PersonalModel()
+    model.strengths = {"a": 1.0, "b": 4.0, "c": 16.0}
+    before = [model.probability_kept(k) for k in ("a", "b", "c")]
+
+    model.strengths = {k: v * 10 for k, v in model.strengths.items()}
+    after = [model.probability_kept(k) for k in ("a", "b", "c")]
+
+    assert before == after, "rescaling every strength changed the verdicts"
+
+
+def test_the_middle_of_the_population_sits_at_a_half():
+    import preference_model
+
+    model = preference_model.PersonalModel()
+    model.strengths = {"low": 0.25, "middle": 1.0, "high": 4.0}
+    assert model.probability_kept("middle") == pytest.approx(0.5, abs=0.01)
+
+
+def test_an_unknown_asset_is_still_a_half():
+    import preference_model
+
+    assert preference_model.PersonalModel().probability_kept("nobody") == 0.5
