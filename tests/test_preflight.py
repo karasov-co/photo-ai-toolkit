@@ -550,8 +550,15 @@ def test_j_publication_replaces_everything_or_nothing(tmp_path):
 
 
 def test_k_the_default_model_is_exactly_the_current_one():
-    assert bootstrap.DEFAULT_SEMANTIC_MODEL == "gpt-5.6-sol"
-    assert bootstrap.resolve_model(None) == "gpt-5.6-sol"
+    assert bootstrap.DEFAULT_SEMANTIC_MODEL == "gpt-5.6-terra"
+    assert bootstrap.resolve_model(None) == "gpt-5.6-terra"
+
+
+def test_a_run_can_be_costed_before_it_is_paid_for():
+    """A number before the money, not after."""
+    cheap = bootstrap.estimate_cost("gpt-5.6-terra", 300)
+    dear = bootstrap.estimate_cost("gpt-5.6-sol", 300)
+    assert 0 < cheap < dear
 
 
 def test_k_no_legacy_model_appears_anywhere_in_the_source():
@@ -571,7 +578,7 @@ def test_k_no_legacy_model_appears_anywhere_in_the_source():
 def test_k_a_legacy_family_is_recognised_as_one():
     for name in ("gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo", "o1-preview"):
         assert bootstrap.is_legacy_model(name), name
-    for name in ("gpt-5.6-sol", "gpt-5.6-sol-mini"):
+    for name in ("gpt-5.6-terra", "gpt-5.6-sol"):
         assert not bootstrap.is_legacy_model(name), name
 
 
@@ -690,3 +697,43 @@ def test_the_insights_scope_line_counts_correctly(tmp_path):
         built, tmp_path / "insights.html", scope="new", total_stored=281
     ).read_text()
     assert "261 newly analyzed photographs, out of 281" in page
+
+
+# --- money is asked about before it is spent ---------------------------------
+
+
+def test_a_large_batch_asks_before_spending(archive, tmp_path, monkeypatch, capsys):
+    """The estimate has to arrive before the charge, not in the summary after it."""
+    for i in range(80):
+        write_jpeg(photo_like(400, 300, seed=i + 20), archive / f"bulk{i}.jpg")
+    client = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    monkeypatch.setattr("builtins.input", lambda *_: "n")
+
+    code = analyze(archive, tmp_path / "run")
+
+    printed = capsys.readouterr().out
+    assert code == 0
+    assert "costing roughly $" in printed
+    assert client.responses.stage2_calls == 0, "nothing was sent after declining"
+    assert not (tmp_path / "run" / "report.html").exists()
+
+
+def test_a_small_batch_does_not_ask(archive, tmp_path, monkeypatch):
+    def refuse(*_):
+        raise AssertionError("two photographs should not need confirming")
+
+    monkeypatch.setattr("builtins.input", refuse)
+    with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    assert analyze(archive, tmp_path / "run") == 0
+
+
+def test_the_estimate_counts_only_what_is_billable(archive, tmp_path, monkeypatch, capsys):
+    """Reused photographs cost nothing and must not appear in the price."""
+    with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    assert analyze(archive, tmp_path / "run") == 0
+    capsys.readouterr()
+
+    assert analyze(archive, tmp_path / "run") == 0
+    printed = capsys.readouterr().out
+    assert "Reused:   2" in printed
+    assert "Nothing new to analyse." in printed

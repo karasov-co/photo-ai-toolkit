@@ -53,7 +53,23 @@ MODEL_VAR = "OPENAI_MODEL"
 # every judgement in the report while the report went on claiming to be the
 # analysis that was asked for -- the artistic read in particular is the whole
 # product, and it is not portable across model generations.
-DEFAULT_SEMANTIC_MODEL = "gpt-5.6-sol"
+DEFAULT_SEMANTIC_MODEL = "gpt-5.6-terra"
+
+# Roughly what a run costs, so the CLI can say so before spending anything.
+# Measured on this archive: Stage 2 sends twelve 512px previews per call,
+# Stage 3 sends up to six frames with crops. These are order-of-magnitude
+# figures for a warning, not billing -- the run prints the calls it actually
+# made, and the provider's dashboard is the authority on money.
+APPROX_USD_PER_100_PHOTOS = {
+    "gpt-5.6-terra": 0.35,
+    "gpt-5.6-sol": 1.80,
+}
+
+
+def estimate_cost(model: str, photographs: int) -> float:
+    """A rough figure in dollars, for warning before a large run."""
+    per_hundred = APPROX_USD_PER_100_PHOTOS.get(model, 1.0)
+    return round(per_hundred * max(0, photographs) / 100.0, 2)
 
 # Families this toolkit will not fall back to, and will not name as a
 # workaround. Listed so a test can assert their absence from the fallback paths

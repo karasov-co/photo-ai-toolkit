@@ -182,6 +182,11 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
             print("\nAnalyzing new assets:", flush=True)
         print(f"  [{printed['analysed']:>4}] {filename}", flush=True)
 
+    if semantic and not args.yes:
+        stop = _confirm_cost(input_dir, model, options)
+        if stop is not None:
+            return stop
+
     print(f"Analyzing {input_dir}")
     try:
         result = pipeline.run(options, progress=progress)
@@ -328,6 +333,66 @@ def _write_outputs(
     if trash["count"]:
         print(f"  {trash['count']} file(s) proposed for removal (nothing has been moved)")
     logging.getLogger(__name__).debug("Published %s", ", ".join(published))
+
+
+# Above this many photographs the run stops and asks, because the difference
+# between 20 files and 300 is the difference between a few cents and a few
+# dollars -- and the number nobody sees before it is spent is the one that
+# causes the argument afterwards.
+CONFIRM_ABOVE = 60
+
+
+def _confirm_cost(input_dir: Path, model: str, options) -> int | None:
+    """Count what is new, price it, and ask. Returns an exit code to stop, or None.
+
+    Counting happens with checksums only: no photograph is decoded to produce
+    this estimate, so saying no costs nothing but the file walk.
+    """
+    import batches
+    import media
+
+    assets = media.discover(
+        input_dir,
+        follow_symlinks=options.follow_symlinks,
+        exclude=media.excluded_roots(options.output_dir, options.resolved_quarantine()),
+    )
+    if not options.include_video:
+        assets = [a for a in assets if a.kind is not media.MediaKind.VIDEO]
+    if options.limit:
+        assets = assets[: options.limit]
+
+    cache = pipeline.AnalysisCache(options.internal / pipeline.CACHE_NAME)
+    history = batches.read_all(options.internal / batches.MANIFEST_NAME)
+    fresh, modified, reused = batches.classify_assets(
+        assets, cache, model, seen_keys=batches.seen_keys(history)
+    )
+    billable = len(fresh) + len(modified)
+
+    print(f"\nAssets discovered: {len(assets)}")
+    print(f"  New:      {len(fresh)}")
+    if modified:
+        print(f"  Modified: {len(modified)}")
+    print(f"  Reused:   {len(reused)}  (no API calls, no charge)")
+
+    if billable == 0:
+        print("\nNothing new to analyse.")
+        return None
+    if billable < CONFIRM_ABOVE:
+        return None
+
+    estimate = bootstrap.estimate_cost(model, billable)
+    print(
+        f"\n{billable} photographs will be sent to {model}, costing roughly "
+        f"${estimate:.2f}. This is an estimate, not a quote."
+    )
+    try:
+        answer = input("Continue? [y/N] ").strip().lower()
+    except EOFError:
+        answer = ""
+    if answer not in ("y", "yes"):
+        print("Stopped. Nothing was sent and nothing was changed.")
+        return 0
+    return None
 
 
 def _print_run_tally(result: pipeline.RunResult, space: workspace.Workspace) -> None:
@@ -1043,6 +1108,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-stage3",
         action="store_true",
         help="run the content check but not the artistic read (nothing can reach TOP)",
+    )
+    analyze.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="do not ask before spending on a large batch",
     )
     analyze.add_argument(
         "--insights-scope",

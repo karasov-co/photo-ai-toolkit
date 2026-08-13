@@ -33,7 +33,7 @@ starts by sending one 16×16 test image and checking the answer:
 ```
 LLM preflight
   Provider: OpenAI
-  Model: gpt-5.6-sol
+  Model: gpt-5.6-terra
   Authentication: verified
   Model access: verified
   Vision input: verified
@@ -115,6 +115,23 @@ anything you looked at last week.
 
 `photographer_insights.html` then describes **the 252 you just added**, not the
 whole archive again. Use `--insights-scope all` when you want the long view.
+
+### It asks before spending
+
+Above 60 new photographs the run counts what is billable, prices it and stops
+for an answer:
+
+```
+Assets discovered: 299
+  New:      279
+  Reused:    20  (no API calls, no charge)
+
+279 photographs will be sent to gpt-5.6-terra, costing roughly $0.98.
+Continue? [y/N]
+```
+
+Nothing is decoded to produce that count, so declining costs nothing. `-y`
+skips the question for scripted runs.
 
 ### If something goes wrong
 
@@ -768,7 +785,7 @@ Semantic credentials: loaded from /path/to/photo-ai-toolkit/.env
 ### The model
 
 Precedence: `--model` → `OPENAI_MODEL` → the documented default
-(`gpt-5.6-sol`). If that model is not available to your account, set
+(`gpt-5.6-terra`). If that model is not available to your account, set
 `OPENAI_MODEL` in the same `.env`. The model actually used is recorded in every
 report.
 
@@ -776,7 +793,7 @@ report.
 
 ## The model, and why there is no fallback
 
-`gpt-5.6-sol`, verified against your key before any work starts. Configurable
+`gpt-5.6-terra`, verified against your key before any work starts. Configurable
 via `--model` or `OPENAI_MODEL`, and **never substituted**: if the configured
 model is unavailable the run stops and tells you so.
 
@@ -883,21 +900,6 @@ acceptance, or sales. Release and intellectual-property detection is **advisory
 and does not replace legal review**. Marketplace policies change without notice;
 every rule in `data/marketplace_rules.json` carries the date it was last checked
 and must be re-verified before you rely on it.
-
----
-
-## Legacy entry point
-
-`main.py` is the original single-photo describe-and-score tool and still works
-unchanged:
-
-```bash
-python main.py --input ./photos --output ./results [--dry-run] [--force]
-```
-
-It produces one absolute 1–1000 score per photo. That approach is why this
-project moved to ranking: every live call against a real archive came back 548,
-560, 694, 762 — a scale that does not discriminate is not a scale.
 
 ---
 
