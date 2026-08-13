@@ -869,7 +869,17 @@ def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float =
         except stage3_module.Stage3ParseError as e:
             errors.append(f"attempt {attempt + 1}: {e}")
         except Exception as e:
-            # Not swallowed: recorded against every frame in the group.
+            import bootstrap
+
+            # An account-level failure is not a bad group -- it is the end of
+            # the run. On a live archive the balance ran out at photograph 154
+            # and the remaining 145 were each recorded as an individual Stage 3
+            # failure, so the run finished, exited zero, and published a report
+            # in which half the photographs had no artistic read at all.
+            if bootstrap.is_fatal_api_error(e):
+                kind, message = bootstrap.classify_api_error(e)
+                raise bootstrap.SemanticUnavailable(message, kind=kind) from e
+            # Anything else is recorded against every frame in the group.
             errors.append(f"attempt {attempt + 1}: {reports.redact(str(e))}")
             logger.warning("Stage 3 group failed: %s", reports.redact(str(e)))
             break
@@ -1173,6 +1183,7 @@ def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> N
 
 def _stage3(assets, measurements, provisional, semantics, options, client, result, model):
     """Run the artistic read, or record for every frame why it did not run."""
+    import bootstrap
     import stage3 as stage3_module  # noqa: F401  (used throughout this function)
 
     routed = {r.asset_key: r.route_class for r in provisional}
@@ -1209,6 +1220,20 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
             assets, measurements, routed, hints,
             model=stage3_model, client=client or _client_for(options), cache=cache,
         )
+    except bootstrap.SemanticUnavailable as e:
+        # Already classified as fatal downstream: an exhausted balance or a
+        # rejected key will hit every remaining group identically, so the run
+        # ends and the previous report survives rather than being replaced by
+        # one in which every artistic field is an error string.
+        #
+        # The developer escape hatch still applies. `analyze` never sets it.
+        if not options.allow_semantic_fallback:
+            raise
+        logger.error("Stage 3 unavailable, continuing on request: %s", e)
+        return {
+            key: stage3_module.ArtisticAssessment.failed([str(e)], model=model)
+            for key in routed
+        }
     except Exception as e:
         logger.error("Stage 3 failed entirely: %s", reports.redact(str(e)))
         return {

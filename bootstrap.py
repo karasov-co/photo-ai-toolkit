@@ -279,8 +279,26 @@ def classify_api_error(error: Exception) -> tuple[str, str]:
         return "permission", "the key does not have access to this model"
     if "notfound" in name.lower() or "404" in text or "does not exist" in text:
         return "model_not_found", "the model does not exist or is not available to this key"
+    if "insufficient_quota" in text or "no credits remaining" in text or "credit_balance" in text:
+        return "quota", "the account has no remaining credits"
+    if "billing" in text or "payment" in text:
+        return "billing", "the account has a billing problem"
     if "ratelimit" in name.lower() or "429" in text:
         return "rate_limit", "the API rate limit was reached"
     if any(word in name.lower() for word in ("connection", "timeout", "apiconnection")):
         return "network", "the API could not be reached"
     return "unknown", f"the API call failed ({name})"
+
+
+# Failures that will hit every remaining request identically. A parse error is
+# about one group; an exhausted balance is about the rest of the run, and
+# carrying on spends minutes to produce a report that is wrong about every
+# photograph after the point the credit ran out.
+FATAL_API_KINDS = frozenset(
+    {"authentication", "permission", "model_not_found", "quota", "billing"}
+)
+
+
+def is_fatal_api_error(error: Exception) -> bool:
+    kind, _ = classify_api_error(error)
+    return kind in FATAL_API_KINDS

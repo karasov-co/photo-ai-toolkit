@@ -89,9 +89,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "and the files it came from -- nothing here is general advice."
         ),
         "insights.lede_new": (
-            "Insights based on {total} newly analyzed photographs. The other "
-            "{stored} in this collection were analysed before and are unchanged; "
-            "run with --insights-scope all to include them."
+            "Insights based on {total} newly analyzed photographs, out of {stored} "
+            "in this collection. The rest were analysed in an earlier run and have "
+            "not changed; use --insights-scope all to include them."
         ),
         "insights.back": "Back to the photographs",
         "insights.genres": "What you shoot best",
@@ -357,9 +357,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "число и файлы, из которых оно получено, — общих советов здесь нет."
         ),
         "insights.lede_new": (
-            "Выводы по {total} новым фотографиям. Остальные {stored} в этой "
-            "коллекции анализировались раньше и не менялись; чтобы учесть и их, "
-            "запустите с --insights-scope all."
+            "Выводы по {total} новым фотографиям из {stored} в этой коллекции. "
+            "Остальные анализировались в прошлый раз и не менялись; чтобы учесть "
+            "и их, запустите с --insights-scope all."
         ),
         "insights.back": "Назад к фотографиям",
         "insights.genres": "Что у вас получается лучше всего",

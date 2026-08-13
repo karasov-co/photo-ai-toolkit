@@ -618,3 +618,75 @@ def test_reused_assets_are_not_printed_as_though_they_were_analysed(
     assert any("c.jpg" in line for line in progress)
     assert not any("a.jpg" in line or "b.jpg" in line for line in progress)
     assert len(progress) == 1
+
+
+# --- an account that runs out mid-run -----------------------------------------
+#
+# From a live run: the balance was exhausted at photograph 154. The remaining
+# 145 were each recorded as an individual Stage 3 failure, the run finished,
+# exited zero, and published a report in which half the photographs had no
+# artistic read -- presented exactly like the half that did.
+
+
+class NoCredits(Exception):
+    status_code = 429
+
+    def __str__(self):
+        return (
+            "Error code: 429 - {'error': {'message': 'You have no credits remaining. "
+            "Add credits to continue using the API.', 'type': 'insufficient_quota', "
+            "'code': 'credit_balance_exhausted'}}"
+        )
+
+
+class RunsOutOfCredit(Responses):
+    """Answers Stage 2, then refuses every Stage 3 call."""
+
+    def create(self, **kwargs):
+        if "emotional_resonance" in kwargs.get("instructions", ""):
+            raise NoCredits()
+        return super().create(**kwargs)
+
+
+def test_an_exhausted_balance_ends_the_run_instead_of_half_analysing(
+    archive, tmp_path, monkeypatch
+):
+    out = tmp_path / "run"
+    good = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
+    assert analyze(archive, out) == 0
+    previous = (out / "report.html").read_text()
+
+    write_jpeg(photo_like(1200, 900, seed=8), archive / "d.jpg")
+    broke = Client(stage2=stage2_reply(1), stage3=stage3_reply(1))
+    broke.responses.__class__ = RunsOutOfCredit
+    with_client(monkeypatch, broke)
+
+    assert analyze(archive, out) != 0
+    assert (out / "report.html").read_text() == previous, "the good report was replaced"
+    assert good is not broke
+
+
+def test_an_exhausted_balance_is_told_apart_from_a_bad_group():
+    assert bootstrap.is_fatal_api_error(NoCredits())
+    assert bootstrap.classify_api_error(NoCredits())[0] == "quota"
+    # A malformed reply is about one group and must stay survivable.
+    assert not bootstrap.is_fatal_api_error(ValueError("no JSON array in the reply"))
+
+
+@pytest.mark.parametrize(
+    "error",
+    [ModelUnavailable(), RuntimeError("401 invalid_api_key"), RuntimeError("403 permission denied")],
+)
+def test_every_account_level_failure_ends_the_run(error):
+    assert bootstrap.is_fatal_api_error(error)
+
+
+def test_the_insights_scope_line_counts_correctly(tmp_path):
+    """It said "the other 281" when 261 of those 281 were the ones in scope."""
+    import insights as insights_module
+
+    built = insights_module.Insights(total=261)
+    page = insights_module.write(
+        built, tmp_path / "insights.html", scope="new", total_stored=281
+    ).read_text()
+    assert "261 newly analyzed photographs, out of 281" in page
