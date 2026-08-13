@@ -107,6 +107,10 @@ class PipelineOptions:
     # archive should tell you about the batch, not repeat what the archive as a
     # whole has always said.
     insights_scope: str = "new"
+    # Worker processes for the decode pass. None means "one per core, minus
+    # one"; 1 keeps the single-process path, which is what to use when a file
+    # is crashing the run and you need a traceback rather than a dead pool.
+    jobs: int | None = None
 
     def resolved_quarantine(self) -> Path:
         """The *physical* quarantine directory, deliberately not the farm folder.
@@ -701,6 +705,62 @@ def semantic_pass(
     return _stitch(cached_raw, by_name, out)
 
 
+def _measure_one(args):
+    """One asset, measured. Top-level so a process pool can pickle it."""
+    asset, previews_dir, video_samples = args
+    if asset.kind is media.MediaKind.VIDEO:
+        return measure_video(asset, previews_dir, samples=video_samples)
+    return measure_photo(asset, previews_dir)
+
+
+# Below this, a process pool costs more than it saves: starting an interpreter
+# and pickling the work is tens of milliseconds per worker, and a handful of
+# photographs are decoded in less than that. It also keeps small runs -- and
+# every test -- in one process, where a traceback is a traceback.
+PARALLEL_THRESHOLD = 24
+
+
+def _measure_all(pending, previews_dir, options, progress, total):
+    """Measure everything not already in store, in parallel where it helps.
+
+    Decoding is where a run spends its time and it is embarrassingly parallel:
+    each photograph is independent, and the results are written into a dict
+    keyed by asset afterwards, so nothing depends on the order they finish in.
+
+    `--jobs 1` keeps the old single-process path exactly, which matters because
+    a process pool turns a crash in one file into a broken pool rather than one
+    bad measurement -- and when something is wrong, being able to run the
+    sequential version is how it gets diagnosed.
+    """
+    jobs = _worker_count(options.jobs, len(pending))
+    if jobs <= 1 or len(pending) < PARALLEL_THRESHOLD:
+        for index, asset in pending:
+            if progress:
+                progress(asset.filename, index, total, False)
+            yield index, asset, _measure_one((asset, previews_dir, options.video_samples))
+        return
+
+    from concurrent.futures import ProcessPoolExecutor
+
+    logger.info("Measuring %d assets across %d processes", len(pending), jobs)
+    payloads = [(asset, previews_dir, options.video_samples) for _, asset in pending]
+    with ProcessPoolExecutor(max_workers=jobs) as pool:
+        # Ordered, so progress reads the way it did and the run is reproducible.
+        for (index, asset), measurement in zip(
+            pending, pool.map(_measure_one, payloads, chunksize=1), strict=True
+        ):
+            if progress:
+                progress(asset.filename, index, total, False)
+            yield index, asset, measurement
+
+
+def _worker_count(requested: int | None, work: int) -> int:
+    """One fewer than the cores, so the machine stays usable during a long run."""
+    if requested is not None and requested >= 1:
+        return min(requested, max(1, work))
+    return max(1, min(os.cpu_count() or 1, work))
+
+
 def _stitch(raw: dict[str, dict], by_name: dict, out: dict[str, Semantic]) -> dict[str, Semantic]:
     """Rebuild one scale over every asset in the run, cached and fresh alike.
 
@@ -1039,6 +1099,7 @@ def run(
     result.reused_assets = [a.checksum for a in reused]
     measurements: dict[str, Measurement] = {}
 
+    pending: list[tuple[int, media.Asset]] = []
     for index, asset in enumerate(assets, start=1):
         if should_cancel and should_cancel():
             result.cancelled = True
@@ -1049,19 +1110,20 @@ def run(
             # partial results the user is entitled to.
             assets = assets[: index - 1]
             break
-        reused_here = asset.checksum in set(result.reused_assets)
-        if progress:
-            progress(asset.filename, index, len(assets), reused_here)
 
+        reused_here = asset.checksum in set(result.reused_assets)
         cached = None if options.force else cache.get(asset.checksum)
         if cached is not None:
-            measurement = Measurement.from_dict(cached)
-        else:
-            if asset.kind is media.MediaKind.VIDEO:
-                measurement = measure_video(asset, previews_dir, samples=options.video_samples)
-            else:
-                measurement = measure_photo(asset, previews_dir)
-            cache.put(asset.checksum, measurement.to_dict())
+            if progress:
+                progress(asset.filename, index, len(assets), reused_here)
+            measurements[asset.key] = Measurement.from_dict(cached)
+            continue
+        pending.append((index, asset))
+
+    for _, asset, measurement in _measure_all(
+        pending, previews_dir, options, progress, len(assets)
+    ):
+        cache.put(asset.checksum, measurement.to_dict())
         measurements[asset.key] = measurement
 
     cache.save()

@@ -161,6 +161,7 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
         darkroom_renderer=args.renderer,
         shadow_mode=not args.no_shadow_mode,
         insights_scope=getattr(args, "insights_scope", "new"),
+        jobs=getattr(args, "jobs", None),
     )
 
     printed = {"n": 0, "analysed": 0, "reused": 0, "announced": False}
@@ -1100,6 +1101,14 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument("--video-samples", type=int, default=9)
         parser.add_argument("--force", action="store_true", help="ignore the analysis cache")
         parser.add_argument("--limit", type=int)
+        parser.add_argument(
+            "--jobs", type=int, default=None,
+            help=(
+                "worker processes for decoding (default: one per core). "
+                "--jobs 1 runs in this process, which is what to use when a "
+                "file is crashing the run and you want the traceback"
+            ),
+        )
         parser.add_argument("--copyright", help="copyright holder for generated metadata")
         parser.add_argument(
             "--darkroom", action="store_true",

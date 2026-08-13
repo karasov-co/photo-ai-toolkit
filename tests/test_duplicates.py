@@ -2,6 +2,7 @@
 
 import pytest
 
+import duplicates
 from duplicates import (
     Candidate,
     Cluster,
@@ -222,3 +223,99 @@ def test_each_genre_keeps_its_own_winner():
 def test_selection_scales_without_error(count):
     frames = [candidate(f"f{i}", 100 - i, f"{i:016x}") for i in range(count)]
     assert len(select_diverse(frames, limit=10)) == min(10, count)
+
+
+# --- the BK-tree returns exactly what the quadratic scan did ------------------
+
+
+def _quadratic_clusters(items, distance=duplicates.DEFAULT_DISTANCE,
+                        window=duplicates.SAME_SCENE_SECONDS):
+    """The original all-pairs implementation, kept as the reference."""
+    parent = {i.key: i.key for i in items}
+
+    def find(key):
+        while parent[key] != key:
+            parent[key] = parent[parent[key]]
+            key = parent[key]
+        return key
+
+    ordered = list(items)
+    for i, a in enumerate(ordered):
+        for b in ordered[i + 1:]:
+            if duplicates.hamming(a.phash, b.phash) > distance:
+                continue
+            gap = duplicates._seconds_between(a.date_shot, b.date_shot)
+            if gap is not None and gap > window:
+                continue
+            ra, rb = find(a.key), find(b.key)
+            if ra != rb:
+                parent[rb] = ra
+
+    grouped = {}
+    for item in ordered:
+        grouped.setdefault(find(item.key), []).append(item)
+    out = []
+    for members in grouped.values():
+        best = max(members, key=lambda i: (i.quality, i.key))
+        out.append((best.key, sorted(m.key for m in members)))
+    return sorted(out)
+
+
+def _synthetic(n, seed=7):
+    import random
+
+    random.seed(seed)
+    items = []
+    for i in range(n):
+        value = random.getrandbits(64)
+        if i % 3 and items:
+            # A near-duplicate of the previous frame, one bit away.
+            value = int(items[-1].phash, 16) ^ (1 << random.randrange(64))
+        items.append(
+            duplicates.DupItem(
+                key=f"f{i:05d}", phash=f"{value:016x}",
+                date_shot=f"2026-01-01T00:{i // 60:02d}:{i % 60:02d}",
+                quality=(i * 37) % 100,
+            )
+        )
+    return items
+
+
+@pytest.mark.parametrize("n", [50, 500, 2000])
+def test_the_tree_and_the_full_scan_agree_exactly(n):
+    """Same clusters, same winners, same membership -- at 2000 files."""
+    items = _synthetic(n)
+    fast = [(c.best_key, sorted(i.key for i in c.items)) for c in duplicates.cluster_items(items)]
+    assert sorted(fast) == _quadratic_clusters(items)
+
+
+def test_a_chain_still_joins_through_its_middle():
+    """A~B and B~C but not A~C: a slow pan. All three are one cluster."""
+    items = [
+        duplicates.DupItem(key="a", phash="0000000000000000", date_shot="2026-01-01T00:00:00"),
+        duplicates.DupItem(key="b", phash="000000000000003f", date_shot="2026-01-01T00:00:01"),
+        duplicates.DupItem(key="c", phash="0000000000000fc0", date_shot="2026-01-01T00:00:02"),
+    ]
+    clusters = duplicates.cluster_items(items, distance=6)
+    assert len(clusters) == 1
+    assert sorted(i.key for i in clusters[0].items) == ["a", "b", "c"]
+
+
+def test_an_unusable_hash_never_joins_a_cluster():
+    items = [
+        duplicates.DupItem(key="ok", phash="0000000000000000", date_shot="2026-01-01T00:00:00"),
+        duplicates.DupItem(key="broken", phash="", date_shot="2026-01-01T00:00:01"),
+        duplicates.DupItem(key="nonsense", phash="zzzz", date_shot="2026-01-01T00:00:02"),
+    ]
+    clusters = duplicates.cluster_items(items)
+    assert len(clusters) == 3
+
+
+def test_two_thousand_files_cluster_quickly():
+    """Not a benchmark -- a guard against the quadratic scan coming back."""
+    import time
+
+    items = _synthetic(2000)
+    started = time.perf_counter()
+    duplicates.cluster_items(items)
+    assert time.perf_counter() - started < 5.0

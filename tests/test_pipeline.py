@@ -578,3 +578,85 @@ def test_the_reclassify_command_says_nothing_was_spent(archive, tmp_path, capsys
     capsys.readouterr()
     cli.main(["reclassify", "--analysis", str(out / ".internal" / "reports" / "analysis.json")])
     assert "no tokens were spent" in capsys.readouterr().out
+
+
+# --- parallel decoding produces the same run ---------------------------------
+
+
+def _archive_of(tmp_path, n):
+    root = tmp_path / "many"
+    for i in range(n):
+        write_jpeg(photo_like(300, 200, seed=i), root / f"f{i:03d}.jpg")
+    return root
+
+
+def test_parallel_and_single_process_runs_are_identical(tmp_path):
+    """The whole point: faster, bit for bit the same.
+
+    Uses enough files to cross the threshold where a pool is actually used,
+    so this is comparing the two code paths rather than one path twice.
+    """
+    archive = _archive_of(tmp_path, pipeline.PARALLEL_THRESHOLD + 6)
+
+    serial = pipeline.run(
+        pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "a", jobs=1)
+    )
+    parallel = pipeline.run(
+        pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "b", jobs=4)
+    )
+
+    def snapshot(result):
+        return [
+            (r.filename, r.category, r.final_score, r.scores, r.issues, r.phash,
+             r.cluster_id, r.best_in_cluster)
+            for r in sorted(result.records, key=lambda r: r.filename)
+        ]
+
+    assert snapshot(serial) == snapshot(parallel)
+
+
+def test_a_small_run_stays_in_one_process(tmp_path, monkeypatch):
+    """Spawning workers for five photographs costs more than it saves."""
+    used = {"pool": False}
+
+    class Boom:
+        def __init__(self, *a, **kw):
+            used["pool"] = True
+            raise AssertionError("a pool was started for a handful of files")
+
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", Boom)
+    archive = _archive_of(tmp_path, 4)
+    pipeline.run(pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out"))
+    assert not used["pool"]
+
+
+def test_jobs_one_never_starts_a_pool(tmp_path, monkeypatch):
+    class Boom:
+        def __init__(self, *a, **kw):
+            raise AssertionError("--jobs 1 must stay in this process")
+
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", Boom)
+    archive = _archive_of(tmp_path, pipeline.PARALLEL_THRESHOLD + 2)
+    result = pipeline.run(
+        pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out", jobs=1)
+    )
+    assert len(result.records) == pipeline.PARALLEL_THRESHOLD + 2
+
+
+def test_the_worker_count_leaves_the_machine_usable():
+    import os
+
+    cores = os.cpu_count() or 1
+    assert pipeline._worker_count(None, 1000) <= cores
+    assert pipeline._worker_count(None, 2) <= 2, "never more workers than work"
+    assert pipeline._worker_count(3, 1000) == 3
+
+
+def test_progress_still_reports_every_asset_in_order(tmp_path):
+    seen = []
+    archive = _archive_of(tmp_path, pipeline.PARALLEL_THRESHOLD + 2)
+    pipeline.run(
+        pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out", jobs=2),
+        progress=lambda name, i, total, reused=False: seen.append(name),
+    )
+    assert seen == sorted(seen), "results arrived out of order"

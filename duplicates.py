@@ -136,16 +136,15 @@ def cluster_items(
             parent[rb] = ra
 
     ordered = list(items)
-    for i, a in enumerate(ordered):
-        for b in ordered[i + 1 :]:
-            if hamming(a.phash, b.phash) > distance:
-                continue
-            gap = _seconds_between(a.date_shot, b.date_shot)
-            if gap is not None and gap > window_seconds:
-                # Looks the same, taken hours apart: the same subject twice, not
-                # a burst. Two separate photographs, both worth keeping.
-                continue
-            union(a.key, b.key)
+    for a, b in _candidate_pairs(ordered, distance):
+        if hamming(a.phash, b.phash) > distance:
+            continue
+        gap = _seconds_between(a.date_shot, b.date_shot)
+        if gap is not None and gap > window_seconds:
+            # Looks the same, taken hours apart: the same subject twice, not
+            # a burst. Two separate photographs, both worth keeping.
+            continue
+        union(a.key, b.key)
 
     grouped: dict[str, list[DupItem]] = {}
     for item in ordered:
@@ -156,6 +155,81 @@ def cluster_items(
         best = max(members, key=lambda i: (i.quality, i.key))
         clusters.append(Cluster(items=members, best_key=best.key))
     return sorted(clusters, key=lambda c: c.best_key)
+
+
+# A BK-tree over Hamming distance. Every pair still gets compared in the worst
+# case -- an archive of one photograph repeated 2000 times genuinely is all one
+# cluster -- but a real archive is mostly dissimilar, and the tree skips the
+# comparisons the triangle inequality has already ruled out.
+#
+# At 300 files the quadratic scan is 45,000 comparisons and nobody notices. At
+# 5,000 it is 12.5 million, which is the point somebody starts wondering whether
+# the tool has hung.
+
+
+class _BKTree:
+    """Nodes keyed by integer hash; children indexed by distance from the parent.
+
+    Hamming distance is a metric, so |d(query, node) - d(node, child)| bounds
+    d(query, child) from below: any child outside [d-r, d+r] cannot be within r
+    of the query and its whole subtree is skipped.
+    """
+
+    __slots__ = ("value", "payload", "children")
+
+    def __init__(self, value: int, payload):
+        self.value = value
+        self.payload = payload
+        self.children: dict[int, _BKTree] = {}
+
+    def add(self, value: int, payload) -> None:
+        node = self
+        while True:
+            gap = bin(node.value ^ value).count("1")
+            child = node.children.get(gap)
+            if child is None:
+                node.children[gap] = _BKTree(value, payload)
+                return
+            node = child
+
+    def within(self, value: int, radius: int) -> list:
+        found = []
+        stack = [self]
+        while stack:
+            node = stack.pop()
+            gap = bin(node.value ^ value).count("1")
+            if gap <= radius:
+                found.append(node.payload)
+            for step, child in node.children.items():
+                if gap - radius <= step <= gap + radius:
+                    stack.append(child)
+        return found
+
+
+def _candidate_pairs(items: list[DupItem], distance: int):
+    """Every pair worth comparing, and as few others as possible.
+
+    Items with an unusable hash are handled separately: `hamming` reports them
+    as maximally far, so they can never join a cluster, and putting them in the
+    tree would only cost lookups.
+    """
+    hashed: list[tuple[int, DupItem]] = []
+    for item in items:
+        try:
+            hashed.append((int(item.phash, 16), item))
+        except (TypeError, ValueError):
+            continue
+
+    if len(hashed) < 2:
+        return
+
+    tree = _BKTree(hashed[0][0], hashed[0][1])
+    seen = [hashed[0][1]]
+    for value, item in hashed[1:]:
+        for other in tree.within(value, distance):
+            yield other, item
+        tree.add(value, item)
+        seen.append(item)
 
 
 def is_burst(a: DupItem, b: DupItem, *, window: float = BURST_WINDOW_SECONDS) -> bool:
@@ -199,17 +273,23 @@ def select_diverse(
     chosen: list[Candidate] = []
     per_genre: dict[str, int] = {}
 
+    # Redundancy against the chosen set only grows, one entry per round, so the
+    # running maximum is carried forward instead of recomputed. The loop used to
+    # call `similarity` once per (remaining, chosen) pair on every round --
+    # O(n * k^2) for k picks, and on a large archive with a generous flagship
+    # cap that is the slowest thing in the run after decoding.
+    redundancy: dict[str, float] = {c.key: 0.0 for c in candidates}
+
     while remaining and len(chosen) < limit:
         best = None
         best_value = float("-inf")
         for candidate in remaining:
             if max_per_genre is not None and per_genre.get(candidate.genre, 0) >= max_per_genre:
                 continue
-            redundancy = max(
-                (similarity(candidate.item, c.item) for c in chosen),
-                default=0.0,
+            value = (
+                lambda_ * (candidate.relevance / 100.0)
+                - (1.0 - lambda_) * redundancy[candidate.key]
             )
-            value = lambda_ * (candidate.relevance / 100.0) - (1.0 - lambda_) * redundancy
             if value > best_value:
                 best_value, best = value, candidate
         if best is None:
@@ -217,6 +297,10 @@ def select_diverse(
         chosen.append(best)
         per_genre[best.genre] = per_genre.get(best.genre, 0) + 1
         remaining.remove(best)
+        for candidate in remaining:
+            redundancy[candidate.key] = max(
+                redundancy[candidate.key], similarity(candidate.item, best.item)
+            )
 
     return [c.key for c in chosen]
 
