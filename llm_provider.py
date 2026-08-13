@@ -91,6 +91,15 @@ class ProviderError(RuntimeError):
     """The call failed. The original exception is the cause."""
 
 
+class Truncated(ProviderError):
+    """The budget ran out mid-answer. Splitting the batch is the fix, not retrying.
+
+    Defined before the providers that raise it. It used to sit below
+    `OpenAIProvider`, which referenced it -- legal at runtime, and the kind of
+    ordering that reads as an accident because it is one.
+    """
+
+
 class Provider:
     name = "unknown"
     verified = False
@@ -98,8 +107,50 @@ class Provider:
     def complete_vision(self, request: VisionRequest) -> str:
         raise NotImplementedError
 
+    def check_not_truncated(self, response, max_tokens: int) -> None:
+        """Raise if the reply stopped because the budget ran out.
+
+        On the base class because every provider needs it and only OpenAI had
+        it. A truncated reply is a partial JSON document: it comes back as a
+        string, parses as "no array in the reply", and gets retried identically
+        until the attempts run out. That failure cost two minutes a group and
+        three times the tokens before it was diagnosed on the OpenAI path, and
+        the other three providers were shipped with the same hole.
+
+        Each vendor reports it differently, so all four shapes are checked --
+        an unrecognised shape means no exception, which is the safe direction:
+        a false positive here would split a batch that was fine.
+        """
+        if _looks_truncated(response):
+            raise Truncated(f"the reply hit the {max_tokens}-token limit")
+
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<{type(self).__name__} model={getattr(self, 'model', '?')}>"
+
+
+def _looks_truncated(response) -> bool:
+    """Every way the four providers say "I ran out of room"."""
+    # OpenAI Responses: status plus a reason.
+    if str(getattr(response, "status", "")) == "incomplete":
+        return True
+    details = getattr(response, "incomplete_details", None)
+    if details and "max_output_tokens" in str(getattr(details, "reason", details)):
+        return True
+
+    # Anthropic messages.
+    if str(getattr(response, "stop_reason", "")) == "max_tokens":
+        return True
+
+    # Chat completions, which is what xAI and every self-hosted server speak.
+    for choice in getattr(response, "choices", None) or []:
+        if str(getattr(choice, "finish_reason", "")) == "length":
+            return True
+
+    # Gemini.
+    for candidate in getattr(response, "candidates", None) or []:
+        if "MAX_TOKENS" in str(getattr(candidate, "finish_reason", "")).upper():
+            return True
+    return False
 
 
 # --- OpenAI: the one that runs -------------------------------------------------
@@ -146,20 +197,8 @@ class OpenAIProvider(Provider):
             kwargs["reasoning"] = {"effort": request.reasoning_effort}
 
         response = self.client.responses.create(**kwargs)
-        if _is_truncated(response):
-            raise Truncated(f"the reply hit the {request.max_tokens}-token limit")
+        self.check_not_truncated(response, request.max_tokens)
         return getattr(response, "output_text", "") or ""
-
-
-class Truncated(ProviderError):
-    """The budget ran out mid-answer. Splitting the batch is the fix, not retrying."""
-
-
-def _is_truncated(response) -> bool:
-    if str(getattr(response, "status", "")) == "incomplete":
-        return True
-    details = getattr(response, "incomplete_details", None)
-    return bool(details and "max_output_tokens" in str(getattr(details, "reason", details)))
 
 
 # --- the three that are written but not run ------------------------------------
@@ -212,6 +251,7 @@ class AnthropicProvider(Provider):
             system=request.system,
             messages=[{"role": "user", "content": content}],
         )
+        self.check_not_truncated(response, request.max_tokens)
         blocks = getattr(response, "content", []) or []
         return "".join(getattr(b, "text", "") for b in blocks)
 
@@ -260,6 +300,7 @@ class GeminiProvider(Provider):
                 "max_output_tokens": request.max_tokens,
             },
         )
+        self.check_not_truncated(response, request.max_tokens)
         return getattr(response, "text", "") or ""
 
 
@@ -309,12 +350,82 @@ class OpenAICompatibleProvider(Provider):
                 {"role": "user", "content": content},
             ],
         )
+        self.check_not_truncated(response, request.max_tokens)
         choices = getattr(response, "choices", []) or []
         return choices[0].message.content if choices else ""
 
 
+class GrokProvider(OpenAICompatibleProvider):
+    """xAI, which speaks chat/completions at api.x.ai.
+
+    A subclass rather than a copy: the wire format is the same one every
+    OpenAI-compatible server implements, and the only differences are the
+    endpoint and where the key comes from.
+
+    Two things it does NOT inherit from the OpenAI path:
+
+    `reasoning_effort` is dropped. xAI has its own reasoning controls with
+    different names and different semantics, and forwarding OpenAI's parameter
+    would either be rejected or -- worse -- accepted and mean something else.
+    Chat completions has no field for it, so this is what already happens;
+    it is stated here so nobody adds one later thinking it is a gap.
+
+    Images are jpg or png, 20 MiB each, with no cap on how many per request --
+    so a group of twelve frames goes in one call exactly as it does now. The
+    previews this project sends are 512px JPEGs, three orders of magnitude
+    under the size limit.
+    """
+
+    name = "grok"
+    verified = False
+
+    DEFAULT_BASE_URL = "https://api.x.ai/v1"
+    # 20 MiB per image, per xAI's documented limit. Nothing this project sends
+    # comes close; the check exists so that if something ever does, it fails
+    # here with a sentence rather than at the endpoint with a 400.
+    MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
+    def __init__(self, model: str, base_url: str = "", api_key: str = "", client=None):
+        super().__init__(
+            model,
+            base_url=base_url or self.DEFAULT_BASE_URL,
+            api_key=api_key or _xai_key(),
+            client=client,
+        )
+
+    def complete_vision(self, request: VisionRequest) -> str:
+        for image in request.images:
+            # base64 is 4 characters per 3 bytes.
+            if len(image.base64_jpeg) * 3 // 4 > self.MAX_IMAGE_BYTES:
+                raise ProviderError(
+                    f"an image exceeds xAI's {self.MAX_IMAGE_BYTES // (1024 * 1024)} MiB limit"
+                )
+        # reasoning_effort is not forwarded: the chat/completions call below has
+        # no field for it, and inventing a mapping would change what the model
+        # does without saying so.
+        return super().complete_vision(request)
+
+
+def _xai_key() -> str:
+    """XAI_API_KEY, or the OpenAI one.
+
+    The fallback exists because most people arrive here with OPENAI_API_KEY
+    already in their `.env`, and failing on a key that is sitting right there
+    would be pedantry. A key that does not work is caught by the preflight in
+    one request, which is a better place to find out than a config error.
+    """
+    import os
+
+    return (
+        os.environ.get("XAI_API_KEY", "").strip()
+        or os.environ.get("OPENAI_API_KEY", "").strip()
+        or "not-needed"
+    )
+
+
 PROVIDERS = {
     "openai": OpenAIProvider,
+    "grok": GrokProvider,
     "anthropic": AnthropicProvider,
     "gemini": GeminiProvider,
     "openai-compatible": OpenAICompatibleProvider,
@@ -328,7 +439,9 @@ def build(name: str, model: str, *, base_url: str = "", client=None) -> Provider
         raise ProviderError(
             f"unknown provider {name!r}; available: {', '.join(sorted(PROVIDERS))}"
         )
-    if factory is OpenAICompatibleProvider:
+    if issubclass(factory, OpenAICompatibleProvider):
+        # Grok supplies its own endpoint when none is given; the generic
+        # compatible provider has none to supply.
         return factory(model, base_url=base_url, client=client)
     return factory(model, client=client)
 

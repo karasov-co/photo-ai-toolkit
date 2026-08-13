@@ -41,7 +41,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 PROJECT_ENV = PROJECT_ROOT / ".env"
 
 API_KEY_VAR = "OPENAI_API_KEY"
+# xAI's own variable, checked first. OPENAI_API_KEY still works, because most
+# people arrive with one already in their .env and refusing it would be
+# pedantry -- a key that does not work is caught by the preflight in one
+# request, which is a better place to find out than a config error.
+XAI_KEY_VAR = "XAI_API_KEY"
 MODEL_VAR = "OPENAI_MODEL"
+PROVIDER_VAR = "PHOTO_AI_PROVIDER"
 
 # The model this toolkit runs on. One name, defined once, used by Stage 2 and
 # Stage 3 alike, and verified against the account before any photograph is
@@ -53,7 +59,12 @@ MODEL_VAR = "OPENAI_MODEL"
 # every judgement in the report while the report went on claiming to be the
 # analysis that was asked for -- the artistic read in particular is the whole
 # product, and it is not portable across model generations.
-DEFAULT_SEMANTIC_MODEL = "gpt-5.6-terra"
+DEFAULT_MODEL = "grok-4.6"
+DEFAULT_PROVIDER = "grok"
+
+# The old name, kept because it is what several call sites and tests say. One
+# value, two spellings, and no chance of them drifting apart.
+DEFAULT_SEMANTIC_MODEL = DEFAULT_MODEL
 
 # Families this toolkit will not fall back to, and will not name as a
 # workaround. Listed so a test can assert their absence from the fallback paths
@@ -130,7 +141,9 @@ def load_project_environment(*, working_dir: Path | None = None) -> EnvironmentR
     """
     global _loaded_from, _load_attempted
 
-    key_was_in_environment = bool(os.environ.get(API_KEY_VAR, "").strip())
+    key_was_in_environment = any(
+        os.environ.get(name, "").strip() for name in (XAI_KEY_VAR, API_KEY_VAR)
+    )
 
     loaded: list[Path] = []
     for candidate in _candidates(working_dir):
@@ -142,7 +155,7 @@ def load_project_environment(*, working_dir: Path | None = None) -> EnvironmentR
 
     if key_was_in_environment:
         source = CredentialSource.ENVIRONMENT
-    elif os.environ.get(API_KEY_VAR, "").strip():
+    elif api_key():
         source = (
             CredentialSource.PROJECT_ENV
             if loaded and loaded[0] == PROJECT_ENV
@@ -184,9 +197,16 @@ def _load_one(path: Path) -> bool:
 
 
 def api_key() -> str | None:
-    """The key, or None. Callers pass it straight to the client and never log it."""
-    value = os.environ.get(API_KEY_VAR, "").strip()
-    return value or None
+    """The key, or None. Callers pass it straight to the client and never log it.
+
+    xAI's variable wins where both are set: somebody who has written
+    XAI_API_KEY has said which service they mean.
+    """
+    for name in (XAI_KEY_VAR, API_KEY_VAR):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return None
 
 
 def has_credentials() -> bool:
@@ -220,6 +240,16 @@ def credential_status(language: str = "en") -> str:
 # --- model ------------------------------------------------------------------
 
 
+def resolve_provider(cli_provider: str | None = None) -> str:
+    """CLI, then the environment, then the documented default.
+
+    Same precedence as the model, in the same place, so the two cannot drift.
+    """
+    if cli_provider:
+        return cli_provider
+    return os.environ.get(PROVIDER_VAR, "").strip() or DEFAULT_PROVIDER
+
+
 def resolve_model(cli_model: str | None = None) -> str:
     """CLI, then `OPENAI_MODEL`, then the documented default.
 
@@ -231,7 +261,7 @@ def resolve_model(cli_model: str | None = None) -> str:
     if cli_model:
         return cli_model
     from_env = os.environ.get(MODEL_VAR, "").strip()
-    return from_env or DEFAULT_SEMANTIC_MODEL
+    return from_env or DEFAULT_MODEL
 
 
 def model_source(cli_model: str | None = None) -> str:

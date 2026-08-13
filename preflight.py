@@ -77,8 +77,9 @@ class Failure(StrEnum):
 # person to accept a worse analysis than the one they asked for.
 EXPLANATIONS: dict[str, str] = {
     Failure.NO_KEY.value: (
-        "No API key was found. Put OPENAI_API_KEY in the project's .env file "
-        "(one line: OPENAI_API_KEY=sk-...), then run the same command again."
+        "No API key was found. Put XAI_API_KEY in the project's .env file "
+        "(one line: XAI_API_KEY=xai-...), then run the same command again. "
+        "OPENAI_API_KEY is also accepted."
     ),
     Failure.AUTH.value: (
         "The API rejected the key. It may have been revoked, rotated, or copied "
@@ -290,7 +291,7 @@ def run(model: str, *, client=None, provider: str = "openai", base_url: str = ""
     key_check = Check("Authentication")
     model_check = Check("Model access")
     vision_check = Check("Vision input")
-    api_check = Check("Responses API")
+    api_check = Check("Structured reply")
     result.checks = [key_check, model_check, vision_check, api_check]
 
     if client is None and not bootstrap.has_credentials():

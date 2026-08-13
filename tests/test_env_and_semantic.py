@@ -314,6 +314,9 @@ def test_an_authentication_error_is_not_dressed_up_as_a_local_run(archive, tmp_p
 def test_the_cli_reports_a_semantic_failure_with_a_non_zero_code(archive, tmp_path, capsys, monkeypatch):
     write_env(tmp_path / ".env")
     bootstrap.load_project_environment(working_dir=tmp_path)
+    # Pinned to the provider whose client is being faked; the default builds its
+    # own against api.x.ai and would never see this one.
+    monkeypatch.setenv(bootstrap.PROVIDER_VAR, "openai")
     monkeypatch.setattr(
         bootstrap, "make_client", lambda **_: FakeClient(error=FakeAuthenticationError("401"))
     )

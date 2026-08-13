@@ -127,7 +127,15 @@ def watchful(monkeypatch):
 
 
 def with_client(monkeypatch, client):
-    """Inject one fake client into both the preflight and the pipeline."""
+    """Inject one fake client into both the preflight and the pipeline.
+
+    The provider is pinned to openai because that is what the fake speaks: it
+    exposes `responses.create` and returns an object with `output_text`. The
+    default provider is grok, which builds its own client against api.x.ai and
+    would ignore the injection -- so the pin is describing the fake, not
+    working around the default. `test_grok_is_the_default` covers that.
+    """
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "openai")
     monkeypatch.setattr(bootstrap, "make_client", lambda **_: client)
     monkeypatch.setattr(bootstrap, "has_credentials", lambda: True)
     real = pipeline.run
@@ -324,7 +332,7 @@ def test_the_preflight_block_names_the_model(archive, tmp_path, monkeypatch, cap
     assert "Authentication: verified" in printed
     assert "Model access: verified" in printed
     assert "Vision input: verified" in printed
-    assert "Responses API: verified" in printed
+    assert "Structured reply: verified" in printed
 
 
 # --- D/E/F/G/H. incremental runs and intrinsic stability ----------------------
@@ -550,8 +558,22 @@ def test_j_publication_replaces_everything_or_nothing(tmp_path):
 
 
 def test_k_the_default_model_is_exactly_the_current_one():
-    assert bootstrap.DEFAULT_SEMANTIC_MODEL == "gpt-5.6-terra"
-    assert bootstrap.resolve_model(None) == "gpt-5.6-terra"
+    assert bootstrap.DEFAULT_MODEL == "grok-4.6"
+    assert bootstrap.resolve_model(None) == "grok-4.6"
+    # The old spelling is an alias, not a second value that can drift.
+    assert bootstrap.DEFAULT_SEMANTIC_MODEL == bootstrap.DEFAULT_MODEL
+
+
+def test_grok_is_the_default_provider():
+    assert bootstrap.DEFAULT_PROVIDER == "grok"
+    assert bootstrap.resolve_provider(None) == "grok"
+
+
+def test_the_provider_can_be_chosen_by_flag_or_environment(monkeypatch):
+    assert bootstrap.resolve_provider("anthropic") == "anthropic"
+    monkeypatch.setenv(bootstrap.PROVIDER_VAR, "openai")
+    assert bootstrap.resolve_provider(None) == "openai"
+    assert bootstrap.resolve_provider("gemini") == "gemini", "the flag wins"
 
 
 def test_a_run_can_be_costed_before_it_is_paid_for():

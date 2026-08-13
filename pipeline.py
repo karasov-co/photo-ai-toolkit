@@ -927,11 +927,16 @@ def _provider(model: str, client=None):
     """
     import os
 
-    name = os.environ.get("PHOTO_AI_PROVIDER", "openai")
+    import bootstrap
+
     if client is not None:
+        # An injected client is already connected to something; wrapping it in
+        # the OpenAI provider is what the tests and any reused connection want.
         return llm_provider.OpenAIProvider(model, client=client)
     return llm_provider.build(
-        name, model, base_url=os.environ.get("PHOTO_AI_BASE_URL", "")
+        bootstrap.resolve_provider(),
+        model,
+        base_url=os.environ.get("PHOTO_AI_BASE_URL", ""),
     )
 
 

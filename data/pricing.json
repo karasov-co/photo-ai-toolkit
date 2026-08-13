@@ -1,16 +1,53 @@
 {
   "_comment": [
-    "Rough cost of analysing 100 photographs: Stage 2 sends twelve 512px",
-    "previews per call, Stage 3 up to six frames with crops. These are",
-    "order-of-magnitude figures for the confirmation prompt, not billing.",
-    "The provider's dashboard is the authority on money.",
-    "Re-check these when a vendor changes prices; the date below is when",
-    "somebody last did."
+    "Rough cost of analysing 100 photographs, for the confirmation prompt.",
+    "Not billing: the provider's dashboard is the authority on money.",
+    "Re-check when a vendor changes prices; `checked` is when somebody last did."
   ],
   "checked": "2026-08-13",
+  "default_model": "grok-4.6",
   "default_usd_per_100_photos": 1.0,
+
+  "_formula": {
+    "note": [
+      "usd_per_100_photos = (input_tokens_per_photo * 100 / 1e6) * usd_per_1m_input",
+      "                   + (output_tokens_per_photo * 100 / 1e6) * usd_per_1m_output",
+      "",
+      "The token counts are measured, not guessed. A live Stage 3 call on this",
+      "archive returned 2170 input and 770 output tokens for two frames, giving",
+      "1085 in / 385 out per photograph. Stage 2 sends the same 512px preview in",
+      "groups of twelve and returns one small JSON object per frame: ~1000 in and",
+      "~70 out. Both stages run on every photograph, so they add.",
+      "",
+      "Honest caveat: only grok-4.6 is derived this way. The two gpt-5.6 figures",
+      "predate the formula and were order-of-magnitude estimates -- they are kept",
+      "because they are the right order and marked derived:false rather than",
+      "recomputed from token prices this project has no published source for."
+    ],
+    "input_tokens_per_photo": 2085,
+    "output_tokens_per_photo": 455
+  },
+
   "models": {
-    "gpt-5.6-terra": {"usd_per_100_photos": 0.35, "provider": "openai"},
-    "gpt-5.6-sol":   {"usd_per_100_photos": 1.80, "provider": "openai"}
+    "grok-4.6": {
+      "provider": "grok",
+      "usd_per_1m_input": 2.00,
+      "usd_per_1m_output": 6.00,
+      "usd_per_100_photos": 0.69,
+      "derived": true,
+      "checked": "2026-08-13"
+    },
+    "gpt-5.6-terra": {
+      "provider": "openai",
+      "usd_per_100_photos": 0.35,
+      "derived": false,
+      "checked": "2026-08-13"
+    },
+    "gpt-5.6-sol": {
+      "provider": "openai",
+      "usd_per_100_photos": 1.80,
+      "derived": false,
+      "checked": "2026-08-13"
+    }
   }
 }

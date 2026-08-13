@@ -18,7 +18,7 @@ It never moves, changes or deletes a single original file.
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # put your OpenAI key in it, once
+cp .env.example .env          # put your xAI key in it, once
 python3 cli.py analyze --input ./photos --output ./run
 ```
 
@@ -33,11 +33,12 @@ starts by sending one 16×16 test image and checking the answer:
 ```
 LLM preflight
   Provider: OpenAI
-  Model: gpt-5.6-terra
+  Provider: grok
+  Model: grok-4.6
   Authentication: verified
   Model access: verified
   Vision input: verified
-  Responses API: verified
+  Structured reply: verified
 ```
 
 If any line fails, the run stops immediately, tells you exactly what to fix, and
@@ -126,7 +127,7 @@ Assets discovered: 299
   New:      279
   Reused:    20  (no API calls, no charge)
 
-279 photographs will be sent to gpt-5.6-terra, costing roughly $0.98.
+279 photographs will be sent to grok-4.6, costing roughly $1.93.
 Continue? [y/N]
 ```
 
@@ -811,7 +812,7 @@ Semantic credentials: loaded from /path/to/photo-ai-toolkit/.env
 ### The model
 
 Precedence: `--model` → `OPENAI_MODEL` → the documented default
-(`gpt-5.6-terra`). If that model is not available to your account, set
+(`grok-4.6`). If that model is not available to your account, set
 `OPENAI_MODEL` in the same `.env`. The model actually used is recorded in every
 report.
 
@@ -819,9 +820,19 @@ report.
 
 ## The model, and why there is no fallback
 
-`gpt-5.6-terra`, verified against your key before any work starts. Configurable
-via `--model` or `OPENAI_MODEL`, and **never substituted**: if the configured
-model is unavailable the run stops and tells you so.
+`grok-4.6` on xAI, verified against your key before any work starts.
+Configurable via `--model` or `OPENAI_MODEL`, and **never substituted**: if the
+configured model is unavailable the run stops and tells you so.
+
+The key comes from `XAI_API_KEY`, falling back to `OPENAI_API_KEY` so an
+existing key keeps working without being renamed. Where both are set, the xAI
+one wins.
+
+Other providers are selectable with `--provider`: `openai`, `anthropic`,
+`gemini`, or `openai-compatible` with a `--base-url` for vLLM, Ollama or LM
+Studio. **Only the OpenAI path has been run against a live endpoint** — the
+others are written from each vendor's documented request shape, and the CLI
+says so when you pick one.
 
 That is deliberate, and it is the one place this tool refuses to be helpful. An
 older model would produce a report that looks identical and means something

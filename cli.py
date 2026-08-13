@@ -124,7 +124,7 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
         import llm_provider
 
         model = bootstrap.resolve_model(args.model)
-        provider_name = args.provider or _os.environ.get("PHOTO_AI_PROVIDER", "openai")
+        provider_name = bootstrap.resolve_provider(args.provider)
         base_url = args.base_url or _os.environ.get("PHOTO_AI_BASE_URL", "")
         # The environment is what the pipeline reads, so a --provider flag has
         # to reach it or the preflight would check one endpoint and the run

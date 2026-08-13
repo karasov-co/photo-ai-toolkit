@@ -225,3 +225,179 @@ def test_the_estimate_scales_with_the_batch():
 
 def test_the_pricing_file_is_valid_json():
     json.loads(llm_provider.PRICING_PATH.read_text(encoding="utf-8"))
+
+
+# --- xAI ----------------------------------------------------------------------
+
+
+class FakeChoice:
+    def __init__(self, content="ok", finish_reason="stop"):
+        self.message = type("M", (), {"content": content})()
+        self.finish_reason = finish_reason
+
+
+class FakeChat:
+    def __init__(self, choice=None):
+        self.completions = self
+        self.kwargs = None
+        self.choice = choice or FakeChoice()
+
+    def create(self, **kwargs):
+        self.kwargs = kwargs
+        return type("R", (), {"choices": [self.choice]})()
+
+
+class FakeCompatible:
+    def __init__(self, choice=None):
+        self.chat = FakeChat(choice)
+
+
+def test_grok_is_registered_and_unverified():
+    assert llm_provider.PROVIDERS["grok"] is llm_provider.GrokProvider
+    assert llm_provider.GrokProvider.verified is False
+
+
+def test_grok_points_at_xai_by_default():
+    assert llm_provider.build("grok", "grok-4.6").base_url == "https://api.x.ai/v1"
+
+
+def test_an_explicit_base_url_still_wins():
+    """For a proxy, or a gateway in front of xAI."""
+    engine = llm_provider.build("grok", "grok-4.6", base_url="http://localhost:9000/v1")
+    assert engine.base_url == "http://localhost:9000/v1"
+
+
+def test_grok_speaks_chat_completions_like_the_compatible_provider():
+    client = FakeCompatible()
+    out = llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(request())
+
+    assert out == "ok"
+    assert client.chat.kwargs["model"] == "grok-4.6"
+    blocks = client.chat.kwargs["messages"][1]["content"]
+    assert [b["type"] for b in blocks] == ["text", "image_url", "text", "image_url"]
+    assert blocks[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+def test_grok_never_sends_reasoning_effort():
+    """xAI's reasoning controls are its own; forwarding OpenAI's would either be
+    rejected or, worse, accepted and mean something else."""
+    client = FakeCompatible()
+    llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(
+        request(reasoning_effort="high")
+    )
+    assert "reasoning" not in client.chat.kwargs
+    assert "reasoning_effort" not in client.chat.kwargs
+
+
+def test_all_twelve_frames_go_in_one_request():
+    """xAI caps image size, not image count, so the group is not split."""
+    client = FakeCompatible()
+    images = [llm_provider.Image(f"IMG{i}") for i in range(12)]
+    llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(
+        request(images=images, texts=[f"Frame {i}:" for i in range(12)])
+    )
+    blocks = client.chat.kwargs["messages"][1]["content"]
+    assert sum(1 for b in blocks if b["type"] == "image_url") == 12
+
+
+def test_an_oversized_image_is_refused_before_the_call():
+    """A sentence here beats a 400 from the endpoint."""
+    client = FakeCompatible()
+    huge = llm_provider.Image("A" * (llm_provider.GrokProvider.MAX_IMAGE_BYTES * 4 // 3 + 8))
+    with pytest.raises(llm_provider.ProviderError, match="20 MiB"):
+        llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(
+            request(images=[huge], texts=[])
+        )
+    assert client.chat.kwargs is None, "the request was sent anyway"
+
+
+def test_the_key_comes_from_xai_first_then_openai(monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "xai-one")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-two")
+    assert llm_provider.GrokProvider("grok-4.6").api_key == "xai-one"
+
+    monkeypatch.delenv("XAI_API_KEY")
+    assert llm_provider.GrokProvider("grok-4.6").api_key == "sk-two"
+
+
+# --- truncation, for every provider -------------------------------------------
+
+
+def test_a_length_finish_reason_is_a_truncated_reply():
+    """The hole this closes: three providers returned partial JSON silently."""
+    client = FakeCompatible(FakeChoice(content='[{"n": 1', finish_reason="length"))
+    with pytest.raises(llm_provider.Truncated):
+        llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(request())
+
+
+def test_anthropics_max_tokens_stop_reason_is_truncation():
+    class Messages:
+        def create(self, **kwargs):
+            return type("R", (), {"stop_reason": "max_tokens", "content": []})()
+
+    client = type("C", (), {"messages": Messages()})()
+    with pytest.raises(llm_provider.Truncated):
+        llm_provider.AnthropicProvider("claude", client=client).complete_vision(request())
+
+
+def test_geminis_max_tokens_candidate_is_truncation():
+    class Models:
+        def generate_content(self, **kwargs):
+            candidate = type("C", (), {"finish_reason": "MAX_TOKENS"})()
+            return type("R", (), {"candidates": [candidate], "text": "partial"})()
+
+    client = type("C", (), {"models": Models()})()
+    with pytest.raises(llm_provider.Truncated):
+        llm_provider.GeminiProvider("gemini", client=client).complete_vision(request())
+
+
+def test_a_normal_reply_is_not_mistaken_for_a_truncated_one():
+    for response in (
+        type("R", (), {"choices": [FakeChoice(finish_reason="stop")]})(),
+        type("R", (), {"stop_reason": "end_turn", "content": []})(),
+        type("R", (), {"status": "completed"})(),
+        type("R", (), {})(),
+    ):
+        assert not llm_provider._looks_truncated(response)
+
+
+def test_truncated_is_defined_before_the_providers_that_raise_it():
+    """It sat below OpenAIProvider, which referenced it. Legal, and an accident."""
+    source = llm_provider.PRICING_PATH.parent.parent / "llm_provider.py"
+    text = source.read_text(encoding="utf-8")
+    assert text.index("class Truncated") < text.index("class OpenAIProvider")
+
+
+# --- pricing for the new default ----------------------------------------------
+
+
+def test_grok_is_the_default_priced_model():
+    pricing = llm_provider.load_pricing()
+    assert pricing["default_model"] == "grok-4.6"
+    assert "grok-4.6" in pricing["models"]
+
+
+def test_the_grok_price_is_derived_from_its_token_rates():
+    """Not a guess: the arithmetic in the file has to produce the figure in it."""
+    pricing = llm_provider.load_pricing()
+    formula = pricing["_formula"]
+    entry = pricing["models"]["grok-4.6"]
+
+    expected = (
+        formula["input_tokens_per_photo"] * 100 / 1e6 * entry["usd_per_1m_input"]
+        + formula["output_tokens_per_photo"] * 100 / 1e6 * entry["usd_per_1m_output"]
+    )
+    assert entry["usd_per_100_photos"] == pytest.approx(expected, abs=0.01)
+    assert entry["derived"] is True
+
+
+def test_the_undserived_figures_say_so():
+    """The gpt-5.6 numbers predate the formula and are order-of-magnitude only."""
+    models = llm_provider.load_pricing()["models"]
+    for name in ("gpt-5.6-terra", "gpt-5.6-sol"):
+        assert models[name]["derived"] is False, name
+
+
+def test_every_model_carries_the_date_it_was_checked():
+    for name, entry in llm_provider.load_pricing()["models"].items():
+        assert entry.get("checked"), name

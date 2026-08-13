@@ -1,4 +1,8 @@
 openai==2.53.0
+# Explicit, not transitive. Every deterministic metric in this project is
+# NumPy -- Laplacian variance, structure tensors, phase correlation -- and it
+# was arriving only because rawpy happens to depend on it.
+numpy==2.5.1
 Pillow==12.3.0
 rawpy==0.27.0
 exifread==3.5.1

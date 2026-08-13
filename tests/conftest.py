@@ -131,7 +131,7 @@ def passing_preflight(monkeypatch):
         result = preflight.PreflightResult(ok=True, model=model)
         result.checks = [
             preflight.Check(name, passed=True, detail="verified")
-            for name in ("Authentication", "Model access", "Vision input", "Responses API")
+            for name in ("Authentication", "Model access", "Vision input", "Structured reply")
         ]
         return result
 
