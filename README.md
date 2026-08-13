@@ -173,6 +173,32 @@ by the encoder.
 On a real 45-frame RAW sample, editing gained a median of **12 points** and up
 to **53**. Those are the frames a "current quality" score files in the bin.
 
+### What that number is not
+
+`frame_quality` is used twice, and you should know it before trusting the gain.
+It is the objective the preview search hill-climbs on, *and* it is the ruler
+that reports the result. So `uplift` measures how far the search moved a number
+it was optimising — which is a weaker claim than "the photograph got better",
+however plausible the first makes the second sound. A metric scoring its own
+output will always report progress.
+
+That circularity cannot be settled from the inside. It needs photographs a
+person has ranked:
+
+```bash
+python3 cli.py bench-quality --analysis ./run/.internal/reports/analysis.json \
+                             --labels ./labels.csv
+```
+
+with `filename,human_score` (or `human_rank`, or a `human_score_edited` column
+for the gain half). It reports Spearman correlation against your ranking.
+
+Until that has been run, every record carries `uplift_validated: false` and the
+report says the gain is an estimate from an unchecked metric. **It is false
+today.** No labelled set ships with this project, and the correlation has not
+been measured — so treat the gain as a plausible ordering signal and not as a
+measurement.
+
 ---
 
 ## Your five piles

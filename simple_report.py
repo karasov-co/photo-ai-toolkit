@@ -224,6 +224,7 @@ details.expert th, details.expert td { text-align:left; padding:5px 9px;
                                        border-bottom:1px solid #242424; }
 details.expert th { color:#8c8c8c; font-weight:500; }
 .foot { max-width:1180px; margin:34px auto 0; color:#767676; font-size:12px; }
+.caveat { color:#8a7a5a; }
 a { color:#8fb8d8; }
 """
 
@@ -274,12 +275,24 @@ def write(
 {body}
 </main>
 {_expert_html(records, language) if expert else ""}
-<p class="foot">{html.escape(t("report.footer", language))}</p>
+<p class="foot">{_uplift_note(records, language)}{html.escape(t("report.footer", language))}</p>
 </body>
 </html>
 """
     path.write_text(document, encoding="utf-8")
     return path
+
+
+def _uplift_note(records, language: str) -> str:
+    """One line, when the gain figure has never been checked against a person.
+
+    Shown rather than hidden because the number is prominent on every card and
+    reads as a measurement. It is an estimate from a metric that has not been
+    compared with a human ranking, and saying so costs one sentence.
+    """
+    if any(getattr(r, "uplift_validated", False) for r in records):
+        return ""
+    return f'<span class="caveat">{html.escape(t("report.uplift_unvalidated", language))}</span><br>'
 
 
 def _counts_html(counts: dict[str, int], language: str) -> str:

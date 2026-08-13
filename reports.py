@@ -160,6 +160,13 @@ class AssetRecord:
 
     edit_recipe: list[str] = field(default_factory=list)
     expected_gain: int = 0
+    # Whether the uplift figure has been checked against a human ranking.
+    # False everywhere until `bench-quality` says otherwise, because
+    # `frame_quality` is both the objective the preview search optimises and
+    # the ruler that reports the result -- so an unvalidated uplift measures
+    # how far the search moved its own metric, not how much better the
+    # photograph got.
+    uplift_validated: bool = False
 
     marketplaces: list[dict] = field(default_factory=list)
     provenance: str = "unknown"

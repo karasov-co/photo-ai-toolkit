@@ -63,6 +63,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "report.recipe_ready": "Edit recipe written to edit_recipes/",
         "report.insights_link": "What this collection says about your photography",
+        "report.uplift_unvalidated": (
+            "The gain after editing is an estimate from an internal metric that has "
+            "not been checked against a labelled set."
+        ),
         "report.footer": (
             "Scores are suggestions, not verdicts. Nothing has been moved, changed or "
             "deleted: the folders hold links to your original files."
@@ -338,6 +342,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "report.recipe_ready": "Рецепт обработки сохранён в edit_recipes/",
         "report.insights_link": "Что эта съёмка говорит о вашей фотографии",
+        "report.uplift_unvalidated": (
+            "Прирост после обработки — оценка внутренней метрики, не проверенная "
+            "на размеченном наборе."
+        ),
         "report.footer": (
             "Оценки — это подсказки, а не приговор. Ничего не перемещено, не изменено "
             "и не удалено: в папках лежат ссылки на ваши оригиналы."

@@ -238,6 +238,28 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
     return 0
 
 
+def cmd_bench_quality(args: argparse.Namespace) -> int:
+    """Correlate the internal quality metric against a human ranking."""
+    import bench_quality
+
+    records = _load_records(Path(args.analysis))
+    labels = bench_quality.read_labels(Path(args.labels))
+    if not labels:
+        print(
+            f"No labels found in {args.labels}. Expected CSV with a filename column "
+            "and human_score or human_rank.",
+            file=sys.stderr,
+        )
+        return 1
+
+    result = bench_quality.compare(records, labels)
+    print(bench_quality.format_report(result))
+    if args.json:
+        reports.write_json_atomic(result.to_dict(), Path(args.json))
+        print(f"\nWritten to {args.json}")
+    return 0
+
+
 def _still_trash(asset_id: str, records: list[AssetRecord]) -> bool:
     """A user who rescued a file from trash must not still see it in the plan."""
     record = next((r for r in records if r.asset_id == asset_id), None)
@@ -1134,6 +1156,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_shared_analysis_arguments(measure)
     measure.set_defaults(func=cmd_measure)
+
+    bench = sub.add_parser(
+        "bench-quality",
+        help="correlate the internal quality metric against a human ranking",
+    )
+    bench.add_argument("--analysis", required=True, help="path to analysis.json")
+    bench.add_argument(
+        "--labels", required=True,
+        help="CSV file or directory: filename,human_score (or human_rank)",
+    )
+    bench.add_argument("--json", help="also write the result as JSON")
+    bench.set_defaults(func=cmd_bench_quality)
 
     report = sub.add_parser("report", help="filter, sort and re-render a stored run")
     report.add_argument("--analysis", required=True)

@@ -1598,6 +1598,7 @@ def _build_record(
         stock_metadata=metadata.to_dict(),
         edit_recipe=measurement.recipe,
         expected_gain=scored.scores.potential_gain,
+        uplift_validated=edit_recipe.UPLIFT_VALIDATED,
         marketplaces=[r.to_dict() for r in recommendations],
         provenance=record.value.value,
         legal_warnings=legal_warnings,

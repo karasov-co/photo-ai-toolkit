@@ -116,6 +116,18 @@ class EditRecipe:
 # --- the deterministic quality function -------------------------------------
 
 
+# Set to True only when `bench-quality` has been run against a labelled set and
+# the correlation held. It is a claim about evidence, so it is not something the
+# code may decide for itself.
+#
+# The circularity it flags: `frame_quality` is the objective the preview search
+# hill-climbs on AND the ruler used to report the outcome. `uplift` is therefore
+# the distance the search moved a number it was optimising, which is a weaker
+# statement than "the photograph improved" -- and the two are not the same claim
+# however plausible the first makes the second sound.
+UPLIFT_VALIDATED = False
+
+
 def frame_quality(rgb: np.ndarray) -> float:
     """A 0-100 technical read on one already-decoded frame.
 
