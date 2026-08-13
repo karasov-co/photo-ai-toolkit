@@ -76,6 +76,7 @@ class PipelineOptions:
     input_dir: Path
     output_dir: Path
     quarantine_dir: Path | None = None
+    internal_dir: Path | None = None
     language: str = "en"
     profile_name: str | None = None
     profile_path: Path | None = None
@@ -111,7 +112,26 @@ class PipelineOptions:
         refused the move. Keeping the physical store separate removes the
         collision at its source rather than teaching the check to tolerate it.
         """
-        return self.quarantine_dir or (self.output_dir / "quarantine")
+        if self.quarantine_dir:
+            return self.quarantine_dir
+        # An older run put this at the output root. Keep using it when it is
+        # there rather than starting a second store somewhere else and leaving
+        # the first one orphaned with files inside it.
+        legacy = self.output_dir / "quarantine"
+        if legacy.is_dir():
+            return legacy
+        return self.internal / "quarantine"
+
+    @property
+    def internal(self) -> Path:
+        """Everything the tool keeps for itself: cache, previews, diagnostics.
+
+        Hidden so that the output directory shows a photographer their
+        photographs rather than the software's filing system. Nothing is
+        withheld -- the full JSON, the previews and the log are all in here,
+        and every other command reads them from here.
+        """
+        return self.internal_dir or (self.output_dir / ".internal")
 
 
 @dataclass
@@ -128,6 +148,10 @@ class RunResult:
     stage3_completed: int = 0
     stage3_failed: int = 0
     stage3_skipped: int = 0
+    # Keyed by asset key. Kept on the result so that everything written after
+    # the run -- edit recipes, insights -- can use what was measured without
+    # decoding a second time.
+    measurements: dict = field(default_factory=dict)
 
     @property
     def analysis_mode(self) -> str:
@@ -852,8 +876,8 @@ def run(
             f"{bootstrap.API_KEY_VAR} is not set in the environment or in a .env file"
         )
 
-    previews_dir = options.output_dir / PREVIEW_DIRNAME
-    cache = AnalysisCache(options.output_dir / CACHE_NAME)
+    previews_dir = options.internal / PREVIEW_DIRNAME
+    cache = AnalysisCache(options.internal / CACHE_NAME)
 
     # The output tree holds previews, reports and a symlink farm. Pointed
     # inside the input, a second run would otherwise treat its own 512px
@@ -918,6 +942,7 @@ def run(
     result.records = _score_all(
         assets, measurements, clusters, semantics, calibration, options, model, stage3_results
     )
+    result.measurements = measurements
     _apply_policy(result.records, options)
     if options.darkroom:
         _darkroom_pass(assets, measurements, result.records, options)
@@ -953,13 +978,13 @@ def _apply_policy(records, options: PipelineOptions) -> None:
     from model_monitoring import Monitor, Observation
     from preference_store import PreferenceStore
 
-    store = PreferenceStore(options.output_dir / "preferences.jsonl")
+    store = PreferenceStore(options.internal / "preferences.jsonl")
     model = preference_model.fit(store)
 
     # The monitor is the tenth gate. Reading its state here is what connects the
     # `monitor` command to the pipeline: without it, switching automation off
     # after a false trash would have had no effect on the next run.
-    monitor = Monitor(options.output_dir / "model_monitoring.json")
+    monitor = Monitor(options.internal / "model_monitoring.json")
     health = monitor.evaluate()
     holdout = health["resolved_cases"]
 
@@ -1093,7 +1118,7 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
         }
 
     stage3_model = bootstrap_model(options, model)
-    cache = AnalysisCache(options.output_dir / CACHE_NAME)
+    cache = AnalysisCache(options.internal / CACHE_NAME)
     try:
         assessments = stage3_pass(
             assets, measurements, routed, hints,

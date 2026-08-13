@@ -18,36 +18,123 @@ and they belong in opposite piles.
 ## What it does
 
 ```
-$ python cli.py analyze --input ~/Pictures/vietnam --output ./run
+$ python cli.py analyze --input ~/Pictures/japan --output ./run
 
-  [   1/64] P1042930.RW2
+  [   1/47] P1019368.JPG
   ...
-==============================================================
+==================================================================
 COLLECTION SUMMARY
-==============================================================
-  Total assets                                64
-  Photos                                      60
-  Videos                                       4
+==================================================================
+  Analysis mode                               local + semantic
 
-  Usable stock                                41
-  Needs manual review                         20
-  Flagship / portfolio                         1
-  Trash / reject                               2
+  Total assets                                     47
 
-  Duplicate clusters                           3
-  Low confidence                               2
-  Space recoverable from quarantine       117.4 MB
-==============================================================
+  What these photographs are:
+    Top                                             3
+    Good — stock                                   13
+    Good — personal                                26
+    Needs decision                                  0
+    Weak                                            5
 
-1 file(s) would move, 19.3 MB:
-      2  unrecoverable: unusable_duration: 1.5s is below 3.0s
+  Duplicate clusters                                8
 
-Nothing has been moved. Re-run with --apply to carry this out.
+  Top photos:
+    [ 88] P1019412.JPG
+    [ 86] P1019389.JPG
+    [ 85] P1019399.JPG
+
+  These are suggestions, not verdicts -- a score is one opinion
+  about a photograph. Nothing has been moved, changed or deleted:
+  the folders hold links to your original files.
+==================================================================
 ```
 
-Per file you get ten separate scores, the problems split into what an edit can
-fix and what it cannot, a concrete edit recipe, a route class, marketplace
-eligibility, and a proposed filesystem action that has not been carried out.
+and an output directory holding what you came for and nothing else:
+
+```
+run/
+  report.html                  the five piles, ranked
+  photographer_insights.html   what the collection says about your photography
+  top/  good_stock/  good_personal/  needs_decision/  weak/
+  edit_recipes/                one XMP sidecar per photograph worth editing
+  .internal/                   previews, JSON, CSV, log, cache, diagnostics
+```
+
+The folders hold **symlinks**. Analysis never copies, moves, alters or deletes
+an original.
+
+---
+
+## One number: potential after editing
+
+Everything is ranked by one question -- *how good can this photograph become
+after a normal edit?* -- and never by how the untouched file looks right now. A
+dark, flat, tilted RAW that will come back beautifully outranks a bright JPEG
+that will not, which is the entire point of the tool. Current quality is shown
+beside it in small text, because you still want to know whether you are looking
+at a finished frame or a raw one.
+
+| Category | Meaning |
+|---|---|
+| `TOP` | The strongest work here. Shown first, and linked in `top/` |
+| `GOOD — STOCK` | A good photograph that also works as stock material |
+| `GOOD — PERSONAL` | A good photograph worth keeping. Not stock material |
+| `WEAK` | Blinks, dead moments, accidental frames, weaker takes of a shot you already have |
+| `NEEDS DECISION` | Genuinely borderline, and rare by design |
+
+Three things the score deliberately does **not** contain: whether the photograph
+can be licensed, whether anyone would buy it, and whether a stranger walked into
+the frame. Those checks still run, and all they do is separate `GOOD — STOCK`
+from `GOOD — PERSONAL`. They never lower a score, never block `TOP`, and never
+make a photograph `WEAK`. Somebody photographing their own family should never
+be told their picture has a licensing problem, so the default report contains no
+legal vocabulary at all -- no releases, no trademarks, no editorial-only. It is
+in `.internal/reports/analysis.json` and behind the report's *Expert details*
+block for whoever actually sells work.
+
+`WEAK` is a shelf, not a bin. No category is grounds for deletion; that still
+requires a demonstrable unrecoverable fault recorded as evidence.
+
+---
+
+## Edit recipes
+
+Every photograph scoring 70 or above gets its own Camera Raw sidecar in
+`edit_recipes/`, built from that photograph's own measurements. One preset
+cannot fit a collection -- the whole premise of the analysis is that these
+frames differ -- so there is no single "look" to apply.
+
+They are a **starting point, not a finished edit**: they undo what the camera
+got wrong (exposure, colour cast, a tilted horizon, clipped highlights) and stop
+there. `edit_recipes/HOW-TO-USE.txt` explains the Lightroom Classic import
+(*Metadata > Read Metadata from File*) and what to do in Camera Raw, Capture
+One, darktable and RawTherapee.
+
+Nothing here writes beside your originals. A converter looks for `<stem>.xmp`
+next to the file, so writing there would silently replace work you had already
+done; these stay in the output directory until you choose to copy one across.
+
+Where the analysis supports it, a frame is also offered up to three creative
+directions -- documentary neutral, cinematic low key, warm autumn, cool winter,
+restrained black and white. Each has to be *earned* by something measured: a
+season applied to an unrelated photograph is a lie about the picture, so a frame
+that earns none is offered none. No extra model calls are made for any of this.
+
+---
+
+## Photographer insights
+
+`photographer_insights.html` reports patterns across the whole collection:
+strongest genres, recurring visual habits, what you do reliably well, what is
+costing you frames, and the three things most worth changing next -- each with
+the count and the filenames behind it.
+
+Per-file feedback teaches you about that file. "Eleven of your fourteen
+portraits put the subject dead centre" teaches you something you can use on the
+next shoot. Nothing is reported unless enough frames support it, there are no
+invented quotations, and the reading list is a small fixed table of real
+photographers and books to look up rather than a paragraph of invented
+commentary about them.
 
 ---
 
@@ -123,51 +210,30 @@ permanently purged.
 
 ---
 
-## The final score, and the five piles
-
-Everything above answers a component question. The question a photographer
-actually asks is "is this any good, and what do I do with it", and that is one
-number and one category per file.
+## How the score is built
 
 `final_score` (0–100) blends technical potential, the content pass, the artistic
 read, the portrait analysis, documentary value and standing within the
-collection. Three separations hold it together:
-
-**Quality is not saleability.** A release, a crowd of strangers, a private
-context, a subject nobody wants to license — those are facts about
-*distribution*. They decide `GOOD_STOCK` versus `GOOD_PERSONAL` and they never
-touch the score. `legal_readiness` and `stock_potential` appear nowhere in the
-blend, which is why a photograph of your family can outscore everything else in
-the run.
+collection. Two asymmetries hold it together, and they point in opposite
+directions on purpose.
 
 **Technical excellence cannot rescue a failed photograph.** Eyes shut, an
 accidental frame, a dead moment, no subject, an unrecoverable fault — each
 applies a *ceiling*, not a penalty. A penalty can be outvoted by a big enough
 number elsewhere; a ceiling cannot, which is the whole reason for using one.
 
-**Evidence can rescue an unconventional photograph.** The inverse asymmetry. A
-confident Stage 3 read showing high documentary significance or distinctiveness
-applies a *floor*, keeping a technically poor and commercially useless frame out
-of `WEAK`. It only overrules a *guess* — "this looks like a dead moment" — never
-an observation like a closed eye.
+**Evidence can rescue an unconventional photograph.** A confident Stage 3 read
+showing high documentary significance or distinctiveness applies a *floor*,
+keeping a technically poor and commercially useless frame out of `WEAK`. It only
+overrules a *guess* — "this looks like a dead moment" — never an observation like
+a closed eye.
 
-| Category | Meaning |
-|---|---|
-| `TOP` | ≥ 85, a completed and confident artistic read, no critical defect. Shown first in the report and linked in `top_photos/` |
-| `GOOD_STOCK` | A good photograph that is commercially usable |
-| `GOOD_PERSONAL` | A good photograph, not for stock: faces, releases, private context, or no commercial demand |
-| `WEAK` | Genuinely poor: accidental frames, dead moments, bad expressions, no subject, technical failures, clearly inferior duplicates |
-| `NEEDS_DECISION` | Genuinely ambiguous, and rare by design — only near the keep boundary, and only when the read says it does not know |
-
-`WEAK` is a shelf, not a bin. No category is grounds for deletion; that still
-requires a demonstrable unrecoverable fault recorded as evidence.
-
-Two asymmetries inside the portrait gate are worth stating, because they look
-inconsistent until you notice which direction each one errs in. Declining to
-*promote* a frame costs nothing, so the label `AWKWARD` alone is enough to keep
-it out of TOP. Writing a frame off costs the photograph, so `WEAK` needs the
-model's own numbers — expression quality and publishability both low, at
-confidence — and not merely a word from a list.
+The same split runs through the portrait gate, and it looks inconsistent until
+you notice which way each half errs. Declining to *promote* a frame costs
+nothing, so the label `AWKWARD` alone keeps it out of `TOP`. Writing a frame off
+costs the photograph, so `WEAK` needs the model's own numbers — expression
+quality and publishability both low, at confidence — and not merely a word from
+a list.
 
 Every record carries `stage3_delta`: how many points the artistic read moved
 that frame, positive or negative, measured by scoring it twice — once with the
@@ -330,15 +396,11 @@ python cli.py purge --quarantine ./quarantine \
 | `monitor` | False-trash rate, drift, calibration; can switch automation off |
 | `trash` | Carry out `delete_plan.json` in Python (dry run unless `--apply`) |
 
-### The two stock counters
-
-They answer different questions and are named apart for that reason:
-
-- **Technically usable, needs checking** — past the technical thresholds. Says
-  nothing about content, faces, logos or releases.
-- **Fully checked and ready to export** — everything verified and exportable.
-  Requires the semantic pass, so it is `0` in a local-only run, and the summary
-  says why.
+`analyze` takes `--expert` to print the route classes, the two stock counters
+and release status alongside the five piles. They answer a stock seller's
+questions rather than a photographer's, which is why they are no longer in the
+default summary — nothing was removed, and all of it is still in
+`.internal/reports/analysis.json`.
 
 Filtering and sorting on `report`: `--media`, `--route-class`, `--route`,
 `--genre`, `--marketplace`, `--min-score`, `--min-potential`, `--min-confidence`,
@@ -350,23 +412,30 @@ Filtering and sorting on `report`: `--media`, `--route-class`, `--route`,
 
 ```
 run/
-  reports/
-    analysis.json          every dimension, every reason, machine-readable
-    analysis.csv           the same, for a spreadsheet
-    report.html            a page with the previews on it
-    distribution.csv       one row per file with a `destination` column
-    delete_candidates.txt  paths and reasons; nothing removed
-    delete.sh              moves to Trash, run by hand after looking
-    contact_sheet_delete.jpg
-  previews/
-  trash_quarantine/  manual_review/
-  stock/{standard,strong,editorial,by_genre,marketplace_packages}/
-  portfolio/{flagship,by_genre}/
-  archive/
+  report.html                  the five piles, ranked by potential after editing
+  photographer_insights.html   patterns across the whole collection
+  top/  good_stock/  good_personal/  needs_decision/  weak/
+  edit_recipes/                one .xmp per photograph scoring 70+, plus HOW-TO-USE.txt
+  .internal/
+    reports/analysis.json      every dimension, every reason, machine-readable
+    reports/analysis.csv       the same, for a spreadsheet
+    reports/full_report.html   the expert page: every score, every warning
+    reports/insights.json
+    reports/delete_candidates.txt   paths and reasons; nothing removed
+    reports/delete.sh          moves to Trash, run by hand after looking
+    reports/contact_sheet_delete.jpg
+    routing/                   stock/, portfolio/, by_genre/, marketplace packages
+    previews/  processing.log  analysis_cache.json  quarantine/
 ```
 
-Everything under the class folders is a **symlink farm** pointing back at the
-originals. No file is copied or moved to produce it.
+The category folders are a **symlink farm** pointing back at the originals. No
+file is copied, moved or altered to produce it, and re-running rebuilds it from
+`analysis.json` without decoding anything.
+
+`.internal/` is hidden rather than absent. Every command that reads a previous
+run — `report`, `reclassify`, `quarantine`, `restore` — reads it from there, and
+an output directory from an older version is tidied into it automatically on the
+next run.
 
 `contact_sheet_delete.jpg` exists because looking at a grid of what you are about
 to lose is the practice that caught four good photographs an earlier version of
@@ -585,7 +654,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 1246 tests, no network, no API key
+pytest          # 1311 tests, no network, no API key
 ruff check .
 ```
 

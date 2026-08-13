@@ -42,6 +42,65 @@ STRINGS: dict[str, dict[str, str]] = {
             "and it is not a failure of the analysis."
         ),
         "misc.not_for_stock": "Not for stock",
+        # --- the default report ---
+        "report.title": "Your photographs",
+        "report.lede": (
+            "Ranked by how good each photograph can realistically become after a normal "
+            "edit -- not by how the untouched file looks right now."
+        ),
+        "report.potential": "after editing",
+        "report.current": "as shot",
+        "report.empty_section": "Nothing here.",
+        "report.expert": "Expert details",
+        "report.expert_note": (
+            "The full numbers behind each decision. Nothing here is needed to use the "
+            "report; the complete data is in .internal/reports/analysis.json."
+        ),
+        "report.recipe_ready": "Edit recipe written to edit_recipes/",
+        "report.insights_link": "What this collection says about your photography",
+        "report.footer": (
+            "Scores are suggestions, not verdicts. Nothing has been moved, changed or "
+            "deleted: the folders hold links to your original files."
+        ),
+        "category.note.TOP": "The strongest work here. Edit these first.",
+        "category.note.GOOD_STOCK": "Good photographs that also work as stock material.",
+        "category.note.GOOD_PERSONAL": "Good photographs worth keeping and printing.",
+        "category.note.NEEDS_DECISION": "Genuinely borderline. A quick look settles them.",
+        "category.note.WEAK": (
+            "Kept, not deleted. Blinks, missed moments, accidental frames and weaker "
+            "takes of a shot you already have."
+        ),
+        "expert.file": "File",
+        "expert.potential": "After editing",
+        "expert.current": "As shot",
+        "expert.category": "Category",
+        "expert.route_class": "Route class",
+        "expert.stage3_delta": "Artistic read",
+        "expert.stock_blockers": "Stock notes",
+        # --- photographer insights ---
+        "insights.title": "What this collection says about your photography",
+        "insights.lede": (
+            "Patterns across all {total} photographs. Every line below names the number "
+            "and the files it came from -- nothing here is general advice."
+        ),
+        "insights.back": "Back to the photographs",
+        "insights.genres": "What you shoot best",
+        "insights.genres_lead": "Ranked by how well each did, not by how many you took: {genres}",
+        "insights.genres_evidence": "{genre} scored highest against your own average",
+        "insights.habits": "Your visual habits",
+        "insights.technical": "What you do reliably well",
+        "insights.artistic": "What the artistic read keeps finding",
+        "insights.weaknesses": "What is costing you frames",
+        "insights.improvements": "The three things worth changing next",
+        "insights.inspiration": "Worth looking at",
+        "insights.inspiration_note": (
+            "Names to look up in the genres you shoot most. No commentary, because a "
+            "one-line summary of somebody's life work is usually wrong."
+        ),
+        "insights.footer": (
+            "Based only on this collection. A different shoot would produce different "
+            "patterns, and one weak run is not a verdict on anybody's photography."
+        ),
         "summary.top_gap": (
             "(nothing reached TOP: the best photograph scored {best}, and TOP needs {threshold})"
         ),
@@ -51,10 +110,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "summary.stage3_completed": "Artistic read completed",
         # categories
-        "category.TOP": "Top photos",
-        "category.GOOD_STOCK": "Good, sellable as stock",
-        "category.GOOD_PERSONAL": "Good, keep (not for stock)",
-        "category.NEEDS_DECISION": "Genuinely ambiguous, you decide",
+        "category.TOP": "Top",
+        "category.GOOD_STOCK": "Good — stock",
+        "category.GOOD_PERSONAL": "Good — personal",
+        "category.NEEDS_DECISION": "Needs decision",
         "category.WEAK": "Weak",
         "category.top": "final score {value}: a completed artistic read and no critical defect",
         "category.weak": "final score {value} is below the keep threshold",
@@ -119,6 +178,14 @@ STRINGS: dict[str, dict[str, str]] = {
             "and does not replace legal review. Marketplace policies change and must "
             "be re-verified."
         ),
+        # The same caution without the licensing vocabulary. A photographer
+        # sorting their own holiday photographs is not making a legal decision
+        # and should not be handed a legal disclaimer.
+        "warn.disclaimer_simple": (
+            "These are suggestions, not verdicts -- a score is one opinion about a "
+            "photograph. Nothing has been moved, changed or deleted: the folders "
+            "hold links to your original files."
+        ),
         # misc
         "misc.duplicate_of": "Weaker duplicate of",
         "misc.best_in_cluster": "Best of {n} similar frames",
@@ -150,10 +217,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "mode.local_only": "local-only",
         "mode.local_and_semantic": "local + semantic",
         "mode.local_only_after_semantic_failure": "local-only after semantic failure",
-        "mode.banner": "SEMANTIC ANALYSIS DID NOT RUN",
+        "mode.banner": "NOBODY LOOKED AT THESE PHOTOGRAPHS",
         "mode.banner_detail": (
-            "Content, faces, logos and release status were not checked. Genres are "
-            "unknown, not 'other'."
+            "Only the files were measured. Without the content and artistic passes, "
+            "nothing can be ranked as a top photograph and the subject of each frame "
+            "is unknown rather than 'other'."
         ),
         "summary.technically_usable": "Technically usable, needs checking",
         "summary.fully_checked": "Fully checked and ready to export",
@@ -234,6 +302,63 @@ STRINGS: dict[str, dict[str, str]] = {
             "результат, а не сбой анализа."
         ),
         "misc.not_for_stock": "Не для стока",
+        "report.title": "Ваши фотографии",
+        "report.lede": (
+            "Отсортировано по тому, насколько сильной фотография реально может стать "
+            "после обычной обработки, а не по тому, как выглядит необработанный файл."
+        ),
+        "report.potential": "после обработки",
+        "report.current": "как снято",
+        "report.empty_section": "Здесь пусто.",
+        "report.expert": "Подробности для специалистов",
+        "report.expert_note": (
+            "Полные цифры за каждым решением. Для работы с отчётом они не нужны; "
+            "все данные лежат в .internal/reports/analysis.json."
+        ),
+        "report.recipe_ready": "Рецепт обработки сохранён в edit_recipes/",
+        "report.insights_link": "Что эта съёмка говорит о вашей фотографии",
+        "report.footer": (
+            "Оценки — это подсказки, а не приговор. Ничего не перемещено, не изменено "
+            "и не удалено: в папках лежат ссылки на ваши оригиналы."
+        ),
+        "category.note.TOP": "Самое сильное здесь. Начните обработку с них.",
+        "category.note.GOOD_STOCK": "Хорошие фотографии, которые годятся и для стока.",
+        "category.note.GOOD_PERSONAL": "Хорошие фотографии — оставить и напечатать.",
+        "category.note.NEEDS_DECISION": "Действительно на грани. Одного взгляда хватит.",
+        "category.note.WEAK": (
+            "Сохранены, не удалены. Моргания, упущенные моменты, случайные кадры и "
+            "слабые дубли того, что у вас уже есть."
+        ),
+        "expert.file": "Файл",
+        "expert.potential": "После обработки",
+        "expert.current": "Как снято",
+        "expert.category": "Категория",
+        "expert.route_class": "Класс маршрута",
+        "expert.stage3_delta": "Художественный разбор",
+        "expert.stock_blockers": "Заметки по стоку",
+        "insights.title": "Что эта съёмка говорит о вашей фотографии",
+        "insights.lede": (
+            "Закономерности по всем {total} фотографиям. Каждая строка ниже называет "
+            "число и файлы, из которых оно получено, — общих советов здесь нет."
+        ),
+        "insights.back": "Назад к фотографиям",
+        "insights.genres": "Что у вас получается лучше всего",
+        "insights.genres_lead": "По результату, а не по количеству снятого: {genres}",
+        "insights.genres_evidence": "{genre} — выше вашего собственного среднего",
+        "insights.habits": "Ваши визуальные привычки",
+        "insights.technical": "Что вы стабильно делаете хорошо",
+        "insights.artistic": "Что раз за разом находит художественный разбор",
+        "insights.weaknesses": "Что стоит вам кадров",
+        "insights.improvements": "Три вещи, которые стоит изменить",
+        "insights.inspiration": "Стоит посмотреть",
+        "insights.inspiration_note": (
+            "Имена для поиска в тех жанрах, которые вы снимаете чаще всего. Без "
+            "комментариев: пересказать чью-то работу одной строкой почти всегда значит соврать."
+        ),
+        "insights.footer": (
+            "Только по этой съёмке. Другая съёмка даст другие закономерности, и один "
+            "слабый запуск — не приговор ничьей фотографии."
+        ),
         "summary.top_gap": (
             "(в TOP не попал никто: лучшая фотография набрала {best}, а для TOP нужно {threshold})"
         ),
@@ -242,10 +367,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "торговые марки не проверены, портретные правила к ним не применялись ***"
         ),
         "summary.stage3_completed": "Художественный разбор выполнен",
-        "category.TOP": "Лучшие фотографии",
-        "category.GOOD_STOCK": "Хорошие, годятся для стока",
-        "category.GOOD_PERSONAL": "Хорошие, оставить (не для стока)",
-        "category.NEEDS_DECISION": "Действительно спорные, решать вам",
+        "category.TOP": "Лучшие",
+        "category.GOOD_STOCK": "Хорошие — сток",
+        "category.GOOD_PERSONAL": "Хорошие — для себя",
+        "category.NEEDS_DECISION": "Нужно решение",
         "category.WEAK": "Слабые",
         "category.top": "итоговая оценка {value}: художественный разбор выполнен, критических дефектов нет",
         "category.weak": "итоговая оценка {value} ниже порога сохранения",
@@ -297,6 +422,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "warn.release_required": "Требуется релиз модели или собственности",
         "warn.logo": "В кадре читаемый товарный знак",
         "warn.provenance": "Происхождение файла не задекларировано",
+        "warn.disclaimer_simple": (
+            "Это подсказки, а не приговор: оценка — всего лишь одно мнение о "
+            "фотографии. Ничего не перемещено, не изменено и не удалено — в папках "
+            "лежат ссылки на ваши оригиналы."
+        ),
         "warn.disclaimer": (
             "Оценки — это рекомендации, а не гарантия художественного качества, "
             "приёмки на стоке или продаж. Определение релизов и прав носит "
@@ -334,10 +464,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "mode.local_only": "только локальный",
         "mode.local_and_semantic": "локальный + semantic",
         "mode.local_only_after_semantic_failure": "только локальный после сбоя semantic",
-        "mode.banner": "SEMANTIC-АНАЛИЗ НЕ ВЫПОЛНЯЛСЯ",
+        "mode.banner": "НА ЭТИ ФОТОГРАФИИ НИКТО НЕ СМОТРЕЛ",
         "mode.banner_detail": (
-            "Содержание, лица, логотипы и статус релизов не проверены. "
-            "Жанр неизвестен, а не «other»."
+            "Измерены только файлы. Без разбора содержания и художественного разбора "
+            "ни один кадр не может попасть в лучшие, а сюжет каждого кадра "
+            "неизвестен, а не «other»."
         ),
         "summary.technically_usable": "Технически пригодно, нужна проверка",
         "summary.fully_checked": "Полностью проверено и готово к экспорту",

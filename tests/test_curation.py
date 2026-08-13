@@ -607,7 +607,7 @@ def test_the_category_survives_into_the_json_and_csv(archive, tmp_path, monkeypa
     import json
 
     run_cli(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3)), monkeypatch)
-    reports_dir = tmp_path / "out" / "reports"
+    reports_dir = tmp_path / "out" / ".internal" / "reports"
     data = json.loads((reports_dir / "analysis.json").read_text())
     assets = data["assets"] if isinstance(data, dict) else data
     assert all(a["category"] for a in assets)
@@ -668,28 +668,30 @@ def test_the_console_summary_names_the_categories(archive, tmp_path):
 
     result = run(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3)))
     text = reports.format_summary(reports.summarise(result.records))
-    assert "Top photos" in text
-    assert "Weak" in text
+    for name in ("Top", "Good — stock", "Good — personal", "Needs decision", "Weak"):
+        assert name in text, name
 
 
 def test_the_html_has_a_top_photos_section(archive, tmp_path, monkeypatch):
     run_cli(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3, 95)), monkeypatch)
-    assert "Top photos" in (tmp_path / "out" / "reports" / "report.html").read_text()
+    assert "Top photos" in (
+        tmp_path / "out" / ".internal" / "reports" / "full_report.html"
+    ).read_text()
 
 
 def test_the_farm_has_a_category_view(archive, tmp_path, monkeypatch):
     run_cli(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3, 95)), monkeypatch)
     out = tmp_path / "out"
-    import layout
+    import workspace
 
     # Every folder exists whether or not it has anything in it, so that an empty
     # pile is visibly empty rather than absent.
-    for folder in layout.CATEGORY_TREE.values():
+    for folder in workspace.CATEGORY_DIRS.values():
         assert (out / folder).is_dir(), folder
 
     linked = sum(
         1
-        for folder in layout.CATEGORY_TREE.values()
+        for folder in workspace.CATEGORY_DIRS.values()
         for entry in (out / folder).iterdir()
         if entry.is_symlink()
     )

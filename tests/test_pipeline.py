@@ -367,12 +367,15 @@ def test_the_analyze_command_writes_every_report(archive, tmp_path, capsys):
     out = tmp_path / "out"
     assert cli.main(["analyze", "--input", str(archive), "--output", str(out)]) == 0
 
-    assert (out / "reports" / "analysis.json").exists()
-    assert (out / "reports" / "analysis.csv").exists()
-    assert (out / "reports" / "report.html").exists()
-    assert (out / "reports" / "distribution.csv").exists()
-    assert (out / "reports" / "delete_candidates.txt").exists()
-    assert (out / "reports" / "delete.sh").exists()
+    assert (out / ".internal" / "reports" / "analysis.json").exists()
+    assert (out / ".internal" / "reports" / "analysis.csv").exists()
+    assert (out / ".internal" / "reports" / "full_report.html").exists()
+    # What a photographer actually opens, at the root and nowhere else.
+    assert (out / "report.html").exists()
+    assert (out / "photographer_insights.html").exists()
+    assert (out / ".internal" / "reports" / "distribution.csv").exists()
+    assert (out / ".internal" / "reports" / "delete_candidates.txt").exists()
+    assert (out / ".internal" / "reports" / "delete.sh").exists()
 
 
 def test_the_delete_script_contains_no_filenames_at_all(archive, tmp_path):
@@ -385,7 +388,7 @@ def test_the_delete_script_contains_no_filenames_at_all(archive, tmp_path):
     """
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
-    script = (out / "reports" / "delete.sh").read_text(encoding="utf-8")
+    script = (out / ".internal" / "reports" / "delete.sh").read_text(encoding="utf-8")
 
     assert "rm -" not in script and "rm " not in script
     for record in _load(out):
@@ -395,7 +398,7 @@ def test_the_delete_script_contains_no_filenames_at_all(archive, tmp_path):
 
 
 def _load(out):
-    rows, _ = pipeline.reports.read_json(out / "reports" / "analysis.json")
+    rows, _ = pipeline.reports.read_json(out / ".internal" / "reports" / "analysis.json")
     return rows
 
 
@@ -475,7 +478,7 @@ def test_the_report_command_filters(archive, tmp_path, capsys):
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
 
-    analysis = str(out / "reports" / "analysis.json")
+    analysis = str(out / ".internal" / "reports" / "analysis.json")
     assert cli.main(["report", "--analysis", analysis, "--route-class", "trash"]) == 0
     printed = capsys.readouterr().out
     assert "lens_cap.jpg" in printed
@@ -486,7 +489,7 @@ def test_the_report_command_renders_russian(archive, tmp_path, capsys):
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
-    cli.main(["--lang", "ru", "report", "--analysis", str(out / "reports" / "analysis.json")])
+    cli.main(["--lang", "ru", "report", "--analysis", str(out / ".internal" / "reports" / "analysis.json")])
     assert "СВОДКА" in capsys.readouterr().out
 
 
@@ -497,7 +500,7 @@ def test_the_quarantine_command_is_a_dry_run_by_default(archive, tmp_path, capsy
 
     cli.main([
         "quarantine",
-        "--analysis", str(out / "reports" / "analysis.json"),
+        "--analysis", str(out / ".internal" / "reports" / "analysis.json"),
         "--quarantine", str(tmp_path / "bin"),
         "--input", str(archive),
     ])
@@ -510,7 +513,7 @@ def test_the_quarantine_and_restore_round_trip(archive, tmp_path, capsys):
     out = tmp_path / "out"
     bin_dir = tmp_path / "bin"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
-    analysis = str(out / "reports" / "analysis.json")
+    analysis = str(out / ".internal" / "reports" / "analysis.json")
 
     cli.main(["quarantine", "--analysis", analysis, "--quarantine", str(bin_dir),
               "--input", str(archive), "--apply"])
@@ -530,7 +533,7 @@ def test_the_purge_command_refuses_without_the_typed_phrase(tmp_path, capsys):
 def test_an_override_recorded_by_the_cli_is_respected_by_the_next_run(archive, tmp_path, capsys):
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
-    analysis = str(out / "reports" / "analysis.json")
+    analysis = str(out / ".internal" / "reports" / "analysis.json")
 
     cli.main(["override", "--analysis", analysis, "lens_cap.jpg",
               "--set-class", "review", "--note", "keep it"])
@@ -547,7 +550,7 @@ def test_an_override_recorded_by_the_cli_is_respected_by_the_next_run(archive, t
 def test_a_rescued_file_disappears_from_the_quarantine_plan(archive, tmp_path, capsys):
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
-    analysis = str(out / "reports" / "analysis.json")
+    analysis = str(out / ".internal" / "reports" / "analysis.json")
     cli.main(["override", "--analysis", analysis, "lens_cap.jpg", "--set-class", "review"])
     capsys.readouterr()
 
@@ -571,5 +574,5 @@ def test_the_reclassify_command_says_nothing_was_spent(archive, tmp_path, capsys
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
-    cli.main(["reclassify", "--analysis", str(out / "reports" / "analysis.json")])
+    cli.main(["reclassify", "--analysis", str(out / ".internal" / "reports" / "analysis.json")])
     assert "no tokens were spent" in capsys.readouterr().out

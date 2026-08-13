@@ -171,7 +171,7 @@ def test_the_pipeline_records_an_observation_for_every_prediction(tmp_path):
     out = tmp_path / "out"
     pipeline.run(pipeline.PipelineOptions(input_dir=root, output_dir=out))
 
-    monitor = Monitor(out / "model_monitoring.json")
+    monitor = Monitor(out / ".internal" / "model_monitoring.json")
     assert len(monitor.state.observations) == 3
     assert all(not o.resolved for o in monitor.state.observations)
 
@@ -185,15 +185,16 @@ def test_an_override_resolves_the_observation(tmp_path):
     result = pipeline.run(pipeline.PipelineOptions(input_dir=root, output_dir=out))
     record = result.records[0]
 
-    store = overrides_module.OverrideStore(out / overrides_module.OVERRIDES_NAME)
+    internal = out / ".internal"
+    store = overrides_module.OverrideStore(internal / overrides_module.OVERRIDES_NAME)
     store.set(overrides_module.Override(asset_id=record.asset_id, route_class="flagship"))
 
     resolved = overrides_module.resolve_observations(
-        result.records, store, out / "model_monitoring.json"
+        result.records, store, internal / "model_monitoring.json"
     )
     assert resolved >= 1
 
-    monitor = Monitor(out / "model_monitoring.json")
+    monitor = Monitor(internal / "model_monitoring.json")
     assert any(o.resolved for o in monitor.state.observations)
 
 

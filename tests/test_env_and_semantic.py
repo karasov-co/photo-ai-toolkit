@@ -182,7 +182,7 @@ def test_the_cli_exits_non_zero_and_explains(archive, tmp_path, capsys):
 def test_no_report_is_written_when_credentials_are_missing(archive, tmp_path):
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out), "--semantic"])
-    assert not (out / "reports" / "analysis.json").exists()
+    assert not (out / ".internal" / "reports" / "analysis.json").exists()
 
 
 def test_no_api_call_is_attempted_without_a_key(archive, tmp_path, monkeypatch):
@@ -376,12 +376,12 @@ def test_the_fallback_banner_is_impossible_to_miss(archive, tmp_path):
     )
     summary = reports.summarise(result.records)
     printed = reports.format_summary(summary, "en")
-    assert "SEMANTIC ANALYSIS DID NOT RUN" in printed
+    assert "NOBODY LOOKED AT THESE PHOTOGRAPHS" in printed
 
     html = reports.write_html(result.records, tmp_path / "r.html", summary=summary).read_text(
         encoding="utf-8"
     )
-    assert "SEMANTIC ANALYSIS DID NOT RUN" in html
+    assert "NOBODY LOOKED AT THESE PHOTOGRAPHS" in html
 
 
 # --- G. re-running after a local-only run --------------------------------
@@ -429,9 +429,10 @@ def test_genre_is_unknown_rather_than_other_when_nothing_looked(archive, tmp_pat
 
 
 def test_the_summary_reports_release_status_as_unchecked(archive, tmp_path):
+    """Expert mode: the stock seller still gets told, the photographer does not."""
     result = pipeline.run(pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out"))
     summary = reports.summarise(result.records)
-    printed = reports.format_summary(summary, "ru")
+    printed = reports.format_summary(summary, "ru", expert=True)
 
     assert not summary["semantic_ran"]
     assert "не проверен" in printed
@@ -439,13 +440,31 @@ def test_the_summary_reports_release_status_as_unchecked(archive, tmp_path):
 
 
 def test_the_two_stock_counters_are_named_apart(archive, tmp_path):
+    """Both counters still exist and are still distinguishable -- in expert mode.
+
+    They answer a stock seller's question, not a photographer's, so the default
+    summary no longer prints either. Naming them apart still matters wherever
+    they do appear: "usable stock: 37" beside "marketplace-ready: 0" read as a
+    contradiction until the labels said which was which.
+    """
     result = pipeline.run(pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out"))
     summary = reports.summarise(result.records)
-    printed = reports.format_summary(summary, "ru")
+    printed = reports.format_summary(summary, "ru", expert=True)
 
     assert "Технически пригодно" in printed
-    assert "Полностью проверено и готово к экспорту" in printed
-    assert "Ничего не готово к экспорту, потому что" in printed
+    assert "Полностью проверено" in printed
+
+
+def test_the_default_summary_does_not_mention_releases_or_route_classes(archive, tmp_path):
+    """`stock` is exempt: it is the name of a category, not a legal status."""
+    result = pipeline.run(pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out"))
+    printed = reports.format_summary(reports.summarise(result.records), "en").lower()
+
+    for phrase in (
+        "release", "marketplace", "flagship", "editorial", "trademark",
+        "stock potential", "routing", "confidence",
+    ):
+        assert phrase not in printed, phrase
 
 
 # --- I. short clips and duplicates are not unconditional trash ---------------

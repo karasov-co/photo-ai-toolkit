@@ -10,9 +10,13 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Local photo libraries and run output
+# Local photo libraries and run output. An output directory is a farm of
+# symlinks into somebody's own photo library plus a cache -- meaningless to
+# anyone else, and 544 of them were committed once.
 photos/
 results/
+run/
+photo_results/
 test_results/
 stories_picks/
 

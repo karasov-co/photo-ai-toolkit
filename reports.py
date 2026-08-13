@@ -130,6 +130,12 @@ class AssetRecord:
     # low one are indistinguishable without this.
     final_score_detail: dict = field(default_factory=dict)
     category_reasons: list[str] = field(default_factory=list)
+    # Where this photograph's XMP sidecar was written, if it earned one.
+    recipe_path: str = ""
+    # Optional readings of the frame, each with the measurement that earned it.
+    # Never a style library: a season applied to an unrelated photograph is a
+    # lie about the picture.
+    creative_directions: list[dict] = field(default_factory=list)
     # Why it cannot be sold, kept strictly apart from why it is or is not good.
     commercial_blockers: list[str] = field(default_factory=list)
     route_class: str = ""
@@ -276,6 +282,22 @@ def _csv_row(record: AssetRecord) -> dict:
         "status": record.status,
         "error": redact(record.error),
     }
+
+
+def write_json_atomic(payload: dict, path: Path) -> Path:
+    """Any JSON document, written the same safe way as the report is.
+
+    A temp file and a rename, because an interrupted write leaves a file that
+    parses as nothing and reads as "the run produced no insights".
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+    return path
 
 
 def write_json(records: list[AssetRecord], path: Path, *, summary: dict | None = None) -> Path:
@@ -430,8 +452,15 @@ def _row(label: str, value, width: int = LABEL_WIDTH) -> str:
     return f"  {text}{' ' * padding}{value:>7}"
 
 
-def format_summary(summary: dict, language: str = "en") -> str:
-    """The block printed at the end of a run."""
+def format_summary(summary: dict, language: str = "en", *, expert: bool = False) -> str:
+    """The block printed at the end of a run.
+
+    The default is the five piles and nothing else. What used to be here as well
+    -- route classes, missing releases, technically-usable counts, marketplace
+    readiness -- answered questions a photographer never asked, in vocabulary
+    they should not have to learn. All of it is still computed, still in the
+    JSON, and printed by `--expert`.
+    """
     lines = ["", "=" * 66, t("summary.title", language), "=" * 66]
 
     mode = summary.get("analysis_mode", "local_only")
@@ -440,15 +469,25 @@ def format_summary(summary: dict, language: str = "en") -> str:
         lines.append("")
         lines.append(f"  *** {t('mode.banner', language)} ***")
         lines.append(f"  {t('mode.banner_detail', language)}")
+    if summary.get("semantic_partial"):
+        lines.append(
+            "  "
+            + t(
+                "summary.semantic_partial",
+                language,
+                count=summary.get("not_semantically_checked", 0),
+                total=summary.get("total", 0),
+            )
+        )
     lines.append("")
 
     lines.append(_row(t("summary.total", language), summary.get("total", 0)))
-    lines.append(_row(t("summary.photos", language), summary.get("photos", 0)))
-    lines.append(_row(t("summary.videos", language), summary.get("videos", 0)))
+    if summary.get("videos"):
+        lines.append(_row(t("summary.photos", language), summary.get("photos", 0)))
+        lines.append(_row(t("summary.videos", language), summary.get("videos", 0)))
 
-    # The categories lead, and every one of them is printed even at zero -- an
-    # absent line reads as "none", and so does a zero, but only the zero is
-    # something the reader can rely on.
+    # Every pile is printed even at zero -- an absent line reads as "none", and
+    # so does a zero, but only the zero is something the reader can rely on.
     by_category = summary.get("by_category") or {}
     if by_category:
         lines.append("")
@@ -467,28 +506,43 @@ def format_summary(summary: dict, language: str = "en") -> str:
             )
 
     lines.append("")
-    lines.append(f"  {t('summary.route_classes', language)}")
+    lines.append(_row(t("summary.clusters", language), summary.get("duplicate_clusters", 0)))
+    if summary.get("failed"):
+        lines.append(_row(t("summary.failed", language), summary.get("failed", 0)))
+
+    top = summary.get("top_photos") or []
+    strongest = summary.get("strongest") or []
+    shown = top or strongest
+    if shown:
+        lines.append("")
+        label = "summary.top_photos" if top else "summary.strongest"
+        lines.append(f"  {t(label, language)}:")
+        for item in shown[:8]:
+            lines.append(f"    [{item['score']:>3}] {item['filename']}")
+
+    if expert:
+        lines.extend(_expert_summary(summary, language))
+
+    lines.append("")
+    lines.extend(_wrap(t("warn.disclaimer" if expert else "warn.disclaimer_simple", language)))
+    lines.append("=" * 66)
+    return "\n".join(lines)
+
+
+def _expert_summary(summary: dict, language: str) -> list[str]:
+    """The old block, behind a flag. Nothing was deleted, only moved."""
+    lines = ["", f"  {t('summary.route_classes', language)}"]
     for route_class, count in sorted(
         (summary.get("by_class") or {}).items(), key=lambda kv: -kv[1]
     ):
         lines.append(_row("  " + t(f"class.{route_class}", language), count))
     lines.append("")
-    lines.append(_row(t("summary.clusters", language), summary.get("duplicate_clusters", 0)))
     lines.append(_row(t("summary.low_confidence", language), summary.get("low_confidence", 0)))
 
-    semantic_ran = bool(summary.get("semantic_ran"))
-    if summary.get("semantic_partial"):
+    if summary.get("semantic_ran"):
         lines.append(
-            "  "
-            + t(
-                "summary.semantic_partial",
-                language,
-                count=summary.get("not_semantically_checked", 0),
-                total=summary.get("total", 0),
-            )
+            _row(t("summary.missing_releases", language), summary.get("missing_releases", 0))
         )
-    if semantic_ran:
-        lines.append(_row(t("summary.missing_releases", language), summary.get("missing_releases", 0)))
     else:
         lines.append(
             _row(t("summary.release_status", language), t("summary.release_unchecked", language))
@@ -497,15 +551,6 @@ def format_summary(summary: dict, language: str = "en") -> str:
         _row(t("summary.technically_usable", language), summary.get("technically_usable", 0))
     )
     lines.append(_row(t("summary.fully_checked", language), summary.get("fully_checked", 0)))
-    if not semantic_ran:
-        lines.append(
-            _row(
-                t("summary.not_semantically_checked", language),
-                summary.get("not_semantically_checked", 0),
-            )
-        )
-        lines.append(f"  {t('summary.export_blocked_reason', language)}")
-    lines.append(_row(t("summary.failed", language), summary.get("failed", 0)))
     lines.append(
         _row(t("summary.recoverable_space", language), f"{summary.get('recoverable_mb', 0)} MB")
     )
@@ -513,28 +558,11 @@ def format_summary(summary: dict, language: str = "en") -> str:
     genres = summary.get("top_genres") or []
     if genres:
         lines.append("")
-        lines.append(f"  {t('summary.top_genres', language)}: " + ", ".join(f"{g} ({n})" for g, n in genres))
-
-    top_photos = summary.get("top_photos") or []
-    if top_photos:
-        lines.append("")
-        lines.append(f"  {t('summary.top_photos', language)}:")
-        for item in top_photos[:12]:
-            lines.append(f"    [{item['score']:>3}] {item['filename']}  ({item['genre']})")
-
-    strongest = summary.get("strongest") or []
-    if strongest:
-        lines.append("")
-        lines.append(f"  {t('summary.strongest', language)}:")
-        for item in strongest[:8]:
-            delta = item.get("stage3_delta") or 0
-            moved = f"  stage3 {delta:+d}" if delta else ""
-            lines.append(f"    [{item['score']:>3}] {item['filename']}  ({item['class']}){moved}")
-
-    lines.append("")
-    lines.extend(_wrap(t("warn.disclaimer", language)))
-    lines.append("=" * 66)
-    return "\n".join(lines)
+        lines.append(
+            f"  {t('summary.top_genres', language)}: "
+            + ", ".join(f"{g} ({n})" for g, n in genres)
+        )
+    return lines
 
 
 def _wrap(text: str, width: int = 64) -> list[str]:

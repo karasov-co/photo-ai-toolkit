@@ -31,6 +31,7 @@ import pipeline
 import quarantine as quarantine_module
 import reports
 import stock_metadata
+import workspace
 from calibration import BUILTIN_PROFILES, CalibrationProfile, resolve
 from reports import AssetRecord
 from scoring import RouteClass
@@ -47,15 +48,15 @@ SORT_KEYS = {
 }
 
 
-def setup_logging(output_dir: Path, verbose: bool = False) -> None:
+def setup_logging(log_dir: Path, verbose: bool = False) -> None:
     """File plus stdout, with a redacting filter on every handler.
 
     The filter is not optional. An API key in a traceback ends up in
     processing.log, which is the file a user attaches to a bug report.
     """
-    output_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
     handlers = [
-        logging.FileHandler(output_dir / "processing.log", encoding="utf-8"),
+        logging.FileHandler(log_dir / "processing.log", encoding="utf-8"),
         logging.StreamHandler(sys.stdout),
     ]
     redactor = reports.RedactingFilter()
@@ -100,7 +101,12 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         print(f"Error: input directory does not exist: {input_dir}", file=sys.stderr)
         return 1
 
-    setup_logging(output_dir, args.verbose)
+    space = workspace.Workspace(output_dir)
+    moved = workspace.migrate(output_dir)
+    space.create()
+    setup_logging(space.internal, args.verbose)
+    if moved:
+        print(f"Tidied {len(moved)} item(s) from an earlier run into {workspace.INTERNAL}/")
     language = i18n.normalise(args.lang)
 
     semantic = resolve_semantic(args)
@@ -162,7 +168,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     if result.cancelled:
         print("Run cancelled; partial results follow.")
 
-    store = overrides_module.OverrideStore(output_dir / overrides_module.OVERRIDES_NAME)
+    store = overrides_module.OverrideStore(space.internal / overrides_module.OVERRIDES_NAME)
     applied = overrides_module.apply_to(result.records, store)
     if applied:
         print(f"Applied {applied} manual override(s).")
@@ -176,11 +182,11 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             if _still_trash(op.asset_id, result.records)
         ]
         overrides_module.resolve_observations(
-            result.records, store, output_dir / "model_monitoring.json"
+            result.records, store, space.internal / "model_monitoring.json"
         )
 
-    _write_outputs(result, output_dir, language)
-    print(reports.format_summary(result.summary, language))
+    _write_outputs(result, space, language)
+    print(reports.format_summary(result.summary, language, expert=args.expert))
 
     if result.planned_operations:
         print()
@@ -194,14 +200,47 @@ def _still_trash(asset_id: str, records: list[AssetRecord]) -> bool:
     return record is not None and record.route_class == RouteClass.TRASH.value
 
 
-def _write_outputs(result: pipeline.RunResult, output_dir: Path, language: str) -> None:
-    reports_dir = output_dir / "reports"
+def _write_outputs(result: pipeline.RunResult, space: workspace.Workspace, language: str) -> None:
+    """The two pages a person opens, the five folders, and everything else hidden.
+
+    Order matters in one place: the edit recipes are written before the report,
+    because the report says which photographs have one.
+    """
+    import insights as insights_module
+    import recipe_export
+    import simple_report
+
+    space.create()
+    reports_dir = space.reports
+
+    recipes = recipe_export.export_all(
+        result.records, result.measurements, space.recipes, language=language
+    )
+    counts = workspace.build_category_farm(result.records, space)
+
+    simple_report.write(
+        result.records,
+        space.report,
+        language=language,
+        insights_link=workspace.INSIGHTS_NAME,
+    )
+    collection = insights_module.build(result.records, result.measurements)
+    insights_module.write(
+        collection, space.insights, language=language, report_link=workspace.REPORT_NAME
+    )
+
+    # Everything below is the same data as before, written where it was always
+    # written -- just no longer at the root. `report`, `reclassify`, `quarantine`
+    # and `restore` all read from here.
     reports.write_json(result.records, reports_dir / "analysis.json", summary=result.summary)
     reports.write_csv(result.records, reports_dir / "analysis.csv")
-    reports.write_html(result.records, reports_dir / "report.html", summary=result.summary, language=language)
+    reports.write_html(
+        result.records, reports_dir / "full_report.html", summary=result.summary, language=language
+    )
+    reports.write_json_atomic(collection.to_dict(), reports_dir / "insights.json")
 
     layout.write_record_manifest(result.records, reports_dir)
-    counts = layout.build_class_farm(result.records, output_dir)
+    layout.build_class_farm(result.records, space.routing_views)
     trash = layout.write_record_delete_candidates(result.records, reports_dir)
 
     previews = [
@@ -209,22 +248,26 @@ def _write_outputs(result: pipeline.RunResult, output_dir: Path, language: str) 
         for r in result.records
         if r.route_class == RouteClass.TRASH.value and r.preview_path and Path(r.preview_path).exists()
     ]
-    sheet = layout.build_contact_sheet(previews, reports_dir / "contact_sheet_delete.jpg")
-
-    comparison = layout.build_comparison_sheet(
+    layout.build_contact_sheet(previews, reports_dir / "contact_sheet_delete.jpg")
+    layout.build_comparison_sheet(
         _comparison_rows(result.records, language),
         reports_dir / "contact_sheet_duplicates.jpg",
         language=language,
         semantic_ran=result.semantic_completed,
     )
 
-    print(f"\nReports written to {reports_dir}")
-    print("  symlink farm: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
-    print(f"  delete candidates: {trash['count']} (list + delete.sh, nothing removed)")
-    if sheet:
-        print(f"  contact sheet: {sheet}")
-    if comparison:
-        print(f"  duplicate comparison sheet: {comparison}")
+    print()
+    print(f"  {space.report}")
+    print(f"  {space.insights}")
+    print("  " + ", ".join(f"{name}/ {n}" for name, n in _folder_counts(counts).items()))
+    if recipes["written"]:
+        print(f"  {workspace.RECIPES}/ {len(recipes['written'])} edit recipe(s)")
+    if trash["count"]:
+        print(f"  {trash['count']} file(s) proposed for removal (nothing has been moved)")
+
+
+def _folder_counts(counts: dict[str, int]) -> dict[str, int]:
+    return {workspace.CATEGORY_DIRS[k]: v for k, v in counts.items()}
 
 
 # --- report -----------------------------------------------------------------
@@ -886,6 +929,11 @@ def build_parser() -> argparse.ArgumentParser:
             f"semantic model; overrides {bootstrap.MODEL_VAR}, which overrides the default "
             f"({bootstrap.DEFAULT_SEMANTIC_MODEL})"
         ),
+    )
+    analyze.add_argument(
+        "--expert",
+        action="store_true",
+        help="print the route classes, stock counters and release status as well",
     )
     analyze.add_argument("--no-video", action="store_true")
     analyze.add_argument("--video-samples", type=int, default=9)
