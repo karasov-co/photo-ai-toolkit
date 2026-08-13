@@ -662,7 +662,7 @@ def run_cli(archive, tmp_path, client, monkeypatch):
 
     monkeypatch.setattr(
         preflight, "run",
-        lambda model, client=None: preflight.PreflightResult(ok=True, model=model),
+        lambda model, **kwargs: preflight.PreflightResult(ok=True, model=model),
     )
     assert cli.main(["analyze", "--input", str(archive), "--output", str(tmp_path / "out")]) == 0
 

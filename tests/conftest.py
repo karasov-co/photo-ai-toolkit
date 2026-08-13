@@ -127,7 +127,7 @@ def passing_preflight(monkeypatch):
     """
     import preflight
 
-    def ok(model, *, client=None):
+    def ok(model, **kwargs):
         result = preflight.PreflightResult(ok=True, model=model)
         result.checks = [
             preflight.Check(name, passed=True, detail="verified")
