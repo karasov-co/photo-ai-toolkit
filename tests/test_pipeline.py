@@ -126,9 +126,11 @@ def test_an_empty_directory_produces_an_empty_run(tmp_path):
 def test_progress_is_reported_as_the_run_goes(options):
     """Results have to appear while the run is still going."""
     seen = []
-    run(options, progress=lambda name, i, total: seen.append((name, i, total)))
+    run(options, progress=lambda name, i, total, reused=False: seen.append((name, i, total, reused)))
     assert len(seen) == 5
     assert seen[0][1] == 1 and seen[-1][2] == 5
+    # Nothing was in store on a first run, so nothing is reported as reused.
+    assert not any(row[3] for row in seen)
 
 
 def test_a_run_can_be_cancelled_partway(options):
@@ -365,7 +367,7 @@ def test_trash_survives_a_generous_profile(options, tmp_path):
 
 def test_the_analyze_command_writes_every_report(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    assert cli.main(["analyze", "--input", str(archive), "--output", str(out)]) == 0
+    assert cli.main(["measure", "--input", str(archive), "--output", str(out)]) == 0
 
     assert (out / ".internal" / "reports" / "analysis.json").exists()
     assert (out / ".internal" / "reports" / "analysis.csv").exists()
@@ -387,7 +389,7 @@ def test_the_delete_script_contains_no_filenames_at_all(archive, tmp_path):
     to run by hand.
     """
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     script = (out / ".internal" / "reports" / "delete.sh").read_text(encoding="utf-8")
 
     assert "rm -" not in script and "rm " not in script
@@ -457,7 +459,7 @@ def test_the_trash_command_is_a_dry_run_by_default(tmp_path, capsys):
 
 def test_the_analyze_command_builds_a_symlink_farm_without_copying(archive, tmp_path):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     links = [p for p in out.rglob("*.jpg") if p.is_symlink()]
     assert links
     assert all(p.resolve().parent == archive.resolve() for p in links)
@@ -465,17 +467,17 @@ def test_the_analyze_command_builds_a_symlink_farm_without_copying(archive, tmp_
 
 def test_the_analyze_command_moves_nothing(archive, tmp_path):
     before = sorted(p.name for p in archive.iterdir())
-    cli.main(["analyze", "--input", str(archive), "--output", str(tmp_path / "out")])
+    cli.main(["measure", "--input", str(archive), "--output", str(tmp_path / "out")])
     assert sorted(p.name for p in archive.iterdir()) == before
 
 
 def test_a_missing_input_directory_is_an_error(tmp_path, capsys):
-    assert cli.main(["analyze", "--input", str(tmp_path / "nope"), "--output", str(tmp_path / "o")]) == 1
+    assert cli.main(["measure", "--input", str(tmp_path / "nope"), "--output", str(tmp_path / "o")]) == 1
 
 
 def test_the_report_command_filters(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
 
     analysis = str(out / ".internal" / "reports" / "analysis.json")
@@ -487,7 +489,7 @@ def test_the_report_command_filters(archive, tmp_path, capsys):
 
 def test_the_report_command_renders_russian(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
     cli.main(["--lang", "ru", "report", "--analysis", str(out / ".internal" / "reports" / "analysis.json")])
     assert "СВОДКА" in capsys.readouterr().out
@@ -495,7 +497,7 @@ def test_the_report_command_renders_russian(archive, tmp_path, capsys):
 
 def test_the_quarantine_command_is_a_dry_run_by_default(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
 
     cli.main([
@@ -512,7 +514,7 @@ def test_the_quarantine_command_is_a_dry_run_by_default(archive, tmp_path, capsy
 def test_the_quarantine_and_restore_round_trip(archive, tmp_path, capsys):
     out = tmp_path / "out"
     bin_dir = tmp_path / "bin"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     analysis = str(out / ".internal" / "reports" / "analysis.json")
 
     cli.main(["quarantine", "--analysis", analysis, "--quarantine", str(bin_dir),
@@ -532,14 +534,14 @@ def test_the_purge_command_refuses_without_the_typed_phrase(tmp_path, capsys):
 
 def test_an_override_recorded_by_the_cli_is_respected_by_the_next_run(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     analysis = str(out / ".internal" / "reports" / "analysis.json")
 
     cli.main(["override", "--analysis", analysis, "lens_cap.jpg",
               "--set-class", "review", "--note", "keep it"])
     capsys.readouterr()
 
-    cli.main(["analyze", "--input", str(archive), "--output", str(out), "--force"])
+    cli.main(["measure", "--input", str(archive), "--output", str(out), "--force"])
     assert "Applied 1 manual override" in capsys.readouterr().out
 
     rows, _ = pipeline.reports.read_json(pipeline.Path(analysis))
@@ -549,12 +551,12 @@ def test_an_override_recorded_by_the_cli_is_respected_by_the_next_run(archive, t
 
 def test_a_rescued_file_disappears_from_the_quarantine_plan(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     analysis = str(out / ".internal" / "reports" / "analysis.json")
     cli.main(["override", "--analysis", analysis, "lens_cap.jpg", "--set-class", "review"])
     capsys.readouterr()
 
-    cli.main(["analyze", "--input", str(archive), "--output", str(out), "--force"])
+    cli.main(["measure", "--input", str(archive), "--output", str(out), "--force"])
     printed = capsys.readouterr().out
 
     # A genuinely blurred frame legitimately stays in the plan; the point is
@@ -572,7 +574,7 @@ def test_the_profiles_command_lists_the_built_ins(capsys):
 
 def test_the_reclassify_command_says_nothing_was_spent(archive, tmp_path, capsys):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     capsys.readouterr()
     cli.main(["reclassify", "--analysis", str(out / ".internal" / "reports" / "analysis.json")])
     assert "no tokens were spent" in capsys.readouterr().out

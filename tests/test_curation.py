@@ -138,14 +138,26 @@ def test_3_a_strong_landscape_reaches_top(profile):
     assert verdict.final_score >= curation.DEFAULT_THRESHOLDS.top
 
 
-def test_4_an_inferior_duplicate_is_weak(profile):
-    verdict = judge(
+def test_4_losing_to_a_sibling_does_not_decide_a_category(profile):
+    """Superseded by a later requirement, and the reversal was right.
+
+    This used to assert that the weaker of two near-identical takes became
+    WEAK. That made a photograph's category depend on what else was in the
+    folder: import a sharper frame of the same scene and an unchanged picture
+    turned from good to weak; delete it again and it turned back. Being the
+    second-best of a pair is a fact about the pair.
+
+    It is still reported -- as `duplicate_candidate` on the route class, which
+    is a comparison for a person -- and it no longer touches the score.
+    """
+    alone = judge(profile, sem=semantic(axis_a=60, axis_b=55), art=artistic())
+    beaten = judge(
         profile, best=False, margin=14, cluster=3,
-        sem=semantic(axis_a=60, axis_b=55),
-        art=artistic(),
+        sem=semantic(axis_a=60, axis_b=55), art=artistic(),
     )
-    assert verdict.category == PhotoCategory.WEAK.value
-    assert "sharper frame" in verdict.reasons[0]
+    assert beaten.final_score == alone.final_score
+    assert beaten.category == alone.category
+    assert not any(d["code"] == "inferior_duplicate" for d in beaten.score.defects)
 
 
 def test_5_a_good_portrait_without_a_release_is_personal_not_weak(profile):
@@ -402,9 +414,9 @@ def test_limited_demand_is_a_commercial_fact_not_a_quality_one(profile):
 
 def test_an_uncertain_read_on_the_keep_boundary_asks_a_person(profile):
     verdict = judge(
-        profile, tech=44, uplift=1,
-        sem=semantic(axis_a=42, axis_b=44, axis_c=40, subject_strength=40),
-        art=flat(40, artistic_confidence=70, uncertainty=85),
+        profile, tech=50, uplift=2,
+        sem=semantic(axis_a=50, axis_b=50, axis_c=45, subject_strength=50),
+        art=flat(46, artistic_confidence=70, uncertainty=85),
     )
     assert verdict.category == PhotoCategory.NEEDS_DECISION.value
     assert abs(verdict.final_score - curation.DEFAULT_THRESHOLDS.weak) <= (
@@ -434,21 +446,21 @@ def test_top_or_merely_good_is_not_a_question_for_a_person(profile):
 
 def test_a_confident_read_on_the_boundary_does_not(profile):
     verdict = judge(
-        profile, tech=44, uplift=1,
-        sem=semantic(axis_a=42, axis_b=44, axis_c=40, subject_strength=40),
-        art=flat(40, artistic_confidence=75, uncertainty=10),
+        profile, tech=50, uplift=2,
+        sem=semantic(axis_a=50, axis_b=50, axis_c=45, subject_strength=50),
+        art=flat(46, artistic_confidence=75, uncertainty=10),
     )
     assert verdict.category != PhotoCategory.NEEDS_DECISION.value
 
 
 def test_an_unclear_expression_on_the_boundary_asks_a_person(profile):
     verdict = judge(
-        profile, tech=42, uplift=1,
-        sem=semantic(genre="portrait", faces=True, axis_a=42, axis_b=44, subject_strength=38),
+        profile, tech=50, uplift=2,
+        sem=semantic(genre="portrait", faces=True, axis_a=50, axis_b=50, subject_strength=50),
         art=flat(
-            40, artistic_confidence=70, uncertainty=30,
-            portrait=face(expression="UNCLEAR", expression_confidence=25, expression_quality=44,
-                          portrait_publishability=44, pose_quality=44, face_sharpness=44),
+            46, artistic_confidence=70, uncertainty=30,
+            portrait=face(expression="UNCLEAR", expression_confidence=25, expression_quality=46,
+                          portrait_publishability=52, pose_quality=46, face_sharpness=46),
         ),
     )
     assert verdict.category == PhotoCategory.NEEDS_DECISION.value
@@ -474,10 +486,11 @@ def test_weak_is_a_shelf_and_not_a_bin(profile):
     Worth asserting rather than assuming, because the cheapest way to make a
     culling tool look decisive is to wire a low score to a delete list.
     """
-    verdict = judge(
-        profile, best=False, margin=20, cluster=4, sem=semantic(), art=artistic()
-    )
+    found = IssueSet()
+    found.add(IssueCode.MISSED_FOCUS, "the subject is not in focus")
+    verdict = judge(profile, tech=40, sem=semantic(), art=artistic(), issues=found)
     assert verdict.category == PhotoCategory.WEAK.value
+
     inp = scoring.ScoreInput(
         asset_id="a", filename="frame.jpg", technical_quality=82, uplift=6,
         is_raw=True, semantic=semantic(), artistic=artistic(), is_best_in_cluster=False,
@@ -594,6 +607,13 @@ def run_cli(archive, tmp_path, client, monkeypatch):
     monkeypatch.setattr(pipeline, "run", lambda o, **kw: real(o, **{**kw, "client": client}))
     monkeypatch.setattr("bootstrap.has_credentials", lambda: True)
     monkeypatch.setattr("bootstrap.credential_status", lambda lang="en": "credentials: stubbed")
+
+    import preflight
+
+    monkeypatch.setattr(
+        preflight, "run",
+        lambda model, client=None: preflight.PreflightResult(ok=True, model=model),
+    )
     assert cli.main(["analyze", "--input", str(archive), "--output", str(tmp_path / "out")]) == 0
 
 
@@ -698,27 +718,26 @@ def test_the_farm_has_a_category_view(archive, tmp_path, monkeypatch):
     assert linked == 3
 
 
-def test_the_vision_passes_are_on_by_default_when_a_key_exists(monkeypatch):
-    import argparse
+def test_analyze_is_always_a_full_analysis():
+    """There is no longer a flag that turns `analyze` into a local-only run.
 
-    import bootstrap
+    A downgrade that keeps the command name is how a run with no content check
+    and no artistic read came to be presented as a finished analysis.
+    """
     import cli
 
-    args = argparse.Namespace(semantic=False, no_semantic=False)
-    monkeypatch.setattr(bootstrap, "has_credentials", lambda: True)
-    assert cli.resolve_semantic(args) is True
-    monkeypatch.setattr(bootstrap, "has_credentials", lambda: False)
-    assert cli.resolve_semantic(args) is False
+    parser = cli.build_parser()
+    analyze = parser.parse_args(["analyze", "--input", "i", "--output", "o"])
+    assert not hasattr(analyze, "no_semantic")
+    assert not hasattr(analyze, "allow_semantic_fallback")
+    assert not hasattr(analyze, "semantic")
 
 
-def test_no_semantic_is_honoured_even_with_a_key(monkeypatch):
-    import argparse
-
-    import bootstrap
+def test_local_only_lives_under_its_own_command():
     import cli
 
-    monkeypatch.setattr(bootstrap, "has_credentials", lambda: True)
-    assert cli.resolve_semantic(argparse.Namespace(semantic=False, no_semantic=True)) is False
+    args = cli.build_parser().parse_args(["measure", "--input", "i", "--output", "o"])
+    assert args.func is cli.cmd_measure
 
 
 def test_the_suite_cannot_reach_the_real_env_file():

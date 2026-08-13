@@ -19,8 +19,33 @@ It never moves, changes or deletes a single original file.
 ```bash
 pip install -r requirements.txt
 cp .env.example .env          # put your OpenAI key in it, once
-python cli.py analyze --input ~/Pictures/japan --output ./run
+python3 cli.py analyze --input ./photos --output ./run
 ```
+
+That is the whole command. There are no flags to remember and no modes to
+choose: `analyze` means the full analysis — local measurement, the content
+check, and the artistic read — and it either does all of it or it does none of
+it.
+
+**Your model access is verified before a single photograph is opened.** The run
+starts by sending one 16×16 test image and checking the answer:
+
+```
+LLM preflight
+  Provider: OpenAI
+  Model: gpt-5.6-sol
+  Authentication: verified
+  Model access: verified
+  Vision input: verified
+  Responses API: verified
+```
+
+If any line fails, the run stops immediately, tells you exactly what to fix, and
+**nothing is touched** — no photograph is decoded, no preview is written, no
+output directory is created or reorganised, and a previous report stays exactly
+where it was. This is not a small thing: a run once discovered 299 photographs,
+decoded and measured all of them, reorganised the output folder, and only then
+found out the model name was wrong.
 
 Then open `run/report.html`.
 
@@ -44,15 +69,13 @@ COLLECTION SUMMARY
 
   Duplicate clusters                                8
 
-  Strongest assets:
-    [ 75] P1019399.JPG
-    [ 72] P1019412.JPG
-    [ 71] P1019389.JPG
-    [ 70] P1019396.JPG
-
-  These are suggestions, not verdicts -- a score is one opinion
-  about a photograph. Nothing has been moved, changed or deleted:
-  the folders hold links to your original files.
+Run
+  New assets analysed:      47
+  Unchanged reused:          0
+  LLM calls:                 9  (stage2 4, stage3 5)
+  Content check completed:  47
+  Artistic read completed:  47
+  Report:                   ./run/report.html
 ==================================================================
 ```
 
@@ -69,11 +92,39 @@ run/
   .internal/                   everything the tool keeps for itself
 ```
 
-The five folders hold **shortcuts to your originals**, not copies. Delete the
-whole `run/` directory and your photographs are exactly where they were.
+### Adding more photographs later
 
-No API key? It still runs — measuring, clustering and ranking locally — and says
-plainly what that costs you.
+Point the same command at the same output directory. Only what is new gets
+analysed:
+
+```
+Assets discovered: 299
+  New: 252
+  Reused: 47
+
+Analyzing new assets:
+  [   1] P1020104.JPG
+  ...
+```
+
+The 47 unchanged photographs are **not** re-sent to the model, and their scores,
+categories and explanations do not move by a single point. A photograph's
+quality is a property of that photograph, not of what happens to be in the
+folder beside it — so importing a new shoot cannot promote, demote or re-rank
+anything you looked at last week.
+
+`photographer_insights.html` then describes **the 252 you just added**, not the
+whole archive again. Use `--insights-scope all` when you want the long view.
+
+### If something goes wrong
+
+A failed run cannot damage a good one. Everything is written to a staging
+directory, validated, and swapped into place only once it is complete. If the
+model becomes unavailable halfway through, the previous report, the previous
+category folders and the previous recipes are exactly as they were.
+
+The originals are never touched under any circumstance — analysis does not
+move, rename, modify or delete a single file you photographed.
 
 ---
 
@@ -275,7 +326,7 @@ failed on a real archive:
   script: a filename containing a quote character was enough to inject commands
   into the first version.
 
-**1,316 tests**, no network, no API key: `conftest.py` turns any outbound socket
+**1,357 tests**, no network, no API key: `conftest.py` turns any outbound socket
 into a loud failure and redirects the project root so the suite cannot read a
 real `.env`. Every fixture image is generated.
 
@@ -435,9 +486,8 @@ rule that matters most here, because the failure it replaces was silent — the
 artistic fields were `null` in every report while `flagship` was being assigned
 from three technical axes alone.
 
-The vision passes run by default. `--no-semantic` turns them off; `--semantic`
-makes a missing key an error rather than a downgrade; with no key at all the run
-says what it is skipping and continues locally.
+The vision passes are not optional in `analyze`, and their availability is
+verified before any photograph is opened.
 
 The read is bounded, not universal. It runs on every keep and hero candidate, on
 anything with a face, and on frames whose defect might be deliberate — a
@@ -522,7 +572,8 @@ python cli.py purge --quarantine ./quarantine \
 
 | Command | What it does |
 |---|---|
-| `analyze` | Measure, score, route, write reports and a plan |
+| `analyze` | **The command.** Preflight, measure, content check, artistic read, report |
+| `measure` | Developer tool: local measurement only, explicitly not an analysis |
 | `report` | Filter, sort and re-render a stored run |
 | `reclassify` | Redo routing with different thresholds — no re-analysis, no tokens |
 | `quarantine` | Carry out a plan (dry run unless `--apply`) |
@@ -539,8 +590,9 @@ python cli.py purge --quarantine ./quarantine \
 | `monitor` | False-trash rate, drift, calibration; can switch automation off |
 | `trash` | Carry out `delete_plan.json` in Python (dry run unless `--apply`) |
 
-`analyze` takes `--expert` to print the route classes, the two stock counters
-and release status alongside the five piles. They answer a stock seller's
+`analyze` takes `--insights-scope all` to describe the whole archive rather than
+just this batch, and `--expert` to print the route classes, the two stock
+counters and release status alongside the five piles. They answer a stock seller's
 questions rather than a photographer's, which is why they are no longer in the
 default summary — nothing was removed, and all of it is still in
 `.internal/reports/analysis.json`.
@@ -692,7 +744,7 @@ the application loads the file itself, from the project root, no matter which
 directory you run it from:
 
 ```bash
-python cli.py --lang ru analyze --input ./photos --output ./run --semantic
+python3 cli.py --lang ru analyze --input ./photos --output ./run
 ```
 
 `.env` is in `.gitignore` and is never committed. `.env.example` holds only a
@@ -707,7 +759,7 @@ In order, highest priority first:
 3. `<current directory>/.env`, if that is a different directory
 
 A variable exported in your shell always wins — `.env` never overrides it. Every
-run with `--semantic` prints where the credential came from, and never the key:
+run prints where the credential came from, and never the key:
 
 ```
 Semantic credentials: loaded from /path/to/photo-ai-toolkit/.env
@@ -722,55 +774,41 @@ report.
 
 ---
 
-## Two modes, and the difference matters
+## The model, and why there is no fallback
 
-| Mode | When it runs | What you get |
-|---|---|---|
-| **local + semantic** (default, needs a key) | Whenever `OPENAI_API_KEY` is set | Everything: content, faces, genre, the artistic read, the top pile |
-| **local-only** | No key, or `--no-semantic` | Technical measurement, edit potential, duplicate clustering. **Genre is `unknown`, and nothing can reach the top pile** |
+`gpt-5.6-sol`, verified against your key before any work starts. Configurable
+via `--model` or `OPENAI_MODEL`, and **never substituted**: if the configured
+model is unavailable the run stops and tells you so.
 
-The vision passes are on by default because they *are* the analysis: without
-them every artistic field is empty, no photograph can be ranked as a top one,
-and the subject of each frame is unknown. A run without a key says exactly that,
-in those words, rather than presenting a weaker result as a finished one.
+That is deliberate, and it is the one place this tool refuses to be helpful. An
+older model would produce a report that looks identical and means something
+different — the artistic read is the whole product, and it does not survive a
+model generation. Silently downgrading would hand you a worse analysis under
+the name of the one you asked for, and you would have no way to tell.
 
-- `--semantic` makes a missing key an **error** instead of a downgrade.
-- `--no-semantic` turns them off deliberately.
-- `--no-stage3` keeps the content check and skips the artistic read.
+So there is no automatic fallback, no legacy family in any code path, and no
+error message that suggests one. If your key lacks access, the fix is to the
+account, and the tool says exactly that.
 
-**What is sent to the API:** 512px JPEG previews, in groups of twelve, plus the
-measured clipping figures. No original file is uploaded. No video frames are
-sent. **This costs money** — a few cents per hundred photographs, and the
-run prints where your credential came from (never the key itself).
+**What is sent:** 512px JPEG previews, in groups of twelve, plus the measured
+clipping figures. No original file is uploaded. No video frames are sent. The
+preflight sends a generated 16×16 test image and never one of your photographs.
 
-### When the semantic pass fails
+**What it costs:** a few cents per hundred photographs, and only for the ones
+that are new. The run prints the number of calls it made.
 
-It **fails fast**. If `--semantic` was asked for and the key is missing, the run
-stops with a non-zero exit code *before any photograph is decoded* — it does not
-spend minutes measuring files and then present a local-only result as a finished
-analysis.
-
-If the key exists but the API rejects it, the model is unavailable, or the reply
-is unusable, the run also stops. To accept a local-only result instead, ask for
-it explicitly:
+### `measure`: local only, for developers
 
 ```bash
-python cli.py analyze --input ./photos --output ./run --semantic --allow-semantic-fallback
+python3 cli.py measure --input ./photos --output ./run
 ```
 
-That report is stamped `NOBODY LOOKED AT THESE PHOTOGRAPHS` in the console and
-at the top of the HTML, and every record carries
-`analysis_mode=local_only_after_semantic_failure`.
-
-If a single group of twelve comes back unusable, only that group is affected —
-and the summary says how many files went unchecked rather than reporting the
-run as complete.
-
-### Re-running after adding a key
-
-Just run the same command again. Local measurements come from the cache; the
-vision passes run. `--force` is not needed, and a local-only cache entry can
-never be mistaken for a semantic result.
+Decoding, technical metrics, the edit-potential search and duplicate clustering,
+with no API key and no network. It exists because the deterministic half of the
+pipeline is genuinely useful for debugging, and it announces in its own output
+that it is **not a photo analysis**: no content check, no artistic read, and
+nothing can be ranked as a top photograph. It is not `analyze`, and it never
+produces a report that claims to be one.
 
 ---
 
@@ -779,11 +817,8 @@ never be mistaken for a semantic result.
 `analyze` only ever writes reports, symlinks and proposals. Moving files is a
 separate command, and it is a dry run unless you pass `--apply`.
 
-**The tool still works completely offline.** With `--no-semantic` — or simply
-with no key — it decodes, measures, searches for edit potential, clusters
-duplicates and ranks everything, making no network calls at all; a culling tool
-that cannot run without a network is not a culling tool. What you lose is the
-content and artistic passes, which the summary states rather than hides.
+**The deterministic half still runs offline**, under `measure`, for development
+and debugging. It is not `analyze` and does not claim to be an analysis.
 
 
 
@@ -810,7 +845,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 1316 tests, no network, no API key
+pytest          # 1357 tests, no network, no API key
 ruff check .
 ```
 

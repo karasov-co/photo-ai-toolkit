@@ -67,6 +67,11 @@ def stage1_user_content(encoded_jpeg: str) -> list[dict]:
 
 GROUP_SIZE = 12
 
+# Bumped whenever the Stage 2 prompt changes meaning. Part of the cache key, so
+# a reworded question invalidates exactly the answers whose meaning moved and
+# nothing else.
+STAGE2_PROMPT_VERSION = "stage2-2026-08-13"
+
 STAGE2_SYSTEM = """You are ranking photographs for a working stock and editorial archive.
 
 WHAT YOU ARE JUDGING

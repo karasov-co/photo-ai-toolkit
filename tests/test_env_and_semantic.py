@@ -143,7 +143,7 @@ def test_the_missing_status_says_so_in_both_languages():
     assert "не найден" in bootstrap.credential_status("ru")
 
 
-# --- C. --semantic with no key: fail before decoding anything ----------------
+# --- C. no key: fail before decoding anything -------------------------------
 
 
 def test_semantic_without_a_key_fails_before_any_file_is_opened(archive, tmp_path, monkeypatch):
@@ -169,19 +169,22 @@ def test_semantic_without_a_key_fails_before_any_file_is_opened(archive, tmp_pat
 def test_the_cli_exits_non_zero_and_explains(archive, tmp_path, capsys):
     code = cli.main(
         ["--lang", "ru", "analyze", "--input", str(archive),
-         "--output", str(tmp_path / "out"), "--semantic"]
+         "--output", str(tmp_path / "out")]
     )
     captured = capsys.readouterr()
 
     assert code != 0
     assert "OPENAI_API_KEY" in captured.err
-    assert "OPENAI_API_KEY=your_key_here" in captured.err
-    assert "Ошибка" in captured.err
+    assert ".env" in captured.err
+    # No photograph was opened to learn this, and nothing was suggested as a
+    # way around it.
+    assert "No photograph was opened" in captured.err
+    assert "fallback" not in captured.err.lower()
 
 
 def test_no_report_is_written_when_credentials_are_missing(archive, tmp_path):
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out), "--semantic"])
+    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
     assert not (out / ".internal" / "reports" / "analysis.json").exists()
 
 
@@ -201,13 +204,13 @@ def test_no_api_call_is_attempted_without_a_key(archive, tmp_path, monkeypatch):
 def test_the_error_message_carries_no_credential(archive, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv(bootstrap.API_KEY_VAR, "")
     cli.main(
-        ["analyze", "--input", str(archive), "--output", str(tmp_path / "o"), "--semantic"]
+        ["analyze", "--input", str(archive), "--output", str(tmp_path / "o")]
     )
     captured = capsys.readouterr()
     assert FAKE_KEY not in captured.err + captured.out
 
 
-# --- D. --semantic with a key from .env: the client is used ------------------
+# --- D. a key from .env: the client is used ----------------------------------
 
 
 class FakeResponse:
@@ -312,13 +315,15 @@ def test_the_cli_reports_a_semantic_failure_with_a_non_zero_code(archive, tmp_pa
 
     code = cli.main(
         ["--lang", "ru", "analyze", "--input", str(archive),
-         "--output", str(tmp_path / "out"), "--semantic"]
+         "--output", str(tmp_path / "out")]
     )
     captured = capsys.readouterr()
 
     assert code != 0
-    assert "Ошибка" in captured.err
-    assert "--allow-semantic-fallback" in captured.err
+    assert "key" in captured.err.lower()
+    # The old behaviour pointed at --allow-semantic-fallback here, which is a
+    # way of accepting a result that is not the one that was asked for.
+    assert "fallback" not in captured.err.lower()
 
 
 @pytest.mark.parametrize(

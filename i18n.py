@@ -88,6 +88,11 @@ STRINGS: dict[str, dict[str, str]] = {
             "Patterns across all {total} photographs. Every line below names the number "
             "and the files it came from -- nothing here is general advice."
         ),
+        "insights.lede_new": (
+            "Insights based on {total} newly analyzed photographs. The other "
+            "{stored} in this collection were analysed before and are unchanged; "
+            "run with --insights-scope all to include them."
+        ),
         "insights.back": "Back to the photographs",
         "insights.genres": "What you shoot best",
         "insights.genres_lead": "Ranked by how well each did, not by how many you took: {genres}",
@@ -350,6 +355,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "insights.lede": (
             "Закономерности по всем {total} фотографиям. Каждая строка ниже называет "
             "число и файлы, из которых оно получено, — общих советов здесь нет."
+        ),
+        "insights.lede_new": (
+            "Выводы по {total} новым фотографиям. Остальные {stored} в этой "
+            "коллекции анализировались раньше и не менялись; чтобы учесть и их, "
+            "запустите с --insights-scope all."
         ),
         "insights.back": "Назад к фотографиям",
         "insights.genres": "Что у вас получается лучше всего",

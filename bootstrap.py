@@ -43,10 +43,44 @@ PROJECT_ENV = PROJECT_ROOT / ".env"
 API_KEY_VAR = "OPENAI_API_KEY"
 MODEL_VAR = "OPENAI_MODEL"
 
-# The documented default. Overridable precisely because a model available to one
-# account is not available to another, and a hard-coded name that returns 404 is
-# indistinguishable to the user from a broken tool.
+# The model this toolkit runs on. One name, defined once, used by Stage 2 and
+# Stage 3 alike, and verified against the account before any photograph is
+# opened.
+#
+# It is overridable, because a model available to one account is not available
+# to another. It is never *substituted*: if the configured model is unavailable
+# the run stops and says so. Quietly dropping to an older family would change
+# every judgement in the report while the report went on claiming to be the
+# analysis that was asked for -- the artistic read in particular is the whole
+# product, and it is not portable across model generations.
 DEFAULT_SEMANTIC_MODEL = "gpt-5.6-sol"
+
+# Families this toolkit will not fall back to, and will not name as a
+# workaround. Listed so a test can assert their absence from the fallback paths
+# rather than trusting that nobody adds one back.
+LEGACY_MODEL_PREFIXES = (
+    "gpt-4",
+    "gpt-4o",
+    "gpt-4.1",
+    "gpt-3",
+    "gpt-5-",
+    "chatgpt-4o",
+    "o1",
+    "o3",
+)
+
+
+def is_legacy_model(name: str) -> bool:
+    """Whether a name belongs to a superseded family.
+
+    Used to refuse a *silent* substitution, never to block an operator who has
+    typed one deliberately: `--model` is an explicit instruction from somebody
+    who can see what they asked for, and second-guessing that would be its own
+    kind of dishonesty. What it must never be is a default, a fallback, or a
+    suggestion in an error message.
+    """
+    lowered = str(name or "").strip().lower()
+    return any(lowered.startswith(prefix) for prefix in LEGACY_MODEL_PREFIXES)
 
 _loaded_from: Path | None = None
 _load_attempted = False
@@ -180,7 +214,9 @@ def resolve_model(cli_model: str | None = None) -> str:
     """CLI, then `OPENAI_MODEL`, then the documented default.
 
     The precedence is fixed here rather than at each call site so that the CLI
-    help, the README and the behaviour cannot drift apart.
+    help, the README and the behaviour cannot drift apart. There is no fourth
+    step: if the resolved model does not work, the run stops rather than trying
+    a different one.
     """
     if cli_model:
         return cli_model

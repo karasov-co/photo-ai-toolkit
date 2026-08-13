@@ -115,3 +115,25 @@ def sample_record():
         "status": "ok",
         "error_message": None,
     }
+
+
+@pytest.fixture
+def passing_preflight(monkeypatch):
+    """Let a test past the model check without a key or a network.
+
+    The check itself is exercised directly in `test_preflight.py`. Everywhere
+    else it is a gate to get through, and stubbing it here keeps that gate from
+    being quietly disabled in the code to make tests pass.
+    """
+    import preflight
+
+    def ok(model, *, client=None):
+        result = preflight.PreflightResult(ok=True, model=model)
+        result.checks = [
+            preflight.Check(name, passed=True, detail="verified")
+            for name in ("Authentication", "Model access", "Vision input", "Responses API")
+        ]
+        return result
+
+    monkeypatch.setattr(preflight, "run", ok)
+    return ok

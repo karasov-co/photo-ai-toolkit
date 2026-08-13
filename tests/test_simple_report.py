@@ -487,7 +487,7 @@ def test_the_default_run_produces_the_simplified_tree(archive, tmp_path):
     import cli
 
     out = tmp_path / "out"
-    assert cli.main(["analyze", "--input", str(archive), "--output", str(out)]) == 0
+    assert cli.main(["measure", "--input", str(archive), "--output", str(out)]) == 0
 
     assert (out / "report.html").exists()
     assert (out / "photographer_insights.html").exists()
@@ -502,7 +502,7 @@ def test_the_default_report_has_no_legal_or_routing_vocabulary(archive, tmp_path
     import cli
 
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     page = (out / "report.html").read_text().lower()
 
     body = page.split("<details", 1)[0]
@@ -514,7 +514,7 @@ def test_every_photograph_is_filed_in_exactly_one_category(archive, tmp_path):
     import cli
 
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
 
     filed = [
         entry.name
@@ -529,7 +529,7 @@ def test_the_run_leaves_the_originals_untouched(archive, tmp_path):
     import cli
 
     before = {p.name: p.read_bytes() for p in archive.iterdir()}
-    cli.main(["analyze", "--input", str(archive), "--output", str(tmp_path / "out")])
+    cli.main(["measure", "--input", str(archive), "--output", str(tmp_path / "out")])
     after = {p.name: p.read_bytes() for p in archive.iterdir()}
     assert before == after
     assert not list(archive.glob("*.xmp"))
@@ -539,7 +539,7 @@ def test_the_categories_and_the_report_agree(archive, tmp_path):
     import cli
 
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     rows, _ = __import__("reports").read_json(out / ".internal" / "reports" / "analysis.json")
 
     for row in rows:
@@ -554,7 +554,7 @@ def test_a_second_run_over_an_old_layout_tidies_it(archive, tmp_path):
     (out / "reports").mkdir(parents=True)
     (out / "reports" / "stale.json").write_text("{}")
 
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
 
     assert (out / ".internal" / "reports" / "stale.json").exists()
     assert (out / "report.html").exists()
@@ -564,7 +564,7 @@ def test_no_development_artefacts_in_the_output(archive, tmp_path):
     import cli
 
     out = tmp_path / "out"
-    cli.main(["analyze", "--input", str(archive), "--output", str(out)])
+    cli.main(["measure", "--input", str(archive), "--output", str(out)])
     assert not (out / "test_results").exists()
     assert not any(p.name.endswith(".tmp") for p in out.rglob("*"))
 

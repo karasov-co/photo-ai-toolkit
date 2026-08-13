@@ -156,6 +156,16 @@ class Semantic:
     accidental_probability: int = 0
     dead_moment_probability: int = 0
 
+    def to_dict(self) -> dict:
+        from dataclasses import asdict
+
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> Semantic:
+        known = set(cls.__dataclass_fields__)
+        return cls(**{k: v for k, v in (payload or {}).items() if k in known})
+
     @property
     def needs_release(self) -> bool:
         return self.faces or self.identifiable_people or self.recognizable_property
@@ -324,12 +334,29 @@ def current_quality_score(technical_quality: float) -> int:
     return _clamp(technical_quality)
 
 
+# Issues that describe this asset's relationship to *other* assets rather than
+# the asset itself. They are detected, reported and routed on -- and they are
+# excluded from every intrinsic score, because a photograph does not become
+# harder to edit when a similar one is imported next to it. Leaving
+# WEAKER_DUPLICATE in the recoverability arithmetic made an unchanged
+# photograph's final score move by two points when a new batch arrived.
+COLLECTION_RELATIVE_CODES = frozenset({IssueCode.WEAKER_DUPLICATE})
+
+
+def intrinsic(found: IssueSet) -> IssueSet:
+    """Only the problems that are properties of this file."""
+    return IssueSet(
+        issues=[i for i in found if i.code not in COLLECTION_RELATIVE_CODES]
+    )
+
+
 def recoverability_score(found: IssueSet, *, is_raw: bool) -> int:
     """B: how much room there is to move, and how safely.
 
     RAW starts higher because it genuinely holds one to two stops the rendered
     preview cannot show. That is a fact about the format, not a preference.
     """
+    found = intrinsic(found)
     score = 100.0 if is_raw else 78.0
     score -= 11.0 * len(found.partial)
     score -= 34.0 * len(found.unrecoverable)
@@ -456,6 +483,7 @@ def confidence_score(
     evidence_completeness: float,
 ) -> int:
     """I: how much of this assessment rests on evidence rather than defaults."""
+    found = intrinsic(found)
     score = 100.0
     if not semantic.present:
         score -= 30.0

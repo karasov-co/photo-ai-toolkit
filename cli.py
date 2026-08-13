@@ -28,6 +28,7 @@ import i18n
 import layout
 import overrides as overrides_module
 import pipeline
+import preflight
 import quarantine as quarantine_module
 import reports
 import stock_metadata
@@ -46,6 +47,12 @@ SORT_KEYS = {
     "gain": lambda r: r.expected_gain,
     "filename": lambda r: r.filename,
 }
+
+
+# Exit codes, named so a script can tell the two apart: a configuration that
+# was never going to work, and an analysis that started and then broke.
+PREFLIGHT_EXIT = 2
+SEMANTIC_FAILED_EXIT = 3
 
 
 def setup_logging(log_dir: Path, verbose: bool = False) -> None:
@@ -73,33 +80,60 @@ def setup_logging(log_dir: Path, verbose: bool = False) -> None:
 # --- analyze ----------------------------------------------------------------
 
 
-def resolve_semantic(args: argparse.Namespace) -> bool:
-    """Whether the vision passes run. On by default, because they are the analysis.
-
-    The three states are deliberately distinct:
-
-      --no-semantic   off, and the operator said so
-      --semantic      on, and a missing key is an error rather than a downgrade
-      neither         on when a key exists, local-only when it does not
-
-    The default flipped because "full analysis" that skipped the content check
-    and the artistic read was not a full analysis: it produced a run with every
-    artistic field null, no photograph able to reach TOP, and a summary that
-    looked complete.
-    """
-    if getattr(args, "no_semantic", False):
-        return False
-    if getattr(args, "semantic", False):
-        return True
-    return bootstrap.has_credentials()
-
-
 def cmd_analyze(args: argparse.Namespace) -> int:
+    """The product command: full local + Stage 2 + Stage 3, or nothing.
+
+    The order below is the fix for a specific failure. A run once discovered
+    299 assets, checksummed and decoded every one of them, generated previews,
+    measured them, migrated the output directory to a new layout -- and then
+    made its first API call and learned the configured model was not available
+    to the key. No report, the previous report already moved, and every minute
+    of it spent on work that could not be used.
+
+    So nothing here touches a photograph or the output directory until the
+    model has answered a request with an image in it.
+    """
+    return _analyze(args, semantic=True)
+
+
+def cmd_measure(args: argparse.Namespace) -> int:
+    """Local measurement only. A developer tool, and labelled as one.
+
+    Kept because the deterministic half of this pipeline is genuinely useful on
+    its own for debugging, and deleting it would make the technical filters
+    untestable against a real archive without spending money. It is not
+    `analyze`, it does not claim to be a photo analysis, and its output says so.
+    """
+    return _analyze(args, semantic=False)
+
+
+def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
     input_dir = Path(args.input).resolve()
     output_dir = Path(args.output).resolve()
     if not input_dir.is_dir():
         print(f"Error: input directory does not exist: {input_dir}", file=sys.stderr)
         return 1
+
+    language = i18n.normalise(args.lang)
+
+    # --- nothing above this line has touched a file, and nothing below it runs
+    # --- until the model has proved it works.
+    if semantic:
+        model = bootstrap.resolve_model(args.model)
+        result = preflight.run(model)
+        print(preflight.format_result(result), flush=True)
+        if not result.ok:
+            print(preflight.format_failure(result), file=sys.stderr)
+            return PREFLIGHT_EXIT
+        print(flush=True)
+    else:
+        model = None
+        print(
+            "Local measurement only. This is not a photo analysis: no content "
+            "check, no artistic read, and no photograph can be ranked as a top "
+            "one. Use `analyze` for that.",
+            flush=True,
+        )
 
     space = workspace.Workspace(output_dir)
     moved = workspace.migrate(output_dir)
@@ -107,24 +141,6 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     setup_logging(space.internal, args.verbose)
     if moved:
         print(f"Tidied {len(moved)} item(s) from an earlier run into {workspace.INTERNAL}/")
-    language = i18n.normalise(args.lang)
-
-    semantic = resolve_semantic(args)
-    if semantic or args.semantic:
-        # Flushed, so the status line cannot appear after the error that follows
-        # it: stdout is block-buffered while stderr is not.
-        print(bootstrap.credential_status(language), flush=True)
-    if args.semantic and not bootstrap.has_credentials():
-        # Fail before a single photograph is decoded, and with a non-zero
-        # exit code. The previous behaviour spent minutes measuring files and
-        # then printed a summary that looked like a success.
-        print(i18n.t("creds.error", language), file=sys.stderr)
-        return 2
-    if not semantic and not args.no_semantic:
-        # Nobody switched it off; there is simply no key. Say what that costs,
-        # in the terms the summary will use, rather than quietly producing a
-        # weaker run that looks like a full one.
-        print(i18n.t("creds.local_only", language), flush=True)
 
     options = pipeline.PipelineOptions(
         input_dir=input_dir,
@@ -134,8 +150,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         profile_name=args.profile,
         profile_path=Path(args.profile_file).resolve() if args.profile_file else None,
         semantic=semantic,
-        stage3=semantic and not args.no_stage3,
-        semantic_model=args.model,
+        stage3=semantic and not getattr(args, "no_stage3", False),
+        semantic_model=model,
         include_video=not args.no_video,
         video_samples=args.video_samples,
         force=args.force,
@@ -144,27 +160,40 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         darkroom=args.darkroom,
         darkroom_renderer=args.renderer,
         shadow_mode=not args.no_shadow_mode,
-        allow_semantic_fallback=args.allow_semantic_fallback,
+        insights_scope=getattr(args, "insights_scope", "new"),
     )
 
-    printed = {"n": 0}
+    printed = {"n": 0, "analysed": 0, "reused": 0, "announced": False}
 
-    def progress(filename: str, index: int, total: int) -> None:
+    def progress(filename: str, index: int, total: int, reused: bool = False) -> None:
         # Progressive, and deliberately plain: a progress bar hides the name of
         # the file that is about to crash the run.
+        #
+        # Reused assets are counted, not listed. Printing 47 filenames under a
+        # heading that says "analyzing" is how an incremental run came to look
+        # exactly like a full one.
         printed["n"] = index
-        print(f"  [{index:>4}/{total}] {filename}", flush=True)
+        if reused:
+            printed["reused"] += 1
+            return
+        printed["analysed"] += 1
+        if not printed["announced"]:
+            printed["announced"] = True
+            print("\nAnalyzing new assets:", flush=True)
+        print(f"  [{printed['analysed']:>4}] {filename}", flush=True)
 
     print(f"Analyzing {input_dir}")
     try:
         result = pipeline.run(options, progress=progress)
     except bootstrap.SemanticCredentialsMissing:
         print(i18n.t("creds.error", language), file=sys.stderr)
-        return 2
+        return PREFLIGHT_EXIT
     except bootstrap.SemanticUnavailable as e:
-        print(i18n.t("creds.failed", language, reason=str(e)), file=sys.stderr)
-        print(i18n.t("creds.fallback_hint", language), file=sys.stderr)
-        return 3
+        # The preflight passed and the API failed anyway -- a revoked key
+        # mid-run, a network drop. The previous report stays exactly as it was.
+        print(f"\nThe analysis stopped: {reports.redact(str(e))}", file=sys.stderr)
+        print("The previous report was left untouched.", file=sys.stderr)
+        return SEMANTIC_FAILED_EXIT
     if result.cancelled:
         print("Run cancelled; partial results follow.")
 
@@ -185,8 +214,18 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             result.records, store, space.internal / "model_monitoring.json"
         )
 
-    _write_outputs(result, space, language)
+    try:
+        _write_outputs(
+            result, space, language,
+            insights_scope=getattr(args, "insights_scope", "new"),
+        )
+    except workspace.PublishError as e:
+        print(f"\nThe run did not produce a complete result: {e}", file=sys.stderr)
+        print("The previous report was left untouched.", file=sys.stderr)
+        return SEMANTIC_FAILED_EXIT
+
     print(reports.format_summary(result.summary, language, expert=args.expert))
+    _print_run_tally(result, space)
 
     if result.planned_operations:
         print()
@@ -200,38 +239,62 @@ def _still_trash(asset_id: str, records: list[AssetRecord]) -> bool:
     return record is not None and record.route_class == RouteClass.TRASH.value
 
 
-def _write_outputs(result: pipeline.RunResult, space: workspace.Workspace, language: str) -> None:
-    """The two pages a person opens, the five folders, and everything else hidden.
+def _write_outputs(
+    result: pipeline.RunResult,
+    space: workspace.Workspace,
+    language: str,
+    *,
+    insights_scope: str = "new",
+) -> None:
+    """Build the run in staging, validate it, then swap it in.
 
-    Order matters in one place: the edit recipes are written before the report,
-    because the report says which photographs have one.
+    Nothing a photographer opens is touched until the whole run is on disk and
+    complete. A failure half-way leaves the previous report, the previous
+    category folders and the previous recipes exactly as they were, which is the
+    difference between a run that failed and a run that cost you the last good
+    one.
     """
+    import batches
     import insights as insights_module
     import recipe_export
     import simple_report
 
     space.create()
     reports_dir = space.reports
+    staged = workspace.staging_dir(space, result.run_id or "run")
 
     recipes = recipe_export.export_all(
-        result.records, result.measurements, space.recipes, language=language
+        result.records, result.measurements, staged / workspace.RECIPES, language=language
     )
-    counts = workspace.build_category_farm(result.records, space)
+    counts = workspace.build_category_farm(
+        result.records, workspace.Workspace(staged)
+    )
 
     simple_report.write(
         result.records,
-        space.report,
+        staged / workspace.REPORT_NAME,
         language=language,
         insights_link=workspace.INSIGHTS_NAME,
     )
-    collection = insights_module.build(result.records, result.measurements)
+
+    manifest = batches.latest(space.internal / batches.MANIFEST_NAME)
+    scoped, actual_scope = batches.scope_records(result.records, manifest, insights_scope)
+    collection = insights_module.build(scoped, result.measurements)
     insights_module.write(
-        collection, space.insights, language=language, report_link=workspace.REPORT_NAME
+        collection,
+        staged / workspace.INSIGHTS_NAME,
+        language=language,
+        report_link=workspace.REPORT_NAME,
+        scope=actual_scope,
+        total_stored=len(result.records),
     )
 
-    # Everything below is the same data as before, written where it was always
-    # written -- just no longer at the root. `report`, `reclassify`, `quarantine`
-    # and `restore` all read from here.
+    published = workspace.publish(space, staged)
+
+    # Everything below is diagnostics, written where it has always been written.
+    # It is not part of the transaction: `.internal/` is not what a failed run
+    # would damage, and holding the report back on a CSV error would be worse
+    # than writing an imperfect one.
     reports.write_json(result.records, reports_dir / "analysis.json", summary=result.summary)
     reports.write_csv(result.records, reports_dir / "analysis.csv")
     reports.write_html(
@@ -264,6 +327,43 @@ def _write_outputs(result: pipeline.RunResult, space: workspace.Workspace, langu
         print(f"  {workspace.RECIPES}/ {len(recipes['written'])} edit recipe(s)")
     if trash["count"]:
         print(f"  {trash['count']} file(s) proposed for removal (nothing has been moved)")
+    logging.getLogger(__name__).debug("Published %s", ", ".join(published))
+
+
+def _print_run_tally(result: pipeline.RunResult, space: workspace.Workspace) -> None:
+    """What the run actually did, in the terms it cost.
+
+    Separate from the collection summary on purpose: one describes the
+    photographs, this describes the work. A person who has just waited fifteen
+    minutes is owed both.
+    """
+    calls = result.llm_calls or {}
+    total_calls = sum(calls.values())
+    lines = [
+        "",
+        "Run",
+        f"  New assets analysed:      {len(result.new_assets)}",
+        f"  Modified re-analysed:     {len(result.modified_assets)}",
+        f"  Unchanged reused:         {len(result.reused_assets)}",
+    ]
+    if result.semantic_requested:
+        lines += [
+            f"  LLM calls:                {total_calls}"
+            + (f"  ({_call_breakdown(calls)})" if total_calls else ""),
+            f"  Content check completed:  {sum(1 for r in result.records if r.semantic_present)}",
+            f"  Artistic read completed:  {result.stage3_completed}",
+        ]
+        if result.stage3_failed:
+            lines.append(f"  Artistic read failed:     {result.stage3_failed}")
+    failures = sum(1 for r in result.records if r.status != "ok")
+    if failures:
+        lines.append(f"  Failed to analyse:        {failures}")
+    lines.append(f"  Report:                   {space.report}")
+    print("\n".join(lines))
+
+
+def _call_breakdown(calls: dict) -> str:
+    return ", ".join(f"{name} {count}" for name, count in sorted(calls.items()))
 
 
 def _folder_counts(counts: dict[str, int]) -> dict[str, int]:
@@ -893,24 +993,51 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    analyze = sub.add_parser("analyze", help="measure, score, route and report")
-    analyze.add_argument("--input", required=True)
-    analyze.add_argument("--output", required=True)
-    analyze.add_argument("--quarantine", help="quarantine directory (default: <output>/trash_quarantine)")
-    analyze.add_argument("--profile", choices=list(BUILTIN_PROFILES), help="built-in calibration profile")
-    analyze.add_argument("--profile-file", help="path to a calibration profile JSON")
-    analyze.add_argument(
-        "--semantic",
-        action="store_true",
-        help=(
-            "require the vision passes (Stage 2 content + Stage 3 artistic). They run by "
-            "default when a key is present; this makes a missing key an error instead"
-        ),
+    def add_shared_analysis_arguments(parser) -> None:
+        """Everything both the product command and the developer one take."""
+        parser.add_argument("--input", required=True)
+        parser.add_argument("--output", required=True)
+        parser.add_argument(
+            "--quarantine", help="quarantine directory (default: <output>/.internal/quarantine)"
+        )
+        parser.add_argument(
+            "--profile", choices=list(BUILTIN_PROFILES), help="built-in calibration profile"
+        )
+        parser.add_argument("--profile-file", help="path to a calibration profile JSON")
+        parser.add_argument(
+            "--expert",
+            action="store_true",
+            help="print the route classes, stock counters and release status as well",
+        )
+        parser.add_argument("--no-video", action="store_true")
+        parser.add_argument("--video-samples", type=int, default=9)
+        parser.add_argument("--force", action="store_true", help="ignore the analysis cache")
+        parser.add_argument("--limit", type=int)
+        parser.add_argument("--copyright", help="copyright holder for generated metadata")
+        parser.add_argument(
+            "--darkroom", action="store_true",
+            help="render edit suggestions (about a second per frame)",
+        )
+        parser.add_argument("--renderer", help="darkroom engine: builtin, darktable, rawtherapee")
+        parser.add_argument(
+            "--no-shadow-mode", action="store_true",
+            help="let the policy act instead of only recording what it would do",
+        )
+
+    analyze = sub.add_parser(
+        "analyze",
+        help="the full analysis: local measurement + content check + artistic read",
     )
+    add_shared_analysis_arguments(analyze)
     analyze.add_argument(
-        "--no-semantic",
-        action="store_true",
-        help="local measurement only: no content check, no artistic read, no TOP photos",
+        "--model",
+        default=None,
+        help=(
+            f"overrides {bootstrap.MODEL_VAR}, which overrides the default "
+            f"({bootstrap.DEFAULT_SEMANTIC_MODEL}). Whatever is chosen is verified "
+            "against your account before any photograph is opened, and never "
+            "silently replaced"
+        ),
     )
     analyze.add_argument(
         "--no-stage3",
@@ -918,34 +1045,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="run the content check but not the artistic read (nothing can reach TOP)",
     )
     analyze.add_argument(
-        "--allow-semantic-fallback",
-        action="store_true",
-        help="accept a local-only result if the semantic pass fails (off by default)",
-    )
-    analyze.add_argument(
-        "--model",
-        default=None,
+        "--insights-scope",
+        choices=["new", "all"],
+        default="new",
         help=(
-            f"semantic model; overrides {bootstrap.MODEL_VAR}, which overrides the default "
-            f"({bootstrap.DEFAULT_SEMANTIC_MODEL})"
+            "which photographs the insights page describes: the ones this run "
+            "analysed (default), or everything ever stored in this output directory"
         ),
     )
-    analyze.add_argument(
-        "--expert",
-        action="store_true",
-        help="print the route classes, stock counters and release status as well",
-    )
-    analyze.add_argument("--no-video", action="store_true")
-    analyze.add_argument("--video-samples", type=int, default=9)
-    analyze.add_argument("--force", action="store_true", help="ignore the analysis cache")
-    analyze.add_argument("--limit", type=int)
-    analyze.add_argument("--copyright", help="copyright holder for generated metadata")
-    analyze.add_argument("--darkroom", action="store_true",
-                         help="render edit suggestions (about a second per frame)")
-    analyze.add_argument("--renderer", help="darkroom engine: builtin, darktable, rawtherapee")
-    analyze.add_argument("--no-shadow-mode", action="store_true",
-                         help="let the policy act instead of only recording what it would do")
     analyze.set_defaults(func=cmd_analyze)
+
+    measure = sub.add_parser(
+        "measure",
+        help=(
+            "DEVELOPER TOOL: local measurement only, no content check and no "
+            "artistic read. Not a photo analysis, and its output says so"
+        ),
+    )
+    add_shared_analysis_arguments(measure)
+    measure.set_defaults(func=cmd_measure)
 
     report = sub.add_parser("report", help="filter, sort and re-render a stored run")
     report.add_argument("--analysis", required=True)

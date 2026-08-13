@@ -493,7 +493,15 @@ a { color:#8fb8d8; }
 """
 
 
-def write(insights: Insights, path: Path, *, language: str = "en", report_link: str | None = None) -> Path:
+def write(
+    insights: Insights,
+    path: Path,
+    *,
+    language: str = "en",
+    report_link: str | None = None,
+    scope: str = "all",
+    total_stored: int = 0,
+) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -524,7 +532,7 @@ def write(insights: Insights, path: Path, *, language: str = "en", report_link: 
 <body>
 <main>
 <h1>{html.escape(t("insights.title", language))}</h1>
-<p class="lede">{html.escape(t("insights.lede", language, total=insights.total))}</p>
+<p class="lede">{html.escape(_scope_line(insights, language, scope, total_stored))}</p>
 {link}
 {"".join(s for s in sections if s)}
 <p class="foot">{html.escape(t("insights.footer", language))}</p>
@@ -534,6 +542,21 @@ def write(insights: Insights, path: Path, *, language: str = "en", report_link: 
 """
     path.write_text(document, encoding="utf-8")
     return path
+
+
+def _scope_line(insights: Insights, language: str, scope: str, total_stored: int) -> str:
+    """Say which photographs this page is about, always.
+
+    A page that silently describes a different set of photographs from one run
+    to the next is worse than one that describes the wrong set: the reader
+    cannot tell which they are looking at. So the scope is stated in the first
+    sentence, with the numbers.
+    """
+    if scope == "new" and total_stored and total_stored != insights.total:
+        return t(
+            "insights.lede_new", language, total=insights.total, stored=total_stored
+        )
+    return t("insights.lede", language, total=insights.total)
 
 
 def _genre_items(insights: Insights, language: str) -> list[Observation]:

@@ -37,6 +37,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+import batches
 import curation
 import duplicates
 import edit_recipe
@@ -101,6 +102,11 @@ class PipelineOptions:
     darkroom_renderer: str | None = None
     conservative_art: bool = True
     shadow_mode: bool = True
+    # Which photographs the insights page describes: the ones this run analysed,
+    # or everything ever stored here. "new" by default -- adding a batch to an
+    # archive should tell you about the batch, not repeat what the archive as a
+    # whole has always said.
+    insights_scope: str = "new"
 
     def resolved_quarantine(self) -> Path:
         """The *physical* quarantine directory, deliberately not the farm folder.
@@ -148,6 +154,14 @@ class RunResult:
     stage3_completed: int = 0
     stage3_failed: int = 0
     stage3_skipped: int = 0
+    # How many requests each stage actually made, and how many assets were
+    # answered from store. Printed at the end, because "252 analysed, 47 reused,
+    # 26 calls" is the only honest account of what a run cost.
+    llm_calls: dict = field(default_factory=dict)
+    new_assets: list = field(default_factory=list)
+    reused_assets: list = field(default_factory=list)
+    modified_assets: list = field(default_factory=list)
+    run_id: str = ""
     # Keyed by asset key. Kept on the result so that everything written after
     # the run -- edit recipes, insights -- can use what was measured without
     # decoding a second time.
@@ -223,11 +237,49 @@ class AnalysisCache:
 
         self._data[stage3.cache_key(checksum, model)] = payload
 
+    # Stage 2 is cached per asset for a reason that is not about cost.
+    #
+    # The axes are ranks stitched into percentiles across whatever was in the
+    # run, so re-ranking an unchanged photograph next to 252 new ones changes
+    # its genre, its axes, its score and possibly its category -- while nothing
+    # about the photograph changed. A stored result is that asset's answer,
+    # fixed at the moment it was analysed, and a later batch cannot rewrite it.
+
+    def semantic_key(self, checksum: str, model: str) -> str:
+        import prompts
+
+        return f"stage2:{checksum}:{model}:{prompts.STAGE2_PROMPT_VERSION}"
+
+    def get_semantic(self, checksum: str, model: str) -> dict | None:
+        return self._data.get(self.semantic_key(checksum, model))
+
+    def put_semantic(self, checksum: str, model: str, payload: dict) -> None:
+        self._data[self.semantic_key(checksum, model)] = payload
+
     def get(self, checksum: str) -> dict | None:
         return self._data.get(self.key(checksum))
 
     def put(self, checksum: str, payload: dict) -> None:
         self._data[self.key(checksum)] = payload
+
+    def known_checksums(self) -> set[str]:
+        """Every checksum this cache holds a measurement for."""
+        suffix = f":{self.version}"
+        return {k[: -len(suffix)] for k in self._data if k.endswith(suffix)}
+
+    def has_full_result(self, checksum: str, model: str) -> bool:
+        """Whether this asset can be served entirely from store.
+
+        All three parts, not one: a measurement without a content check would
+        be reused as though it had been analysed, and the photograph would show
+        up in the report with no genre and no artistic read while the summary
+        counted it as reused.
+        """
+        if self.get(checksum) is None:
+            return False
+        if self.get_semantic(checksum, model) is None:
+            return False
+        return self.get_stage3(checksum, model) is not None
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -501,6 +553,8 @@ def semantic_pass(
     model: str,
     client=None,
     group_size: int = 12,
+    cache: AnalysisCache | None = None,
+    calls: dict | None = None,
 ) -> dict[str, Semantic]:
     """Rank frames against each other in groups, then stitch to a global order.
 
@@ -521,15 +575,23 @@ def semantic_pass(
 
         client = bootstrap.make_client()
 
-    photo_names = [
-        a.key
-        for a in assets
-        if a.kind is media.MediaKind.PHOTO and measurements.get(a.key, Measurement()).preview_path
-    ]
-    if not photo_names:
-        return {}
-
     by_name = {a.key: a for a in assets}
+    out: dict[str, Semantic] = {}
+    photo_names: list[str] = []
+
+    for asset in assets:
+        if asset.kind is not media.MediaKind.PHOTO:
+            continue
+        if not measurements.get(asset.key, Measurement()).preview_path:
+            continue
+        stored = cache.get_semantic(asset.checksum, model) if cache is not None else None
+        if stored is not None:
+            out[asset.key] = Semantic.from_dict(stored)
+            continue
+        photo_names.append(asset.key)
+
+    if not photo_names:
+        return out
     groups = aggregate.build_groups(photo_names, size=group_size)
     parsed_groups: list[list[dict]] = []
     per_frame: dict[str, dict] = {}
@@ -575,6 +637,8 @@ def semantic_pass(
             )
             items = batch_runner.parse_group_json(response.output_text or "")
             succeeded += 1
+            if calls is not None:
+                calls["stage2"] = calls.get("stage2", 0) + 1
         except Exception as e:
             first_error = first_error or e
             logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
@@ -612,7 +676,9 @@ def semantic_pass(
 
     scores = aggregate.aggregate_all_axes(parsed_groups)
 
-    out: dict[str, Semantic] = {}
+    # NOT re-initialised: `out` already holds every asset answered from
+    # store. Assigning a fresh dict here threw those away and silently
+    # un-analysed every unchanged photograph in an incremental run.
     for name, item in per_frame.items():
         try:
             assessment = routing.parse_assessment(item, name)
@@ -629,6 +695,8 @@ def semantic_pass(
         if asset is not None:
             semantic.secondary_genres = []
         out[name] = semantic
+        if cache is not None and asset is not None:
+            cache.put_semantic(asset.checksum, model, semantic.to_dict())
     return out
 
 
@@ -857,7 +925,7 @@ def _split_or_widen(frames, *, model, client, stage3_module, budget_factor, erro
 def run(
     options: PipelineOptions,
     *,
-    progress: Callable[[str, int, int], None] | None = None,
+    progress: Callable[..., None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
     client=None,
 ) -> RunResult:
@@ -897,7 +965,22 @@ def run(
         calibration=calibration,
         semantic_requested=options.semantic,
         semantic_model=model if options.semantic else "",
+        run_id=batches.new_run_id(),
     )
+
+    # Split before any work, so the progress output can distinguish the 252
+    # photographs about to be analysed from the 47 that will be answered from
+    # store. Printing all 299 as though each were being analysed is what made a
+    # 15-minute incremental run look identical to a full one.
+    history = batches.read_all(options.internal / batches.MANIFEST_NAME)
+    fresh, modified, reused = batches.classify_assets(
+        assets, cache, model, seen_keys=batches.seen_keys(history)
+    )
+    if options.force:
+        fresh, modified, reused = assets, [], []
+    result.new_assets = [a.checksum for a in fresh]
+    result.modified_assets = [a.checksum for a in modified]
+    result.reused_assets = [a.checksum for a in reused]
     measurements: dict[str, Measurement] = {}
 
     for index, asset in enumerate(assets, start=1):
@@ -910,8 +993,9 @@ def run(
             # partial results the user is entitled to.
             assets = assets[: index - 1]
             break
+        reused_here = asset.checksum in set(result.reused_assets)
         if progress:
-            progress(asset.filename, index, len(assets))
+            progress(asset.filename, index, len(assets), reused_here)
 
         cached = None if options.force else cache.get(asset.checksum)
         if cached is not None:
@@ -952,6 +1036,7 @@ def run(
         record.semantic_completed = result.semantic_completed
         record.semantic_error = result.semantic_error
 
+    _write_manifest(options, result, assets, model)
     result.planned_operations = _plan_operations(assets, result.records, options)
     result.summary = reports.summarise(
         result.records,
@@ -1152,6 +1237,32 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
     return assessments
 
 
+def _write_manifest(options: PipelineOptions, result: RunResult, assets, model: str) -> None:
+    """Record what this run did, so the next one can tell what it added."""
+    import prompts
+    import stage3 as stage3_module
+
+    failed = [r.checksum for r in result.records if r.status != "ok"]
+    manifest = batches.BatchManifest(
+        run_id=result.run_id,
+        started_at=batches.now(),
+        finished_at=batches.now(),
+        new=list(result.new_assets),
+        modified=list(result.modified_assets),
+        reused=list(result.reused_assets),
+        failed=failed,
+        keys=[a.key for a in assets],
+        model=model if options.semantic else "",
+        stage2_prompt_version=prompts.STAGE2_PROMPT_VERSION,
+        stage3_prompt_version=stage3_module.PROMPT_VERSION,
+        analyzer_version=scoring.ANALYZER_VERSION,
+        llm_calls=dict(result.llm_calls),
+        stage2_completed=sum(1 for r in result.records if r.semantic_present),
+        stage3_completed=result.stage3_completed,
+    )
+    batches.append(manifest, options.internal / batches.MANIFEST_NAME)
+
+
 def bootstrap_model(options, fallback: str) -> str:
     import bootstrap
 
@@ -1180,7 +1291,9 @@ def _semantics(
 
     try:
         semantics = semantic_pass(
-            assets, measurements, model=model, client=client
+            assets, measurements, model=model, client=client,
+            cache=AnalysisCache(options.internal / CACHE_NAME),
+            calls=result.llm_calls,
         )
     except Exception as e:
         kind, message = bootstrap.classify_api_error(e)
@@ -1190,11 +1303,40 @@ def _semantics(
             raise bootstrap.SemanticUnavailable(message, kind=kind) from e
         return {}
 
+    # Saved immediately: a Stage 3 failure after this point must not throw away
+    # content results that were already paid for.
+    if semantics:
+        cache = AnalysisCache(options.internal / CACHE_NAME)
+        for asset in assets:
+            found = semantics.get(asset.key)
+            if found is not None:
+                cache.put_semantic(asset.checksum, model, found.to_dict())
+        cache.save()
+
     result.semantic_completed = bool(semantics)
     if not semantics:
         result.semantic_error = "the model returned nothing usable for any group"
         if not options.allow_semantic_fallback:
             raise bootstrap.SemanticUnavailable(result.semantic_error, kind="empty")
+        return semantics
+
+    # Every photograph that needed a content check has to have got one. A run
+    # where 250 assets came from store and the one new group failed used to
+    # succeed: `semantics` was non-empty, so the run reported completion while
+    # the only photograph it had actually been asked about had no genre, no
+    # faces and no subject -- and was filed on that basis.
+    unchecked = [
+        asset.key
+        for asset in assets
+        if asset.kind is media.MediaKind.PHOTO
+        and measurements.get(asset.key, Measurement()).preview_path
+        and asset.key not in semantics
+    ]
+    if unchecked and not options.allow_semantic_fallback:
+        result.semantic_error = (
+            f"{len(unchecked)} photograph(s) came back without a content check"
+        )
+        raise bootstrap.SemanticUnavailable(result.semantic_error, kind="incomplete")
     return semantics
 
 

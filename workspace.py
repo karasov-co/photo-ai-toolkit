@@ -208,3 +208,89 @@ def build_category_farm(records, workspace: Workspace) -> dict[str, int]:
         _relink(workspace.root / folder / record.filename, Path(record.source_path))
         counts[record.category] += 1
     return counts
+
+
+# --- transactional publication ------------------------------------------------
+#
+# A run that fails must leave the previous run intact. That is not a nicety: the
+# outputs are what a photographer works from, and half-replacing them is worse
+# than not running at all -- a report listing 47 photographs beside category
+# folders holding 299 is not recoverable by looking at it.
+#
+# So everything is built in a staging directory and moved into place only once
+# it is complete. The move is per top-level artefact, each one backed up first,
+# and any failure rolls the whole set back.
+
+STAGED = "staging"
+
+# What a complete run must have produced. Validated before anything is swapped,
+# because "the staging directory exists" is not the same as "the run worked".
+REQUIRED_ARTEFACTS = (REPORT_NAME, INSIGHTS_NAME)
+
+
+class PublishError(RuntimeError):
+    """Staging did not produce a complete run, so nothing was replaced."""
+
+
+def staging_dir(space: Workspace, run_id: str) -> Path:
+    path = space.internal / STAGED / run_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def validate_staging(staged: Path) -> list[str]:
+    """Everything missing from a supposedly finished run."""
+    missing = [name for name in REQUIRED_ARTEFACTS if not (staged / name).is_file()]
+    if not any((staged / folder).is_dir() for folder in CATEGORY_DIRS.values()):
+        missing.append("category folders")
+    return missing
+
+
+def publish(space: Workspace, staged: Path) -> list[str]:
+    """Move a validated staging directory into place, or change nothing.
+
+    Each artefact is swapped by rename, which is atomic per entry; the set of
+    them is not, so a failure part-way through restores what was already moved.
+    That is the difference between a run that fails and a run that destroys the
+    last good one.
+    """
+    missing = validate_staging(staged)
+    if missing:
+        raise PublishError(f"the run did not produce: {', '.join(missing)}")
+
+    entries = [name for name in (*REQUIRED_ARTEFACTS, RECIPES, *CATEGORY_DIRS.values())
+               if (staged / name).exists()]
+    backups: list[tuple[Path, Path]] = []
+    published: list[str] = []
+
+    try:
+        for name in entries:
+            live = space.root / name
+            incoming = staged / name
+            if live.exists() or live.is_symlink():
+                backup = space.internal / f"{STAGED}-backup-{name.replace('/', '_')}"
+                _remove(backup)
+                live.rename(backup)
+                backups.append((backup, live))
+            incoming.rename(live)
+            published.append(name)
+    except OSError as e:  # pragma: no cover - filesystem failure mid-swap
+        logger.error("Publication failed after %d artefact(s); rolling back: %s", len(published), e)
+        for name in published:
+            _remove(space.root / name)
+        for backup, live in backups:
+            if not live.exists():
+                backup.rename(live)
+        raise PublishError(str(e)) from e
+
+    for backup, _ in backups:
+        _remove(backup)
+    _remove(staged)
+    return published
+
+
+def _remove(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)

@@ -110,22 +110,26 @@ ARTISTIC_WEIGHTS: dict[str, float] = {
 }
 
 # With a completed artistic read.
+#
+# Every term is a property of the photograph itself. There is deliberately no
+# term for standing within the collection, and there used to be: `scene` scored
+# a frame on how unlike its neighbours it was, which meant importing a second
+# batch changed the score of a photograph nobody had touched. A photograph does
+# not get better because you deleted the one next to it.
 WEIGHTS_WITH_STAGE3: dict[str, float] = {
-    "technical": 0.22,
-    "artistic": 0.34,
-    "semantic": 0.16,
-    "portrait": 0.10,
+    "technical": 0.25,
+    "artistic": 0.38,
+    "semantic": 0.18,
+    "portrait": 0.11,
     "documentary": 0.08,
-    "scene": 0.10,
 }
 
 # Without one. Technical and semantic absorb the missing weight, and the
 # `no_stage3_ceiling` stops the result being mistaken for a judged frame.
 WEIGHTS_WITHOUT_STAGE3: dict[str, float] = {
-    "technical": 0.42,
-    "semantic": 0.34,
-    "documentary": 0.10,
-    "scene": 0.14,
+    "technical": 0.50,
+    "semantic": 0.38,
+    "documentary": 0.12,
 }
 
 
@@ -138,7 +142,6 @@ class DefectCode(StrEnum):
     ACCIDENTAL_FRAME = "accidental_frame"
     DEAD_MOMENT = "dead_moment"
     NO_SUBJECT = "no_subject"
-    INFERIOR_DUPLICATE = "inferior_duplicate"
     UNRECOVERABLE = "unrecoverable"
 
 
@@ -173,7 +176,6 @@ CEILINGS: dict[str, int] = {
     DefectCode.EYES_CLOSED.value: 32,
     DefectCode.BAD_EXPRESSION.value: 34,
     DefectCode.DEAD_MOMENT.value: 38,
-    DefectCode.INFERIOR_DUPLICATE.value: 42,
 }
 
 # Confidence a soft semantic signal needs before it is allowed to write off a
@@ -241,18 +243,14 @@ def critical_defects(
 
     found.extend(_portrait_defects(artistic, is_portrait=is_portrait(semantic)))
 
-    # Measurably weaker than a sibling, not merely different from one. The
-    # margin test happened upstream: inside it, two frames are a tie as far as
-    # local measurement can tell, and both survive.
-    if not inp.is_best_in_cluster:
-        found.append(
-            Defect(
-                DefectCode.INFERIOR_DUPLICATE.value,
-                f"a sharper frame exists in this group ({inp.cluster_margin:.0f} points higher)",
-                CEILINGS[DefectCode.INFERIOR_DUPLICATE.value],
-            )
-        )
-
+    # Losing to a sibling is deliberately NOT here.
+    #
+    # It was, and it made a photograph's category depend on what else happened
+    # to be in the folder: importing a sharper frame of the same scene turned an
+    # unchanged photograph from good into weak, and removing it turned it back.
+    # Being the second-best of two takes is a fact about a pair, not about a
+    # picture, and it is reported as `duplicate_candidate` on the route class
+    # where it belongs -- a comparison for a person, not a verdict.
     return sorted(found, key=lambda d: d.ceiling)
 
 
@@ -415,17 +413,12 @@ def documentary_component(
     return 50
 
 
-def scene_component(inp: ScoreInput, scores: AssetScores) -> int:
-    """Standing against the rest of this collection, not against photography.
-
-    A frame in a burst of nine near-identical takes is worth less than the same
-    frame shot once, and the winner of a big cluster is worth more than a frame
-    with no competition -- it beat something.
-    """
-    base = float(scores.uniqueness)
-    if inp.is_best_in_cluster and inp.cluster_size > 1:
-        base = min(100.0, base + min(10.0, 2.5 * (inp.cluster_size - 1)))
-    return _clamp(base)
+# `scene_component` used to live here: uniqueness against the rest of the
+# collection, folded into the score. It was removed rather than reweighted,
+# because no weight makes a collection-relative term safe in a number that is
+# supposed to describe one photograph. Uniqueness is still measured, still
+# stored on the record, and still drives duplicate review -- it just no longer
+# decides how good a picture is.
 
 
 # --- the score ----------------------------------------------------------------
@@ -505,7 +498,6 @@ def _evaluate(
         "semantic": semantic_component(inp.semantic),
         "portrait": portrait_component(artistic, is_portrait=is_portrait(inp.semantic)),
         "documentary": documentary_component(inp.semantic, artistic),
-        "scene": scene_component(inp, scores),
     }
     blended, used = _blend(components, WEIGHTS_WITH_STAGE3 if has_read else WEIGHTS_WITHOUT_STAGE3)
 
