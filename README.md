@@ -654,7 +654,7 @@ There is no GPU path and none is needed.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 1311 tests, no network, no API key
+pytest          # 1316 tests, no network, no API key
 ruff check .
 ```
 

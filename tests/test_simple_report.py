@@ -83,8 +83,17 @@ def test_a_dark_file_that_recovers_outranks_a_bright_one_that_does_not():
 
 def test_current_quality_is_shown_but_never_ranks(collection, tmp_path):
     page = simple_report.write(collection, tmp_path / "report.html").read_text()
-    assert "as shot" in page
+    assert "technical quality now" in page
     assert "51" in page  # top.jpg's current quality is still visible
+
+
+def test_the_two_numbers_are_labelled_as_different_axes(collection, tmp_path):
+    """A pristine picture of nothing shows a high technical number and a low
+    photographic one. Labelling that pair "as shot" and "after editing" reads
+    as "editing made it worse", which is not what either number means."""
+    page = simple_report.write(collection, tmp_path / "report.html").read_text()
+    assert "as shot" not in page
+    assert "after editing" in page
 
 
 def test_every_category_gets_a_section_even_when_empty(collection, tmp_path):
@@ -605,3 +614,51 @@ def test_paths_in_the_report_are_relative(tmp_path, collection):
 def test_the_recipes_folder_is_named_where_the_report_says_it_is():
     assert workspace.RECIPES == "edit_recipes"
     assert Path(workspace.RECIPES).name in simple_report.t("report.recipe_ready", "en")
+
+
+def test_an_empty_top_section_explains_itself(tmp_path):
+    """"Nothing here" cannot tell a strict threshold from a broken one."""
+    modest = [record(filename=f"m{i}.jpg", category="GOOD_STOCK", final_score=70 + i)
+              for i in range(3)]
+    page = simple_report.write(modest, tmp_path / "report.html", expert=False).read_text()
+    assert "72" in page  # the best score
+    assert str(simple_report.TOP_THRESHOLD) in page
+    assert "normal result" in page
+
+
+def test_the_page_quotes_the_threshold_the_decision_used():
+    assert curation.DEFAULT_THRESHOLDS.top == simple_report.TOP_THRESHOLD
+
+
+def test_a_populated_top_section_says_nothing_about_thresholds(collection, tmp_path):
+    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text()
+    assert "normal result" not in page
+
+
+def test_a_recipe_that_no_longer_qualifies_is_removed(tmp_path):
+    """Scores move between runs; a withdrawn suggestion must not stay on disk."""
+    source = tmp_path / "a.jpg"
+    write_jpeg(photo_like(200, 150), source)
+    folder = tmp_path / "edit_recipes"
+
+    recipe_export.export_all(
+        [record(source_path=str(source), final_score=80)], {"a.jpg": FakeMeasurement()}, folder
+    )
+    assert (folder / "a.xmp").exists()
+
+    result = recipe_export.export_all(
+        [record(source_path=str(source), final_score=50)], {"a.jpg": FakeMeasurement()}, folder
+    )
+    assert not (folder / "a.xmp").exists()
+    assert result["removed"] == ["a.xmp"]
+
+
+def test_a_sidecar_the_tool_did_not_write_is_never_removed(tmp_path):
+    folder = tmp_path / "edit_recipes"
+    folder.mkdir()
+    mine = folder / "my_own_edit.xmp"
+    mine.write_text("<x:xmpmeta>my own work</x:xmpmeta>")
+
+    recipe_export.export_all([], {}, folder)
+
+    assert mine.exists(), "only files carrying this tool's marker may be removed"

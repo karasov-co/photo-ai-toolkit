@@ -172,9 +172,37 @@ def export_all(records, measurements: dict, out_dir: Path, *, language: str = "e
         record.creative_directions = [d.to_dict() for d in directions_for(record, measurement)]
         written.append(record.filename)
 
+    removed = _clear_stale(out_dir, keep={Path(name).stem for name in written})
     if written:
         write_instructions(out_dir, language=language)
-    return {"written": written, "skipped": skipped, "dir": str(out_dir)}
+    return {
+        "written": written, "skipped": skipped, "removed": removed, "dir": str(out_dir)
+    }
+
+
+def _clear_stale(out_dir: Path, keep: set[str]) -> list[str]:
+    """Drop sidecars for photographs this run did not choose.
+
+    Scores move a little between runs, so without this the folder accumulates
+    recipes for frames that no longer qualify -- and a photographer working
+    through it would edit from a suggestion the current analysis has withdrawn.
+
+    Only files this tool wrote are removed, identified by the marker inside
+    them. Anything else in the folder is somebody's own work and is left alone.
+    """
+    removed: list[str] = []
+    for path in out_dir.glob("*.xmp"):
+        if path.stem in keep:
+            continue
+        try:
+            if "photo-ai-toolkit" not in path.read_text(encoding="utf-8", errors="ignore"):
+                continue
+            path.unlink()
+        except OSError as e:  # pragma: no cover - permissions
+            logger.warning("Could not remove the stale recipe %s: %s", path.name, e)
+            continue
+        removed.append(path.name)
+    return removed
 
 
 def export_one(record, measurement, out_dir: Path) -> Path:

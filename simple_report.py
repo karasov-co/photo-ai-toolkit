@@ -39,6 +39,7 @@ import html
 import os
 from pathlib import Path
 
+from curation import DEFAULT_THRESHOLDS as CURATION_THRESHOLDS
 from i18n import t
 
 # The order the piles are shown in, and the accent each gets.
@@ -84,6 +85,11 @@ LEGAL_WORDS = (
 
 MAX_RECOMMENDATIONS = 3
 
+# Read from the categoriser rather than repeated here: the page has to say the
+# same number the decision used, or its explanation of an empty TOP section is
+# fiction the moment somebody tunes the threshold.
+TOP_THRESHOLD = CURATION_THRESHOLDS.top
+
 
 def potential(record) -> int:
     """The one number. Named here so nothing has to guess the field."""
@@ -91,7 +97,15 @@ def potential(record) -> int:
 
 
 def current_quality(record) -> int:
-    """What the unedited file looks like now. Secondary, always."""
+    """How clean the unedited file is. Secondary, always, and a different axis.
+
+    Labelled "technical quality now" rather than "as shot" on purpose. The two
+    numbers on a card measure different things -- one is how good the
+    photograph is, the other is how clean the file is -- and a technically
+    pristine picture of nothing legitimately shows 87 here beside a 67 above
+    it. Calling them "as shot" and "after editing" made that pair read as the
+    same measurement taken twice, which says editing made the photograph worse.
+    """
     return int((record.scores or {}).get("current_quality", 0))
 
 
@@ -223,8 +237,10 @@ def write(
 
     sections = by_section(records)
     counts = {name: len(items) for name, _, items in sections}
+    best = max((potential(r) for r in records), default=0)
     body = "".join(
-        _section(name, accent, items, path.parent, language) for name, accent, items in sections
+        _section(name, accent, items, path.parent, language, best)
+        for name, accent, items in sections
     )
 
     link = (
@@ -269,14 +285,21 @@ def _counts_html(counts: dict[str, int], language: str) -> str:
     )
 
 
-def _section(name: str, accent: str, items: list, base: Path, language: str) -> str:
+def _section(
+    name: str, accent: str, items: list, base: Path, language: str, best: int = 0
+) -> str:
     heading = html.escape(t(f"category.{name}", language))
     note = t(f"category.note.{name}", language)
     if not items:
+        # An empty pile explains itself. "Nothing here" beside a TOP section
+        # leaves the reader unable to tell a strict threshold from a broken one.
+        empty = t("report.empty_section", language)
+        if name == "TOP" and best:
+            empty = t("report.no_top", language, best=best, threshold=TOP_THRESHOLD)
         return (
             f'<section><div class="section-head" style="border-color:{accent}44">'
             f"<h2>{heading}</h2><span class=\"n\">0</span></div>"
-            f'<p class="empty">{html.escape(t("report.empty_section", language))}</p></section>'
+            f'<p class="empty">{html.escape(empty)}</p></section>'
         )
     cards = "".join(_card(record, base, accent, language) for record in items)
     return (

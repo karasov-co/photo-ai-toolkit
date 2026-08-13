@@ -712,15 +712,19 @@ def categorise(
         return Verdict(PhotoCategory.NEEDS_DECISION.value, final.value, reasons, keys, blockers, final)
 
     if not blockers:
+        # Written for a photographer to read. The stock/personal split is
+        # already expressed by the category, so the sentence describes the
+        # photograph rather than its licensing position -- which is also what
+        # keeps it out of the filter that strips legal language from the report.
         reasons.append(
-            f"final score {final.value}, no release needed and commercially usable"
+            f"a clean, legible photograph that also works as stock material "
+            f"(scores {final.value} after editing)"
         )
         keys.append({"key": "category.good_stock", "params": {"value": final.value}})
         return Verdict(PhotoCategory.GOOD_STOCK.value, final.value, reasons, keys, blockers, final)
 
     reasons.append(
-        f"final score {final.value}: a photograph worth keeping. Not for stock -- "
-        + blockers[0]
+        f"a photograph worth keeping and printing (scores {final.value} after editing)"
     )
     keys.append({"key": "category.good_personal", "params": {"value": final.value}})
     return Verdict(PhotoCategory.GOOD_PERSONAL.value, final.value, reasons, keys, blockers, final)

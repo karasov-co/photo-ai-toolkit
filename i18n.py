@@ -49,8 +49,13 @@ STRINGS: dict[str, dict[str, str]] = {
             "edit -- not by how the untouched file looks right now."
         ),
         "report.potential": "after editing",
-        "report.current": "as shot",
+        "report.current": "technical quality now",
         "report.empty_section": "Nothing here.",
+        "report.no_top": (
+            "Nothing reached the top this time: the strongest photograph scored {best}, "
+            "and this section starts at {threshold}. That is a normal result for a "
+            "shoot, and the photographs below it are still the best ones you have."
+        ),
         "report.expert": "Expert details",
         "report.expert_note": (
             "The full numbers behind each decision. Nothing here is needed to use the "
@@ -72,7 +77,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "expert.file": "File",
         "expert.potential": "After editing",
-        "expert.current": "As shot",
+        "expert.current": "Technical now",
         "expert.category": "Category",
         "expert.route_class": "Route class",
         "expert.stage3_delta": "Artistic read",
@@ -308,8 +313,13 @@ STRINGS: dict[str, dict[str, str]] = {
             "после обычной обработки, а не по тому, как выглядит необработанный файл."
         ),
         "report.potential": "после обработки",
-        "report.current": "как снято",
+        "report.current": "техническое качество файла",
         "report.empty_section": "Здесь пусто.",
+        "report.no_top": (
+            "В этот раз сюда никто не попал: лучшая фотография набрала {best}, а раздел "
+            "начинается с {threshold}. Для съёмки это нормально, и кадры ниже — всё "
+            "равно лучшее, что у вас есть."
+        ),
         "report.expert": "Подробности для специалистов",
         "report.expert_note": (
             "Полные цифры за каждым решением. Для работы с отчётом они не нужны; "
@@ -331,7 +341,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "expert.file": "Файл",
         "expert.potential": "После обработки",
-        "expert.current": "Как снято",
+        "expert.current": "Технически сейчас",
         "expert.category": "Категория",
         "expert.route_class": "Класс маршрута",
         "expert.stage3_delta": "Художественный разбор",
