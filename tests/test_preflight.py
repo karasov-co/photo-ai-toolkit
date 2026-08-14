@@ -1039,10 +1039,13 @@ class RevokedAfterPreflight(Responses):
 def test_a_revoked_key_stops_at_the_first_group_not_the_thirty_first(
     archive, tmp_path, monkeypatch
 ):
-    """31 groups, 31 identical 401s, all logged in full. Now: one, then stop.
+    """31 groups, 31 identical 401s, all logged in full. Now: at most four.
 
-    On a paid key the same loop would hammer a rate limit or an exhausted
-    balance to the end of the archive.
+    It was exactly one while the pass was sequential. With four calls in flight
+    the other three are already on the wire when the first 401 comes back, and
+    nothing can recall them -- so the bound is the concurrency, not one. What
+    matters is that it is a bound: the loop does not hammer a revoked key, a
+    rate limit or an exhausted balance to the end of the archive.
     """
     client = Client()
     client.responses.__class__ = RevokedAfterPreflight
@@ -1053,7 +1056,7 @@ def test_a_revoked_key_stops_at_the_first_group_not_the_thirty_first(
         write_jpeg(photo_like(320, 240, seed=100 + i), archive / f"bulk{i:02d}.jpg")
 
     assert analyze(archive, tmp_path / "run", "-y") != 0
-    assert client.responses.stage2_calls == 1, (
+    assert client.responses.stage2_calls <= pipeline.DEFAULT_CONCURRENCY, (
         f"the pass kept going: {client.responses.stage2_calls} groups attempted"
     )
 

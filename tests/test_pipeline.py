@@ -755,7 +755,11 @@ def test_a_run_that_dies_mid_pass_keeps_what_it_already_paid_for(tmp_path, monke
     cache = pipeline.AnalysisCache(tmp_path / "c.json")
 
     with pytest.raises(bootstrap.SemanticUnavailable):
-        pipeline.semantic_pass(assets, measurements, model="m", cache=cache)
+        # concurrency=1 so "the first three calls" and "the first three groups"
+        # are the same three groups; in the pool they need not be.
+        pipeline.semantic_pass(
+            assets, measurements, model="m", cache=cache, concurrency=1
+        )
 
     # The file exists and holds the three groups that were paid for, written
     # before the exception left the function.
@@ -792,3 +796,69 @@ def test_a_fatal_error_in_stage_3_ends_the_run_instead_of_repeating(monkeypatch,
             model="m", client=object(), cache=None,
         )
     assert calls["n"] == 1  # not once per group to the end of the archive
+
+
+# --- speed, and the pacing that has to come with it --------------------------
+
+
+def test_groups_go_out_concurrently_but_come_back_in_order():
+    """Order matters downstream; which call finished first must not."""
+    import time
+
+    seen = []
+
+    def slow(item):
+        time.sleep(0.05 if item == 0 else 0.0)
+        seen.append(item)
+        return item * 10
+
+    out = pipeline._in_parallel([0, 1, 2, 3], slow, concurrency=4, what="test")
+    assert [value for value, _ in out] == [0, 10, 20, 30]
+    assert seen[0] != 0  # something overtook the slow one, so they really ran at once
+
+
+def test_one_worker_stays_in_this_thread():
+    out = pipeline._in_parallel([1, 2], lambda x: x, concurrency=1, what="test")
+    assert [value for value, _ in out] == [1, 2]
+
+
+def test_a_failure_is_carried_back_rather_than_killing_the_batch():
+    def maybe(item):
+        if item == 1:
+            raise ValueError("no")
+        return item
+
+    out = pipeline._in_parallel([0, 1, 2], maybe, concurrency=2, what="test")
+    assert out[0] == (0, None)
+    assert isinstance(out[1][1], ValueError)
+    assert out[2] == (2, None)
+
+
+def test_a_rate_limit_backs_off_and_retries(monkeypatch):
+    waits = []
+    monkeypatch.setattr("time.sleep", lambda s: waits.append(s))
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("Error code: 429 - rate limit exceeded")
+        return "ok"
+
+    assert pipeline._with_backoff(flaky, what="test") == "ok"
+    assert len(waits) == 2
+    assert waits[1] > waits[0]  # exponential, not a fixed sleep
+
+
+def test_anything_that_is_not_a_rate_limit_is_not_retried(monkeypatch):
+    """Retrying a bad key is how a run spends money on the same error 31 times."""
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    calls = {"n": 0}
+
+    def dead():
+        calls["n"] += 1
+        raise RuntimeError("Error code: 403 - insufficient credits")
+
+    with pytest.raises(RuntimeError):
+        pipeline._with_backoff(dead, what="test")
+    assert calls["n"] == 1

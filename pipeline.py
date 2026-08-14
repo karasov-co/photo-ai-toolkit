@@ -73,6 +73,100 @@ CLASS_DIRS = {
 }
 
 
+# The API calls are network-bound, so threads are the right tool: the GIL is
+# released for the whole of a request and four in flight is four times less
+# waiting. Four rather than more because a rate limit costs more than it saves,
+# and because the archive this was measured on is one person's shoot, not a
+# fleet.
+DEFAULT_CONCURRENCY = 4
+
+# 429s are not failures, they are the server pacing the client. Retrying
+# immediately is how a burst becomes a ban.
+RATE_LIMIT_RETRIES = 5
+RATE_LIMIT_BASE_DELAY = 2.0
+
+
+def _is_rate_limited(e: Exception) -> bool:
+    text = str(e).lower()
+    return (
+        getattr(e, "status_code", None) == 429
+        or "429" in text
+        or "rate limit" in text
+        or "rate_limit" in text
+        or "too many requests" in text
+    )
+
+
+def _with_backoff(call, *, what: str):
+    """Run `call`, backing off exponentially while the server says 429.
+
+    Deliberately narrow: only a rate limit is retried here. Everything else --
+    a bad key, an exhausted balance, a malformed reply -- is somebody else's
+    decision, and retrying it is how a run spends money on the same error
+    thirty-one times.
+    """
+    import random
+    import time
+
+    for attempt in range(RATE_LIMIT_RETRIES):
+        try:
+            return call()
+        except Exception as e:
+            if not _is_rate_limited(e) or attempt == RATE_LIMIT_RETRIES - 1:
+                raise
+            # Full jitter: without it, four threads throttled together retry
+            # together, and the burst that caused the 429 repeats on a timer.
+            delay = RATE_LIMIT_BASE_DELAY * (2**attempt) * (0.5 + random.random() / 2)
+            logger.warning(
+                "%s rate-limited; waiting %.1fs (attempt %d of %d)",
+                what, delay, attempt + 1, RATE_LIMIT_RETRIES,
+            )
+            time.sleep(delay)
+    raise AssertionError("unreachable")
+
+
+def _in_parallel(work: list, run, *, concurrency: int, what: str):
+    """`run` over `work`, in order, with `concurrency` calls in flight.
+
+    Results come back in the order of `work`, not the order they finished, so
+    nothing downstream can depend on which group happened to be quickest. One
+    worker runs inline: a pool of one costs a thread and buys nothing, and it
+    is what to use when a traceback matters more than the wall clock.
+
+    An account-level failure stops the remaining submissions dead. Sequentially
+    a revoked key cost exactly one call; with four in flight it costs at most
+    four, because three were already on the wire when the first came back. It
+    does not cost all thirty-one, which is what this is guarding.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    stop: list[bool] = [False]
+    if concurrency <= 1 or len(work) <= 1:
+        return [_result(run, item, what, stop) for item in work]
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        return list(pool.map(lambda item: _result(run, item, what, stop), work))
+
+
+def _result(run, item, what, stop):
+    """One unit of work, with its exception carried rather than raised.
+
+    Raised inside a pool, an exception loses the rest of the batch: work already
+    paid for is thrown away with the map. Carried, it reaches the caller in
+    order, and the caller decides whether it ends the run.
+    """
+    import bootstrap
+
+    if stop[0]:
+        return (None, bootstrap.SemanticUnavailable("the run already stopped", kind="stopped"))
+    try:
+        return (_with_backoff(lambda: run(item), what=what), None)
+    except Exception as e:  # noqa: BLE001 - re-raised by the caller, in order
+        if bootstrap.is_fatal_api_error(e):
+            stop[0] = True
+        return (None, e)
+
+
+
 @dataclass
 class PipelineOptions:
     input_dir: Path
@@ -117,6 +211,10 @@ class PipelineOptions:
     # reasoned at the vendor's default and the bill was two and a half times
     # the quote. None means "do not send the parameter at all".
     reasoning: str | None = "low"
+    # API calls in flight at once. Separate from `jobs`, which is local decode:
+    # one is network latency, the other is CPU, and a machine with four cores
+    # has no business making four API calls for that reason.
+    concurrency: int = DEFAULT_CONCURRENCY
 
     def resolved_quarantine(self) -> Path:
         """The *physical* quarantine directory, deliberately not the farm folder.
@@ -582,6 +680,7 @@ def semantic_pass(
     cache: AnalysisCache | None = None,
     calls: dict | None = None,
     reasoning: str | None = "low",
+    concurrency: int = DEFAULT_CONCURRENCY,
 ) -> dict[str, Semantic]:
     """Rank frames against each other in groups, then stitch to a global order.
 
@@ -590,7 +689,6 @@ def semantic_pass(
     every live absolute call made against this archive returned 548, 560, 694,
     762 -- a scale that does not discriminate is not a scale.
     """
-    import base64
 
     import aggregate
     import batch_runner
@@ -639,48 +737,26 @@ def semantic_pass(
     # a bug in here all used to end the process with every answer bought in this
     # pass still only in memory. `cache.save()` ran once, after both passes
     # completed, which is the one moment a failing run never reaches.
-    try:
-        for index, group in enumerate(groups):
-            frames = []
-            for name in group:
-                measurement = measurements[name]
-                with open(measurement.preview_path, "rb") as f:
-                    encoded = base64.standard_b64encode(f.read()).decode()
-                # For a RAW, hand over what the *sensor* saturated at. For anything
-                # else, hand over the rendered figure and say so. The two mean
-                # different things and the prompt must not conflate them.
-                if measurement.raw_available:
-                    highlights = measurement.raw_clipped_all_channels
-                    shadows = measurement.clipped_shadows
-                else:
-                    highlights = measurement.clipped_highlights
-                    shadows = measurement.clipped_shadows
-                frames.append(
-                    {
-                        "filename": name,
-                        "clipped_highlights": highlights,
-                        "clipped_shadows": shadows,
-                        "measurement_domain": measurement.measurement_domain,
-                        "headroom_stops": measurement.raw_highlight_headroom_stops,
-                        "encoded": encoded,
-                    }
-                )
+    # The frames are built up front, in one thread: reading previews and
+    # base64-encoding them is local work, and doing it inside the pool would put
+    # file I/O and API latency in the same budget.
+    payloads = [_stage2_frames(group, measurements) for group in groups]
 
-            try:
-                text = _provider(model, client).complete_vision(
-                    llm_provider.from_openai_content(
-                        prompts.STAGE2_SYSTEM,
-                        prompts.stage2_user_content(frames),
-                        max_tokens=900 + 260 * len(frames),
-                        reasoning_effort=reasoning,
-                        stage="stage2",
-                    )
-                )
-                items = batch_runner.parse_group_json(text)
-                succeeded += 1
-                if calls is not None:
-                    calls["stage2"] = calls.get("stage2", 0) + 1
-            except Exception as e:
+    def ask(frames):
+        return _provider(model, client).complete_vision(
+            llm_provider.from_openai_content(
+                prompts.STAGE2_SYSTEM,
+                prompts.stage2_user_content(frames),
+                max_tokens=900 + 260 * len(frames),
+                reasoning_effort=reasoning,
+                stage="stage2",
+            )
+        )
+
+    try:
+        replies = _in_parallel(payloads, ask, concurrency=concurrency, what="Stage 2")
+        for index, (group, (text, error)) in enumerate(zip(groups, replies, strict=True)):
+            if error is not None:
                 import bootstrap
 
                 # An account-level failure hits every remaining group identically.
@@ -688,16 +764,25 @@ def semantic_pass(
                 # one per group, each logged in full -- before the run gave up. On
                 # a paid key the same loop would keep hammering a rate limit or an
                 # exhausted balance to the end of the archive.
-                #
-                # `_stage3_call` has had this check since the balance ran out
-                # mid-run; Stage 2 was missed.
-                if bootstrap.is_fatal_api_error(e):
-                    kind, message = bootstrap.classify_api_error(e)
+                if bootstrap.is_fatal_api_error(error):
+                    kind, message = bootstrap.classify_api_error(error)
                     logger.error("Semantic pass stopped at group %d: %s", index, message)
-                    raise bootstrap.SemanticUnavailable(message, kind=kind) from e
+                    raise bootstrap.SemanticUnavailable(message, kind=kind) from error
+                first_error = first_error or error
+                logger.error(
+                    "Semantic group %d failed: %s", index, reports.redact(str(error))
+                )
+                continue
+
+            try:
+                items = batch_runner.parse_group_json(text)
+            except Exception as e:
                 first_error = first_error or e
                 logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
                 continue
+            succeeded += 1
+            if calls is not None:
+                calls["stage2"] = calls.get("stage2", 0) + 1
 
             # A near-ranking is repaired before it is judged. Discarding a group
             # costs twelve photographs their genre, their faces and their subject
@@ -744,6 +829,35 @@ def semantic_pass(
         raise first_error
 
     return _stitch(cached_raw, by_name, out)
+
+
+def _stage2_frames(group, measurements) -> list[dict]:
+    """The per-frame payload for one group: the preview, plus what was measured."""
+    import base64
+
+    frames = []
+    for name in group:
+        measurement = measurements[name]
+        with open(measurement.preview_path, "rb") as f:
+            encoded = base64.standard_b64encode(f.read()).decode()
+        # For a RAW, hand over what the *sensor* saturated at. For anything else,
+        # hand over the rendered figure and say so. The two mean different things
+        # and the prompt must not conflate them.
+        if measurement.raw_available:
+            highlights = measurement.raw_clipped_all_channels
+        else:
+            highlights = measurement.clipped_highlights
+        frames.append(
+            {
+                "filename": name,
+                "clipped_highlights": highlights,
+                "clipped_shadows": measurement.clipped_shadows,
+                "measurement_domain": measurement.measurement_domain,
+                "headroom_stops": measurement.raw_highlight_headroom_stops,
+                "encoded": encoded,
+            }
+        )
+    return frames
 
 
 def _store_group(placed, by_name, cached_raw, cache, model, reasoning) -> None:
@@ -891,6 +1005,7 @@ def stage3_pass(
     cache: AnalysisCache | None = None,
     group_size: int = 6,
     reasoning: str | None = "low",
+    concurrency: int = DEFAULT_CONCURRENCY,
 ) -> dict:
     """The artistic read, in small groups, with crops for anything with a face.
 
@@ -942,40 +1057,45 @@ def stage3_pass(
 
     by_key = {a.key: a for a in assets}
     done = 0
-    try:
-        for start in range(0, len(pending), group_size):
-            group = pending[start : start + group_size]
-            frames = []
-            for key in group:
-                measurement = measurements[key]
-                preview = Path(measurement.preview_path)
-                if not preview.exists():
-                    out[key] = stage3_module.ArtisticAssessment.skipped(
-                        "no preview was generated"
-                    )
-                    continue
-                views = _stage3_views(by_key[key], preview, artistic_hints.get(key, {}))
-                frames.append({"key": key, "views": views, "encoded": views[0][1]})
 
-            if not frames:
-                continue
-
-            try:
-                assessments = _stage3_call(
-                    frames, model=model, client=client, stage3_module=stage3_module,
-                    reasoning=reasoning,
+    # Every group's crops are cut before any call goes out, for the same reason
+    # Stage 2 encodes up front: image work and network latency should not share
+    # a budget.
+    batches = []
+    for start in range(0, len(pending), group_size):
+        frames = []
+        for key in pending[start : start + group_size]:
+            preview = Path(measurements[key].preview_path)
+            if not preview.exists():
+                out[key] = stage3_module.ArtisticAssessment.skipped(
+                    "no preview was generated"
                 )
-            except Exception as e:
+                continue
+            views = _stage3_views(by_key[key], preview, artistic_hints.get(key, {}))
+            frames.append({"key": key, "views": views, "encoded": views[0][1]})
+        if frames:
+            batches.append(frames)
+
+    def ask(frames):
+        return _stage3_call(
+            frames, model=model, client=client, stage3_module=stage3_module,
+            reasoning=reasoning,
+        )
+
+    try:
+        replies = _in_parallel(batches, ask, concurrency=concurrency, what="Stage 3")
+        for frames, (assessments, failure) in zip(batches, replies, strict=True):
+            if failure is not None:
                 # Stage 2 has had this check since a wrong key produced
                 # thirty-one identical 401s. Stage 3 did not, so an exhausted
                 # balance was retried once per group to the end of the archive.
                 # An account-level failure hits every remaining group the same
                 # way; the run ends and what it already bought is saved first.
-                if not bootstrap.is_fatal_api_error(e):
-                    raise
-                kind, message = bootstrap.classify_api_error(e)
+                if not bootstrap.is_fatal_api_error(failure):
+                    raise failure
+                kind, message = bootstrap.classify_api_error(failure)
                 logger.error("Stage 3 stopped after %d group(s): %s", done, message)
-                raise bootstrap.SemanticUnavailable(message, kind=kind) from e
+                raise bootstrap.SemanticUnavailable(message, kind=kind) from failure
 
             for frame in frames:
                 key = frame["key"]
@@ -1471,7 +1591,7 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
         assessments = stage3_pass(
             assets, measurements, routed, hints,
             model=stage3_model, client=client, cache=cache,
-            reasoning=options.reasoning,
+            reasoning=options.reasoning, concurrency=options.concurrency,
         )
     except bootstrap.SemanticUnavailable as e:
         # Already classified as fatal downstream: an exhausted balance or a
@@ -1566,6 +1686,7 @@ def _semantics(
         semantics = semantic_pass(
             assets, measurements, model=model, client=client,
             cache=cache, calls=result.llm_calls, reasoning=options.reasoning,
+            concurrency=options.concurrency,
         )
     except bootstrap.SemanticUnavailable as e:
         # Already classified where it happened -- re-running it through

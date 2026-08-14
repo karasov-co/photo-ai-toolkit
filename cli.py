@@ -183,6 +183,7 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
         insights_scope=getattr(args, "insights_scope", "new"),
         jobs=getattr(args, "jobs", None),
         reasoning=getattr(args, "reasoning", "low"),
+        concurrency=getattr(args, "concurrency", pipeline.DEFAULT_CONCURRENCY),
     )
 
     printed = {"n": 0, "analysed": 0, "reused": 0, "announced": False}
@@ -1160,6 +1161,14 @@ def build_parser() -> argparse.ArgumentParser:
                 "how hard the model is asked to think (default: low). "
                 "Reasoning tokens are billed as output, and this is the only "
                 "control over how many of them a run buys"
+            ),
+        )
+        parser.add_argument(
+            "--concurrency", type=int, default=pipeline.DEFAULT_CONCURRENCY,
+            help=(
+                f"API calls in flight at once (default {pipeline.DEFAULT_CONCURRENCY}). "
+                "Not the same as --jobs: this is network latency, --jobs is local "
+                "decoding. 1 makes the passes sequential"
             ),
         )
         parser.add_argument(
