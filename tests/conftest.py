@@ -118,6 +118,24 @@ def _no_api_key(monkeypatch, tmp_path_factory):
     monkeypatch.chdir(empty)
 
 
+@pytest.fixture(autouse=True)
+def _fakes_speak_the_openai_dialect(monkeypatch):
+    """Pin the provider to openai for the suite, because the doubles are openai.
+
+    Every fake client in tests/ exposes `responses.create` and returns an object
+    with `output_text` -- that is the OpenAI Responses API. The product default
+    is grok, which speaks chat/completions at api.x.ai, so without this pin the
+    pipeline would correctly ignore those doubles and try to reach the real
+    endpoint.
+
+    The pin describes the fakes; it does not paper over the default. Tests that
+    are *about* the default clear this variable and assert on
+    `bootstrap.resolve_provider`, and `test_an_injected_client_is_ignored_when_
+    the_provider_differs` covers the case this exists to make possible.
+    """
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "openai")
+
+
 @pytest.fixture
 def sample_record():
     """One fully-populated record, shaped the way main.process_photo builds it."""

@@ -39,6 +39,10 @@ REPORT_SCHEMA_VERSION = 2
 
 SECRET_PATTERNS = (
     re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
+    # xAI keys. Added after a provider quoted one back inside a 401 body that
+    # went straight into processing.log -- the file people attach to bug
+    # reports. `sk-` was covered; `xai-` was not.
+    re.compile(r"xai-[A-Za-z0-9_\-]{16,}"),
     re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
     re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
     re.compile(r"(?i)\b(api[_-]?key|token|secret|password|authorization)\b\s*[=:]\s*\S+"),

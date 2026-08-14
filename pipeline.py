@@ -574,11 +574,13 @@ def semantic_pass(
     import batch_runner
     import prompts
 
-    if client is None:
-        import bootstrap
-
-        client = bootstrap.make_client()
-
+    # No client is built here. It used to fall back to `bootstrap.make_client()`,
+    # which returns an OpenAI client with no base_url -- hard-wired to
+    # api.openai.com. `_provider` then saw a non-None client and wrapped it in
+    # OpenAIProvider, so a run configured for grok sent an xai- key to OpenAI
+    # and collected a 401 per group. The preflight went through
+    # `llm_provider.build` and reached x.ai correctly, which is why the two
+    # disagreed. Leaving this None lets `_provider` build from configuration.
     by_name = {a.key: a for a in assets}
     out: dict[str, Semantic] = {}
     # Raw model replies, keyed by asset. Both the ones answered from store and
@@ -648,6 +650,20 @@ def semantic_pass(
             if calls is not None:
                 calls["stage2"] = calls.get("stage2", 0) + 1
         except Exception as e:
+            import bootstrap
+
+            # An account-level failure hits every remaining group identically.
+            # Without this, a wrong key produced thirty-one identical 401s --
+            # one per group, each logged in full -- before the run gave up. On
+            # a paid key the same loop would keep hammering a rate limit or an
+            # exhausted balance to the end of the archive.
+            #
+            # `_stage3_call` has had this check since the balance ran out
+            # mid-run; Stage 2 was missed.
+            if bootstrap.is_fatal_api_error(e):
+                kind, message = bootstrap.classify_api_error(e)
+                logger.error("Semantic pass stopped at group %d: %s", index, message)
+                raise bootstrap.SemanticUnavailable(message, kind=kind) from e
             first_error = first_error or e
             logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
             continue
@@ -918,25 +934,32 @@ def _stage3_views(asset, preview: Path, hint: dict) -> list[tuple[str, str]]:
 
 
 def _provider(model: str, client=None):
-    """The provider for this run.
+    """The provider for this run, from configuration -- not from a stray client.
 
-    A client passed in wins: the tests inject a fake, and so does anything that
-    wants to reuse a configured connection. Otherwise the name comes from the
-    environment, so a run can be pointed at a local server without touching the
-    pipeline.
+    An injected client is honoured only when the configured provider is the one
+    it speaks. A client object carries an endpoint and a key inside it, and
+    wrapping whatever turns up in `OpenAIProvider` silently overrode
+    `PHOTO_AI_PROVIDER`: a run set to grok sent an xai- key to api.openai.com
+    and got a 401 back for every group.
+
+    The manufactured client is gone from both callers, so in a real run this is
+    always None and the configuration decides. The check stays as the second
+    line of defence, because the first one was "nobody will pass the wrong
+    client" and that turned out to be exactly what the code did.
     """
     import os
 
     import bootstrap
 
-    if client is not None:
-        # An injected client is already connected to something; wrapping it in
-        # the OpenAI provider is what the tests and any reused connection want.
+    provider = bootstrap.resolve_provider()
+    if client is not None and provider == llm_provider.OpenAIProvider.name:
         return llm_provider.OpenAIProvider(model, client=client)
+    if client is not None:
+        logger.debug(
+            "Ignoring an injected client: this run is configured for %s", provider
+        )
     return llm_provider.build(
-        bootstrap.resolve_provider(),
-        model,
-        base_url=os.environ.get("PHOTO_AI_BASE_URL", ""),
+        provider, model, base_url=os.environ.get("PHOTO_AI_BASE_URL", "")
     )
 
 
@@ -1349,7 +1372,7 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
     try:
         assessments = stage3_pass(
             assets, measurements, routed, hints,
-            model=stage3_model, client=client or _client_for(options), cache=cache,
+            model=stage3_model, client=client, cache=cache,
         )
     except bootstrap.SemanticUnavailable as e:
         # Already classified as fatal downstream: an exhausted balance or a
@@ -1425,12 +1448,6 @@ def bootstrap_model(options, fallback: str) -> str:
     return bootstrap.resolve_model(options.stage3_model) if options.stage3_model else fallback
 
 
-def _client_for(options):
-    import bootstrap
-
-    return bootstrap.make_client()
-
-
 def _semantics(
     assets, measurements, options: PipelineOptions, client, result: RunResult, model: str
 ) -> dict[str, Semantic]:
@@ -1451,6 +1468,16 @@ def _semantics(
             assets, measurements, model=model, client=client,
             cache=cache, calls=result.llm_calls,
         )
+    except bootstrap.SemanticUnavailable as e:
+        # Already classified where it happened -- re-running it through
+        # `classify_api_error` turned "authentication" into "unknown: the API
+        # call failed (SemanticUnavailable)", which reads as a bug in this tool
+        # rather than a wrong key.
+        result.semantic_error = f"{e.kind}: {e}"
+        logger.error("Semantic pass failed: %s", e)
+        if not options.allow_semantic_fallback:
+            raise
+        return {}
     except Exception as e:
         kind, message = bootstrap.classify_api_error(e)
         result.semantic_error = f"{kind}: {message}"

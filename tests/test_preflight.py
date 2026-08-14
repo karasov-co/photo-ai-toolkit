@@ -11,6 +11,7 @@ The tests are lettered to match the requirements they came from.
 """
 
 import json
+import pathlib
 
 import pytest
 from synthetic import photo_like, write_jpeg
@@ -576,7 +577,9 @@ def test_k_the_default_model_is_exactly_the_current_one():
     assert bootstrap.DEFAULT_SEMANTIC_MODEL == bootstrap.DEFAULT_MODEL
 
 
-def test_grok_is_the_default_provider():
+def test_grok_is_the_default_provider(monkeypatch):
+    # The suite pins openai for its fakes; the default is what is asserted here.
+    monkeypatch.delenv(bootstrap.PROVIDER_VAR, raising=False)
     assert bootstrap.DEFAULT_PROVIDER == "grok"
     assert bootstrap.resolve_provider(None) == "grok"
 
@@ -938,3 +941,136 @@ def test_the_class_does_not_override_an_explicit_status():
             return "slow down"
 
     assert preflight.classify(NotFoundError()) == preflight.Failure.QUOTA.value
+
+
+# --- the run must reach the provider it was configured for --------------------
+#
+# The reported failure: the preflight went to api.x.ai and passed, then every
+# semantic group went to api.openai.com with the xai- key and came back 401 --
+# thirty-one times, one per group. Two causes, and either alone was enough.
+
+
+def test_the_pipeline_never_manufactures_a_client():
+    """`bootstrap.make_client()` returns an OpenAI client with no base_url.
+
+    Calling it inside the pipeline hard-wires the run to api.openai.com
+    whatever the configured provider is, which is exactly what happened.
+    """
+    code = [
+        line for line in pathlib.Path(pipeline.__file__).read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+    ]
+    assert "make_client(" not in "\n".join(code), "the pipeline builds its own client again"
+
+
+def test_an_injected_client_is_ignored_when_the_provider_differs(monkeypatch):
+    """Second line of defence: a client carries an endpoint and a key inside it."""
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
+    engine = pipeline._provider("grok-4.6", client=Client(stage2="[]"))
+
+    import llm_provider
+
+    assert isinstance(engine, llm_provider.GrokProvider)
+    assert engine.base_url == "https://api.x.ai/v1"
+
+
+def test_an_injected_client_is_used_when_it_matches(monkeypatch):
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "openai")
+    client = Client(stage2="[]")
+    engine = pipeline._provider("gpt-x", client=client)
+
+    import llm_provider
+
+    assert isinstance(engine, llm_provider.OpenAIProvider)
+    assert engine.client is client
+
+
+def test_with_no_client_the_configuration_decides(monkeypatch):
+    import llm_provider
+
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
+    assert isinstance(pipeline._provider("grok-4.6"), llm_provider.GrokProvider)
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "anthropic")
+    assert isinstance(pipeline._provider("claude"), llm_provider.AnthropicProvider)
+
+
+def test_stage2_and_stage3_agree_with_the_preflight_on_the_endpoint(monkeypatch):
+    """The preflight built from configuration and the passes did not.
+
+    Both go through the same builder now, so a run cannot check one endpoint
+    and then spend on another.
+    """
+    import llm_provider
+
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
+    from_pipeline = pipeline._provider("grok-4.6")
+    from_preflight = llm_provider.build("grok", "grok-4.6")
+    assert type(from_pipeline) is type(from_preflight)
+    assert from_pipeline.base_url == from_preflight.base_url
+
+
+# --- one 401 is enough --------------------------------------------------------
+
+
+class RevokedAfterPreflight(Responses):
+    """Passes the preflight, then 401s every group.
+
+    That is what a key revoked mid-run looks like, and it is the only way to
+    reach the group loop at all -- a key that is wrong from the start is caught
+    by the preflight, which is the point of having one.
+    """
+
+    def create(self, **kwargs):
+        if "verifying an API configuration" in kwargs.get("instructions", ""):
+            return super().create(**kwargs)
+        self.stage2_calls += 1
+        error = Exception(
+            "Error code: 401 - {'error': {'message': 'Incorrect API key provided', "
+            "'code': 'invalid_api_key'}}"
+        )
+        error.status_code = 401
+        raise error
+
+
+def test_a_revoked_key_stops_at_the_first_group_not_the_thirty_first(
+    archive, tmp_path, monkeypatch
+):
+    """31 groups, 31 identical 401s, all logged in full. Now: one, then stop.
+
+    On a paid key the same loop would hammer a rate limit or an exhausted
+    balance to the end of the archive.
+    """
+    client = Client()
+    client.responses.__class__ = RevokedAfterPreflight
+    with_client(monkeypatch, client)
+
+    # Enough photographs for several groups of twelve.
+    for i in range(40):
+        write_jpeg(photo_like(320, 240, seed=100 + i), archive / f"bulk{i:02d}.jpg")
+
+    assert analyze(archive, tmp_path / "run", "-y") != 0
+    assert client.responses.stage2_calls == 1, (
+        f"the pass kept going: {client.responses.stage2_calls} groups attempted"
+    )
+
+
+def test_a_revoked_key_is_reported_as_a_key_problem(archive, tmp_path, monkeypatch, capsys):
+    """It used to surface as 'unknown: the API call failed (SemanticUnavailable)',
+    which reads as a bug in this tool rather than a wrong key."""
+    client = Client()
+    client.responses.__class__ = RevokedAfterPreflight
+    with_client(monkeypatch, client)
+
+    analyze(archive, tmp_path / "run", "-y")
+
+    everything = "".join(capsys.readouterr())
+    assert "SemanticUnavailable" not in everything
+    assert "rejected the key" in everything or "authentication" in everything
+
+
+def test_an_xai_key_never_reaches_a_log(archive, tmp_path):
+    """A provider quoted one back inside a 401 body, which went into the log."""
+    import reports
+
+    leaked = "xai-hRss000000000000000000000000000zGxG"
+    assert leaked not in reports.redact(f"Incorrect API key provided: {leaked}. See docs")
