@@ -16,9 +16,19 @@ __pycache__/
 photos/
 results/
 run/
+# Both spellings. The folder this project actually writes is `photo-results`,
+# with a hyphen; the ignore said `photo_results` with an underscore, so 3,440
+# files walked straight past it into the repository.
 photo_results/
+photo-results/
 test_results/
 stories_picks/
+*.log
+
+# Never versioned, wherever they turn up: the caches and derivatives a run
+# generates. `report/assets/` alone is one JPEG per photograph, twice.
+**/.internal/
+**/report/assets/
 
 # Large media that must never enter git history (GitHub rejects blobs >100 MB)
 *.MOV
