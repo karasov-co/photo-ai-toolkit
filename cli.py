@@ -118,6 +118,22 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
 
     # --- nothing above this line has touched a file, and nothing below it runs
     # --- until the model has proved it works.
+    if semantic and not bootstrap.has_credentials():
+        # No key at all is not a failure, it is a person who has not paid yet.
+        # `analyze` used to stop here with a preflight error and produce
+        # nothing; the local pass is most of what this tool does and it costs
+        # nothing to run. A key that exists and is rejected still stops the run:
+        # that one is a mistake worth surfacing, not a mode.
+        print(
+            "No API key found, so this is the local pass: every technical\n"
+            "measurement, the duplicate groups, the edit recipes and a full\n"
+            "report. What it cannot do is look at the picture -- no content\n"
+            "check, no artistic read, and nothing can be ranked as a top\n"
+            f"photograph. Set {bootstrap.XAI_KEY_VAR} and run `analyze` again for that.\n",
+            flush=True,
+        )
+        semantic = False
+
     if semantic:
         import os as _os
 

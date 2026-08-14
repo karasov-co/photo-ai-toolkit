@@ -151,17 +151,57 @@ def analyze(archive, out, *extra):
 # --- A. no key ----------------------------------------------------------------
 
 
-def test_a_missing_key_stops_before_anything_is_opened(archive, tmp_path, watchful, capsys):
+# No key at all and a key that does not work are different situations, and they
+# used to be handled identically: both refused to open a photograph. Refusing is
+# right for a broken key -- somebody meant to pay and something is wrong -- and
+# wrong for no key, which is just a person who has not paid yet. The local pass
+# is most of what this tool does and it costs nothing to run.
+
+
+def test_no_key_runs_the_local_pass_and_still_produces_a_report(archive, tmp_path, capsys):
     out = tmp_path / "run"
     code = analyze(archive, out)
+
+    assert code == 0
+    report = out / "report" / "index.html"
+    assert report.is_file()
+    assert '<img' in report.read_text()
+
+    said = capsys.readouterr().out
+    assert "local pass" in said
+    assert bootstrap.XAI_KEY_VAR in said
+    assert "no content check" in said or "no content" in said
+
+
+def test_no_key_never_claims_a_content_check_happened(archive, tmp_path):
+    out = tmp_path / "run"
+    analyze(archive, out)
+    payload = json.loads((out / ".internal" / "reports" / "analysis.json").read_text())
+    assert all(not a.get("semantic_present") for a in payload["assets"])
+    assert all(a["category"] != "TOP" for a in payload["assets"])
+
+
+def test_a_rejected_key_still_stops_before_anything_is_opened(
+    archive, tmp_path, watchful, capsys, monkeypatch
+):
+    """The strict path, unchanged: a key that exists and fails is a mistake."""
+    monkeypatch.setenv(bootstrap.XAI_KEY_VAR, "xai-nope")
+    client = Client(error=RuntimeError("Error code: 401 - invalid api key"))
+    with_client(monkeypatch, client)
+
+    code = analyze(archive, out := tmp_path / "run")
 
     assert code != 0
     assert watchful["photos"] == 0, "not a single photograph should have been decoded"
     assert not out.exists(), "the output directory must not even be created"
-    assert "OPENAI_API_KEY" in capsys.readouterr().err
 
 
-def test_a_missing_key_leaves_an_existing_run_exactly_as_it_was(archive, tmp_path, watchful):
+def test_a_rejected_key_leaves_an_existing_run_exactly_as_it_was(
+    archive, tmp_path, watchful, monkeypatch
+):
+    monkeypatch.setenv(bootstrap.XAI_KEY_VAR, "xai-nope")
+    with_client(monkeypatch, Client(error=RuntimeError("Error code: 401 - invalid api key")))
+
     out = tmp_path / "run"
     space = workspace.Workspace(out).create()
     space.report.parent.mkdir(parents=True, exist_ok=True)
@@ -175,14 +215,18 @@ def test_a_missing_key_leaves_an_existing_run_exactly_as_it_was(archive, tmp_pat
     assert watchful["photos"] == 0
 
 
-def test_a_missing_key_creates_no_previews(archive, tmp_path):
-    out = tmp_path / "run"
-    analyze(archive, out)
-    assert not list(tmp_path.rglob("*_jpg.jpg"))
+def test_a_rejected_key_creates_no_previews(archive, tmp_path, monkeypatch):
+    monkeypatch.setenv(bootstrap.XAI_KEY_VAR, "xai-nope")
+    with_client(monkeypatch, Client(error=RuntimeError("Error code: 401 - invalid api key")))
+    analyze(archive, tmp_path / "run")
+    assert not list((tmp_path / "run").rglob("*_jpg.jpg"))
 
 
-def test_a_missing_key_does_not_migrate_an_old_layout(archive, tmp_path):
+def test_a_rejected_key_does_not_migrate_an_old_layout(archive, tmp_path, monkeypatch):
     """The reported failure moved the previous run before it knew it could work."""
+    monkeypatch.setenv(bootstrap.XAI_KEY_VAR, "xai-nope")
+    with_client(monkeypatch, Client(error=RuntimeError("Error code: 401 - invalid api key")))
+
     out = tmp_path / "run"
     (out / "reports").mkdir(parents=True)
     (out / "reports" / "analysis.json").write_text('{"assets": []}')

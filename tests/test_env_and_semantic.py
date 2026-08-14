@@ -171,26 +171,32 @@ def test_semantic_without_a_key_fails_before_any_file_is_opened(archive, tmp_pat
     assert opened["n"] == 0, "not a single photograph should have been decoded"
 
 
-def test_the_cli_exits_non_zero_and_explains(archive, tmp_path, capsys):
+def test_the_cli_runs_locally_and_says_exactly_what_is_missing(archive, tmp_path, capsys):
+    """This used to exit non-zero with nothing to show for it.
+
+    Refusing is right for a key that exists and fails; for no key it threw away
+    the local pass, which is most of what this tool does and costs nothing. What
+    must never happen is claiming a content check ran.
+    """
     code = cli.main(
-        ["--lang", "ru", "analyze", "--input", str(archive),
-         "--output", str(tmp_path / "out")]
+        ["analyze", "--input", str(archive), "--output", str(tmp_path / "out")]
     )
-    captured = capsys.readouterr()
+    said = capsys.readouterr().out
 
-    assert code != 0
-    assert "OPENAI_API_KEY" in captured.err
-    assert ".env" in captured.err
-    # No photograph was opened to learn this, and nothing was suggested as a
-    # way around it.
-    assert "No photograph was opened" in captured.err
-    assert "fallback" not in captured.err.lower()
+    assert code == 0
+    assert (tmp_path / "out" / "report" / "index.html").is_file()
+    assert bootstrap.XAI_KEY_VAR in said
+    assert "no content" in said and "no artistic read" in said
+    assert "fallback" not in said.lower()
 
 
-def test_no_report_is_written_when_credentials_are_missing(archive, tmp_path):
+def test_the_report_written_without_a_key_does_not_pretend(archive, tmp_path):
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
-    assert not (out / ".internal" / "reports" / "analysis.json").exists()
+    payload = json.loads((out / ".internal" / "reports" / "analysis.json").read_text())
+    assert payload["assets"]
+    assert all(not a.get("semantic_present") for a in payload["assets"])
+    assert all(not a.get("semantic_requested") for a in payload["assets"])
 
 
 def test_no_api_call_is_attempted_without_a_key(archive, tmp_path, monkeypatch):
