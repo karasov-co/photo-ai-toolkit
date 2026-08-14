@@ -73,9 +73,6 @@ def semantic(**overrides) -> scoring.Semantic:
         "axis_a": 70,
         "axis_b": 70,
         "axis_c": 60,
-        "faces": False,
-        "brand_mark": False,
-        "identifiable_people": False,
         "subject_strength": 75,
     }
     payload.update(overrides)
@@ -101,7 +98,7 @@ def test_1_a_blinking_portrait_is_weak(profile):
     verdict = judge(
         profile,
         tech=94,  # technically excellent, which is the point
-        sem=semantic(genre="portrait", faces=True, identifiable_people=True, axis_a=88, axis_b=85),
+        sem=semantic(genre="portrait", axis_a=88, axis_b=85),
         art=artistic(
             portrait=face(
                 eyes_state="CLOSED", expression="BLINK", expression_quality=10,
@@ -165,60 +162,30 @@ def test_5_a_good_portrait_without_a_release_is_never_weak(profile):
         profile,
         tech=85, uplift=7,
         sem=semantic(
-            genre="portrait", faces=True, identifiable_people=True,
-            axis_a=70, axis_b=80, subject_strength=85,
+            genre="portrait", axis_a=70, axis_b=80, subject_strength=85,
         ),
         art=flat(78, artistic_confidence=80, portrait=face()),
     )
     assert verdict.category in (
-        PhotoCategory.GOOD_PERSONAL.value, PhotoCategory.GOOD_EDITORIAL.value
+        PhotoCategory.GOOD_PERSONAL.value, PhotoCategory.GOOD_STOCK.value
     )
-    assert any("release" in b for b in verdict.commercial_blockers)
+    assert not any("release" in b for b in verdict.commercial_blockers)
 
 
-def test_a_documentary_frame_behind_a_release_is_editorial_not_personal(profile):
-    """The reported failure, as a category.
+def test_a_documentary_frame_is_stock_not_a_special_case(profile):
+    """Four tests here described GOOD_EDITORIAL and its release gates.
 
-    Street signs and unreleased faces used to land a photojournalist's work in
-    the same pile as a snapshot of nothing. Editorial is a market; being told
-    you have no market is a different statement, and it was the wrong one.
+    The category is gone, and with it every path that decided stock versus
+    editorial: model and property releases, face blocking, brand and signage
+    blocking. Everything that used to land in editorial lands in stock now.
     """
     verdict = judge(
         profile, tech=84, uplift=7,
-        sem=semantic(genre="reportage", faces=True, identifiable_people=True,
-                     signage_text=True, axis_c=75, subject_strength=80),
+        sem=semantic(genre="reportage", axis_c=75, subject_strength=80),
         art=flat(75, artistic_confidence=80, documentary_significance=82),
     )
-    assert verdict.category == PhotoCategory.GOOD_EDITORIAL.value
-
-
-def test_a_dominant_brand_mark_is_still_not_editorial(profile):
-    verdict = judge(
-        profile, tech=84, uplift=7,
-        sem=semantic(genre="street", brand_mark=True, signage_text=True,
-                     axis_c=80, subject_strength=80),
-        art=flat(75, artistic_confidence=80, documentary_significance=85),
-    )
-    assert verdict.category != PhotoCategory.GOOD_EDITORIAL.value
-
-
-def test_signs_without_documentary_weight_are_not_editorial(profile):
-    """Editorial is earned by the document, not by containing a sign."""
-    verdict = judge(
-        profile, tech=80, uplift=6,
-        sem=semantic(genre="other", signage_text=True, axis_c=20, subject_strength=60),
-        art=flat(50, artistic_confidence=75, documentary_significance=25),
-    )
-    assert verdict.category != PhotoCategory.GOOD_EDITORIAL.value
-
-
-def test_without_stage3_the_content_axis_decides_editorial(profile):
-    verdict = judge(
-        profile, tech=80, uplift=6,
-        sem=semantic(genre="reportage", signage_text=True, faces=True,
-                     axis_c=78, subject_strength=70),
-    )
-    assert verdict.category == PhotoCategory.GOOD_EDITORIAL.value
+    assert verdict.category == PhotoCategory.GOOD_STOCK.value
+    assert not hasattr(PhotoCategory, "GOOD_EDITORIAL")
 
 
 def test_6_a_commercially_usable_good_image_is_good_stock(profile):
@@ -357,7 +324,7 @@ def test_a_confident_read_does_not_overrule_a_closed_eye(profile):
     """The line between a guess and an observation."""
     verdict = judge(
         profile, tech=88,
-        sem=semantic(genre="portrait", faces=True),
+        sem=semantic(genre="portrait"),
         art=artistic(
             documentary_significance=95, distinctiveness=95, artistic_confidence=90,
             portrait=face(
@@ -372,7 +339,7 @@ def test_a_confident_read_does_not_overrule_a_closed_eye(profile):
 def test_a_deliberate_closed_eye_is_not_a_defect(profile):
     verdict = judge(
         profile, tech=84, uplift=6,
-        sem=semantic(genre="portrait", faces=True, subject_strength=80),
+        sem=semantic(genre="portrait", subject_strength=80),
         art=flat(
             82, artistic_confidence=85,
             intent_reading={"closed eyes": "deliberate"},
@@ -401,14 +368,12 @@ def test_a_release_never_lowers_the_score(profile):
     """The rule stated as an equality, because an inequality would drift."""
     art = flat(80, artistic_confidence=80, portrait=face())
     common = {"tech": 85, "uplift": 7, "art": art}
-    private = judge(profile, sem=semantic(genre="portrait", faces=True,
-                                          identifiable_people=True, subject_strength=80), **common)
-    sellable = judge(profile, sem=semantic(genre="portrait", faces=False,
-                                           identifiable_people=False, subject_strength=80), **common)
+    private = judge(profile, sem=semantic(genre="portrait", subject_strength=80), **common)
+    sellable = judge(profile, sem=semantic(genre="portrait", subject_strength=80), **common)
     assert private.final_score == sellable.final_score
     # Which market it belongs to may differ; how good the photograph is may not.
     assert private.category in (
-        PhotoCategory.GOOD_PERSONAL.value, PhotoCategory.GOOD_EDITORIAL.value
+        PhotoCategory.GOOD_PERSONAL.value, PhotoCategory.GOOD_STOCK.value
     )
     assert sellable.category in (PhotoCategory.GOOD_STOCK.value, PhotoCategory.TOP.value)
 
@@ -416,8 +381,7 @@ def test_a_release_never_lowers_the_score(profile):
 def test_a_crowd_of_strangers_never_lowers_the_score(profile):
     art = flat(78, artistic_confidence=80)
     alone = judge(profile, sem=semantic(people_count=0), art=art)
-    crowded = judge(profile, sem=semantic(people_count=40, faces=True,
-                                          identifiable_people=True), art=art)
+    crowded = judge(profile, sem=semantic(people_count=40), art=art)
     assert crowded.final_score == alone.final_score
 
 
@@ -425,32 +389,33 @@ def test_the_score_ignores_the_two_commercial_dimensions(profile):
     """Stated structurally: neither name may appear among the components."""
     verdict = judge(profile, sem=semantic(), art=artistic())
     assert "stock_potential" not in verdict.score.components
-    assert "legal_readiness" not in verdict.score.components
+    assert "legal_readiness" not in verdict.score.components  # gone entirely now
 
 
 def test_a_personal_photograph_can_still_be_top(profile):
     """TOP is about the photograph. Nothing about stock enters it."""
     verdict = judge(
         profile, tech=90, uplift=9,
-        sem=semantic(genre="portrait", faces=True, identifiable_people=True,
-                     axis_a=90, axis_b=95, axis_c=85, subject_strength=92),
+        sem=semantic(genre="portrait", axis_a=90, axis_b=95, axis_c=85, subject_strength=92),
         art=flat(93, artistic_confidence=88, portrait=face()),
     )
     assert verdict.category == PhotoCategory.TOP.value
-    assert verdict.commercial_blockers
+    # A high-demand frame now has nothing blocking it: the only blocker left is
+    # weak demand, and this one does not have that problem.
+    assert verdict.commercial_blockers == []
 
 
 def test_a_release_is_never_a_reason_a_photograph_is_bad(profile):
-    """It may explain GOOD_PERSONAL. It may never explain WEAK."""
+    """There are no releases left to be a reason for anything."""
     weak = judge(
         profile, tech=40,
-        sem=semantic(faces=True, identifiable_people=True, intended_frame=False,
+        sem=semantic(intended_frame=False,
                      subject_strength=8, accidental_probability=90),
         art=flat(15, artistic_candidate=False),
     )
     assert weak.category == PhotoCategory.WEAK.value
-    assert weak.commercial_blockers
     assert not any("release" in r for r in weak.reasons)
+    assert not any("release" in b for b in weak.commercial_blockers)
 
 
 def test_limited_demand_is_a_commercial_fact_not_a_quality_one(profile):
@@ -506,7 +471,7 @@ def test_a_confident_read_on_the_boundary_does_not(profile):
 def test_an_unclear_expression_on_the_boundary_asks_a_person(profile):
     verdict = judge(
         profile, tech=50, uplift=2,
-        sem=semantic(genre="portrait", faces=True, axis_a=50, axis_b=50, subject_strength=50),
+        sem=semantic(genre="portrait", axis_a=50, axis_b=50, subject_strength=50),
         art=flat(
             46, artistic_confidence=70, uncertainty=30,
             portrait=face(expression="UNCLEAR", expression_confidence=25, expression_quality=46,
@@ -595,7 +560,7 @@ def stage2_reply(count: int, **overrides) -> str:
             {
                 "n": i + 1, "genre": "landscape", "axis_a": i + 1,
                 "axis_b": count - i, "axis_c": i + 1, "recover": "easy",
-                "faces": False, "brand_mark": False, "note": "lift shadows",
+                "note": "lift shadows",
                 "intended_frame": True, "subject_strength": 75,
                 "accidental_probability": 2, "dead_moment_probability": 3,
                 **overrides,
@@ -686,7 +651,7 @@ def test_the_category_survives_into_the_json_and_csv(archive, tmp_path, monkeypa
 
 def test_a_blinking_portrait_is_weak_end_to_end(archive, tmp_path):
     client = _Client(
-        stage2_reply(3, genre="portrait", faces=True),
+        stage2_reply(3, genre="portrait"),
         stage3_reply(
             3, 80,
             portrait=face(
@@ -816,7 +781,7 @@ def test_a_small_face_still_decides_a_portrait(profile):
     """
     verdict = judge(
         profile, tech=85,
-        sem=semantic(genre="portrait", faces=True, identifiable_people=True, subject_strength=60),
+        sem=semantic(genre="portrait", subject_strength=60),
         art=flat(
             55, artistic_confidence=58,
             portrait=face(
@@ -833,7 +798,7 @@ def test_the_same_small_face_in_a_landscape_still_gates_nothing(profile):
     """The rule it replaced has to keep working, or street photography dies."""
     verdict = judge(
         profile, tech=85, uplift=6,
-        sem=semantic(genre="landscape", faces=True, subject_strength=80),
+        sem=semantic(genre="landscape", subject_strength=80),
         art=flat(
             75, artistic_confidence=75,
             portrait=face(
@@ -850,7 +815,7 @@ def test_mid_speech_is_a_failed_moment(profile):
     """The most common unusable outtake in any portrait shoot."""
     verdict = judge(
         profile, tech=90,
-        sem=semantic(genre="portrait", faces=True),
+        sem=semantic(genre="portrait"),
         art=flat(
             60, artistic_confidence=70,
             portrait=face(
@@ -865,7 +830,7 @@ def test_mid_speech_is_a_failed_moment(profile):
 def test_half_closed_eyes_fail_like_closed_ones(profile):
     verdict = judge(
         profile, tech=90,
-        sem=semantic(genre="portrait", faces=True),
+        sem=semantic(genre="portrait"),
         art=flat(
             60, artistic_confidence=70,
             portrait=face(eyes_state="PARTIALLY_CLOSED", expression_confidence=80),
@@ -879,7 +844,7 @@ def test_squinting_is_not_a_failure(profile):
     """Faces squint outdoors. That is not a bad photograph."""
     verdict = judge(
         profile, tech=85, uplift=6,
-        sem=semantic(genre="portrait", faces=True, subject_strength=80),
+        sem=semantic(genre="portrait", subject_strength=80),
         art=flat(
             78, artistic_confidence=78,
             portrait=face(eyes_state="SQUINTING", expression_confidence=80),
@@ -892,7 +857,7 @@ def test_the_verdict_can_rest_on_the_numbers_rather_than_the_label(profile):
     """No enum can list every way a face fails, so the model's own scores count."""
     verdict = judge(
         profile, tech=88,
-        sem=semantic(genre="portrait", faces=True),
+        sem=semantic(genre="portrait"),
         art=flat(
             65, artistic_confidence=70,
             portrait=face(
@@ -910,7 +875,7 @@ def test_a_merely_neutral_expression_is_not_a_failure(profile):
     """A calm face is not a broken one; both numbers have to be low."""
     verdict = judge(
         profile, tech=85, uplift=6,
-        sem=semantic(genre="portrait", faces=True, subject_strength=80),
+        sem=semantic(genre="portrait", subject_strength=80),
         art=flat(
             78, artistic_confidence=78,
             portrait=face(
@@ -925,7 +890,7 @@ def test_a_merely_neutral_expression_is_not_a_failure(profile):
 def test_an_unusable_reading_still_needs_confidence(profile):
     verdict = judge(
         profile, tech=85, uplift=6,
-        sem=semantic(genre="portrait", faces=True, subject_strength=80),
+        sem=semantic(genre="portrait", subject_strength=80),
         art=flat(
             78, artistic_confidence=78,
             portrait=face(

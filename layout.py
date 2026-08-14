@@ -230,7 +230,7 @@ def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
     the only one they were ever useful to.
     """
     counts: dict[str, int] = {}
-    extra = ("stock/editorial", "stock/by_genre", "portfolio/by_genre",
+    extra = ("stock/by_genre", "portfolio/by_genre",
              "stock/marketplace_packages", "archive", "duplicate_review")
     # Never clear or write inside the physical quarantine, whatever it is called.
     for folder in (*CLASS_TREE.values(), *extra):
@@ -246,9 +246,6 @@ def build_class_farm(records: list, out_dir: Path) -> dict[str, int]:
 
         _relink(out_dir / folder / record.filename, source)
         counts[record.route_class] = counts.get(record.route_class, 0) + 1
-
-        if record.route == "editorial" and record.route_class.startswith("stock"):
-            _relink(out_dir / "stock/editorial" / record.filename, source)
 
         genre = (record.genre or "other").replace("/", "-")
         if record.route_class in ("stock_standard", "stock_strong"):

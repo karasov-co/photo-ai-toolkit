@@ -15,10 +15,7 @@ def semantic(**kwargs):
         "description": "terraced rice fields under morning fog",
         "concepts": ["tourism", "agriculture"],
         "secondary_genres": ["travel"],
-        "faces": False,
-        "brand_mark": False,
-        "identifiable_people": False,
-    }
+        }
     return Semantic(**{**base, **kwargs})
 
 
@@ -145,10 +142,6 @@ def test_a_location_is_not_duplicated_in_the_title():
     assert title.lower().count("hanoi") == 1
 
 
-def test_an_editorial_description_says_so():
-    assert "Editorial use only" in sm.build_description("a protest march", [], "editorial")
-
-
 def test_a_description_is_capped():
     assert len(sm.build_description("x" * 500, [], "commercial")) <= sm.MAX_DESCRIPTION_CHARS + 1
 
@@ -162,22 +155,6 @@ def test_generated_metadata_is_complete_enough_to_submit():
 
 def test_metadata_without_a_description_is_not_complete():
     assert not sm.generate(semantic=Semantic(), route="commercial").is_complete
-
-
-def test_a_face_sets_the_model_release_requirement():
-    assert generated(faces=True).model_release_required
-
-
-def test_recognizable_property_sets_the_property_release_requirement():
-    assert generated(recognizable_property=True).property_release_required
-
-
-def test_a_logo_produces_a_warning():
-    assert "trademark" in generated(brand_mark=True).logo_warning.lower()
-
-
-def test_a_clean_frame_produces_no_logo_warning():
-    assert generated().logo_warning == ""
 
 
 def test_the_ai_label_is_carried_through():
@@ -269,14 +246,6 @@ def test_the_submission_csv_has_one_row_per_asset(tmp_path):
     assert written[0]["keywords"]
 
 
-def test_the_csv_records_the_release_requirements(tmp_path):
-    path = sm.write_submission_csv([("a.jpg", generated(faces=True))], tmp_path / "s.csv")
-    with open(path, newline="", encoding="utf-8") as f:
-        row = next(csv.DictReader(f))
-    assert row["model_release_required"] == "True"
-    assert row["route"] == "commercial"
-
-
 # --- privacy ----------------------------------------------------------------
 
 
@@ -291,3 +260,11 @@ def test_stripping_gps_does_not_mutate_the_original_dict():
     exif = {"gps_lat": 21.0}
     sm.strip_gps(exif)
     assert "gps_lat" in exif
+
+
+def test_the_submission_csv_has_no_release_columns():
+    """Five tests lived here, filling release columns from a model's guess."""
+    for gone in ("model_release_required", "property_release_required",
+                 "logo_warning", "recognizable_person"):
+        assert gone not in sm.SUBMISSION_CSV_FIELDS
+        assert not hasattr(generated(), gone)

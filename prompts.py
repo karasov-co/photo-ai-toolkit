@@ -63,16 +63,16 @@ def stage1_user_content(encoded_jpeg: str) -> list[dict]:
     ]
 
 
-# --- Stage 2: three axes, ranked inside a group ------------------------------
+# --- Stage 2: two axes, ranked inside a group --------------------------------
 
 GROUP_SIZE = 12
 
 # Bumped whenever the Stage 2 prompt changes meaning. Part of the cache key, so
 # a reworded question invalidates exactly the answers whose meaning moved and
 # nothing else.
-STAGE2_PROMPT_VERSION = "stage2-2026-08-14"
+STAGE2_PROMPT_VERSION = "stage2-2026-08-16"
 
-STAGE2_SYSTEM = """You are ranking photographs for a working stock and editorial archive.
+STAGE2_SYSTEM = """You are ranking photographs for a working archive.
 
 WHAT YOU ARE JUDGING
 Not the file as shot. Every frame that survives goes into an edit. Judge what the
@@ -122,52 +122,26 @@ above one that is technically immaculate and dull.
 Before ranking, for every frame name one reason it would be worth keeping even if
 it is "wrong". Do this silently; it does not go in the output.
 
-Rank the frames against EACH OTHER on three independent axes. Never average them.
+Rank the frames against EACH OTHER on two independent axes. Never average them.
 
-  axis_a  COMMERCIAL USABILITY -- clean composition, legible subject, room for
-          text, no dominant brand mark, no recognisable faces. This is the
-          mass market.
+There is no commercial-usability axis and no question about releases, faces or
+brand marks. Those asked a model that has never seen a release form to answer a
+legal question, and the answer decided which pile a photograph landed in. They
+are gone, and the tokens with them.
+
+  axis_a  CONTENT -- the moment, the composition and the subject. Is there
+          something happening, is the frame legible, does the eye land where
+          it should. Nothing about markets, buyers, releases or permissions.
+
   axis_b  UNREPEATABILITY -- could a competent photographer get this frame by
           travelling there with the same camera? A sunset over Hanoi: yes.
           A moment, a light, a face, a weather that will not return: no.
-          This axis is deliberately opposed to axis_a; the "wrong" frames often
-          score highest here.
+          The "wrong" frames -- the ones a tidiness score would bury -- often
+          rank highest here.
   axis_c  DOCUMENTARY VALUE -- place, event, cultural context, rarity of location.
 
 Rank within genre where the genre differs: street loses to landscape on any shared
 scale because landscape is tidier, and that comparison is meaningless.
-
-BRAND MARKS ARE NOT THE SAME THING AS SIGNS
-
-Two separate questions, and collapsing them is why a photograph of a street
-gets treated like an advertisement.
-
-  brand_mark    A registered company mark, reproduced large and legible enough
-                that the photograph is partly *about* that brand: a Coca-Cola
-                logo filling a wall, a Nike swoosh on the subject's chest, the
-                golden arches as the subject of the frame, a product shot with
-                the label readable.
-
-                NOT: a brand that happens to be somewhere in a street scene, a
-                small logo on a passing bus, a label nobody could read at this
-                size, a shop name written in ordinary letters.
-
-                Answer false unless the mark genuinely dominates. This one has
-                no "when in doubt say yes" -- guessing yes on every street
-                photograph removes the entire genre from commercial use, and
-                that is a worse error than the one it avoids.
-
-  signage_text  Shop signs, street signs, neon, restaurant boards, transit and
-                metro navigation, price boards, hand-painted lettering, notices
-                on walls. The written texture of a place.
-
-                This is environment, not advertising. It restricts a frame to
-                editorial use, which is a normal and valuable category -- it is
-                not a defect and it is not a reason to file the photograph as
-                having no commercial value at all.
-
-A Chinatown street full of shop signs: signage_text true, brand_mark false.
-A close-up of a Starbucks cup: brand_mark true.
 
 ALSO ANSWER, PER FRAME, INDEPENDENTLY OF THE RANKING
 
@@ -209,18 +183,13 @@ Each object:
  "axis_b": <rank on axis_b within this group, 1 = best>,
  "axis_c": <rank on axis_c within this group, 1 = best>,
  "recover": "easy|moderate|hopeless",
- "faces": <true if any recognisable face is present>,
- "brand_mark": <true ONLY for a registered company mark, large and legible>,
- "signage_text": <true for shop signs, street signs, neon, transit navigation>,
  "intended_frame": <true|false>,
  "subject_strength": <0-100>,
  "accidental_probability": <0-100>,
  "dead_moment_probability": <0-100>,
  "note": "<max 12 words: what to do in the edit>"}
 
-Each axis is a strict ranking: every rank from 1 to N used exactly once per axis.
-faces decides whether the frame needs a model release, so when in doubt answer
-true. brand_mark is different -- read the section above before answering it."""
+Each axis is a strict ranking: every rank from 1 to N used exactly once per axis."""
 
 
 def stage2_user_content(frames: list[dict]) -> list[dict]:
@@ -260,7 +229,7 @@ def stage2_user_content(frames: list[dict]) -> list[dict]:
 
 
 def expected_group_keys() -> set[str]:
-    return {"n", "genre", "axis_a", "axis_b", "axis_c", "recover", "faces"}
+    return {"n", "genre", "axis_a", "axis_b", "axis_c", "recover"}
 
 
 # --- Stage 3: the artistic read ---------------------------------------------

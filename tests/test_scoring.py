@@ -16,14 +16,12 @@ from scoring import (
     current_quality_score,
     eligible_for_flagship,
     explain,
-    legal_readiness_score,
     portfolio_potential_score,
     post_edit_potential_score,
     recoverability_score,
     route_for,
     routing_score,
     score,
-    stock_potential_score,
     uniqueness_score,
 )
 
@@ -43,9 +41,6 @@ def clean_semantic(**kwargs) -> Semantic:
     """A frame somebody actually looked at, with nothing needing a release."""
     base = {
         "present": True,
-        "faces": False,
-        "brand_mark": False,
-        "identifiable_people": False,
         "axis_a": 75,
         "axis_b": 70,
         "axis_c": 60,
@@ -63,7 +58,7 @@ def test_every_dimension_is_present_and_in_range(profile):
     payload = scores.to_dict()
     assert set(payload) == {
         "current_quality", "recoverability", "post_edit_potential", "aesthetic_potential",
-        "stock_potential", "portfolio_potential", "legal_readiness", "uniqueness",
+        "stock_potential", "portfolio_potential", "uniqueness",
         "confidence", "routing_score",
     }
     assert all(0 <= v <= 100 for v in payload.values())
@@ -145,85 +140,33 @@ def test_routine_fixable_problems_do_not_reduce_recoverability():
     )
 
 
-# --- the blocking rule ------------------------------------------------------
+# --- nothing blocks any more -------------------------------------------------
+#
+# Nine tests lived here: a face routed a frame to EDITORIAL, a logo did, an
+# unexamined frame did, and three dimensions of `legal_readiness` scored the
+# result. All of it asked a vision model a legal question it cannot answer, and
+# the answer decided which pile a photograph landed in.
 
 
-def test_a_face_blocks_commercial_stock():
-    assert route_for(clean_semantic(faces=True)) is Route.EDITORIAL
-
-
-def test_a_logo_blocks_commercial_stock():
-    assert route_for(clean_semantic(brand_mark=True)) is Route.EDITORIAL
-
-
-def test_a_clean_frame_is_commercial():
+def test_every_frame_is_commercial_now():
     assert route_for(clean_semantic()) is Route.COMMERCIAL
+    assert route_for(Semantic()) is Route.COMMERCIAL
 
 
-def test_an_unexamined_frame_is_blocked_from_commercial_stock():
-    """Fail safe: nobody has checked for faces, so nothing is sold as commercial."""
-    assert route_for(Semantic()) is Route.EDITORIAL
+def test_the_release_vocabulary_is_gone_from_the_module():
+    import scoring
 
+    for gone in ("legal_readiness_score", "UNKNOWN_LEGAL_READINESS",
+                 "LEGAL_READINESS_NOT_ASSESSED"):
+        assert not hasattr(scoring, gone), gone
+    for gone in ("EDITORIAL_ONLY", "NEEDS_MODEL_RELEASE",
+                 "NEEDS_PROPERTY_RELEASE", "LEGAL_REVIEW"):
+        assert gone not in AssetTag.__members__, gone
+    assert "legal_readiness" not in score(
+        ScoreInput(asset_id="a", filename="a", technical_quality=70),
+        default_photo_profile(),
+    ).to_dict()
 
-def test_no_score_can_route_a_face_to_commercial_stock(profile):
-    """Not a weighting -- a branch. Assert it holds at maximum scores."""
-    inp = ScoreInput(
-        asset_id="a",
-        filename="a.RW2",
-        technical_quality=100,
-        uplift=0,
-        semantic=clean_semantic(faces=True, axis_a=100, axis_b=100, axis_c=100),
-        is_raw=True,
-    )
-    result = classify(inp, score(inp, profile), profile)
-    assert result.route is Route.EDITORIAL
-    assert AssetTag.EDITORIAL_ONLY in result.tags
-    assert AssetTag.COMMERCIAL_OK not in result.tags
-
-
-def test_the_blocked_reason_names_what_was_found(profile):
-    inp = ScoreInput(
-        asset_id="a", filename="a", technical_quality=70, semantic=clean_semantic(brand_mark=True)
-    )
-    result = classify(inp, score(inp, profile), profile)
-    assert any("brand mark" in r for r in result.reasons)
-
-
-def test_street_signs_do_not_block_commercial_stock(profile):
-    """The reported failure: shop signs read as brands and blocked the frame."""
-    signs = clean_semantic(brand_mark=False, signage_text=True)
-    inp = ScoreInput(asset_id="a", filename="a", technical_quality=70, semantic=signs)
-    assert not signs.blocks_commercial
-    assert signs.editorial_only
-    assert classify(inp, score(inp, profile), profile).route is not None
-
-
-def test_an_unexamined_frame_says_so_rather_than_claiming_a_face_was_seen(profile):
-    """'Unchecked' and 'a face is present' are different claims."""
-    inp = ScoreInput(asset_id="a", filename="a", technical_quality=70)
-    result = classify(inp, score(inp, profile), profile)
-    assert any("unchecked" in r for r in result.reasons)
-    assert not any("faces and logos present" in r for r in result.reasons)
-
-
-# --- legal readiness --------------------------------------------------------
-
-
-def test_a_clean_frame_needs_no_paperwork():
-    assert legal_readiness_score(clean_semantic()) == 100
-
-
-def test_a_face_costs_more_readiness_than_a_property():
-    assert legal_readiness_score(clean_semantic(faces=True)) < legal_readiness_score(
-        clean_semantic(recognizable_property=True)
-    )
-
-
-def test_unknown_is_not_scored_as_though_both_problems_were_confirmed():
-    """Compounding 'we did not look' into every dimension collapsed the scale."""
-    confirmed_both = legal_readiness_score(clean_semantic(faces=True, brand_mark=True))
-    unknown = legal_readiness_score(Semantic())
-    assert unknown > confirmed_both
 
 
 # --- uniqueness -------------------------------------------------------------
@@ -374,12 +317,12 @@ def test_selection_alone_is_not_enough_without_an_artistic_read(profile):
     assert any("no artistic analysis" in r for r in result.reasons)
 
 
-def test_the_class_reason_comes_before_the_release_note(profile):
+def test_the_class_reason_comes_first(profile):
     """A plan prints the first reason; for a corrupt file it must be the blocker."""
     result = routed(
         profile,
         issues=blocking(IssueCode.CORRUPT_FILE, "unreadable"),
-        semantic=clean_semantic(faces=True),
+        semantic=clean_semantic(),
     )
     assert "unrecoverable" in result.reasons[0]
 
@@ -430,7 +373,7 @@ def test_the_routing_score_is_the_only_blend(profile):
     scores = AssetScores(
         current_quality=50, recoverability=60, post_edit_potential=70,
         aesthetic_potential=80, stock_potential=40, portfolio_potential=30,
-        legal_readiness=100, uniqueness=90, confidence=70,
+        uniqueness=90, confidence=70,
     )
     blended = routing_score(scores, profile)
     assert 0 <= blended <= 100
@@ -443,12 +386,6 @@ def test_a_profile_with_broken_weights_falls_back_rather_than_dividing_by_zero()
 
 
 # --- derived dimensions -----------------------------------------------------
-
-
-def test_stock_potential_is_gated_by_legal_readiness():
-    clean = stock_potential_score(clean_semantic(), potential=80, legal=100)
-    encumbered = stock_potential_score(clean_semantic(faces=True), potential=80, legal=55)
-    assert encumbered < clean
 
 
 def test_portfolio_potential_is_gated_by_whether_the_frame_can_be_saved():

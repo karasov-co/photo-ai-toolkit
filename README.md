@@ -220,11 +220,12 @@ that caught it was looking at them.
 
 **A missing model release never makes a photograph worse.** Whether a picture
 can be licensed decides *stock* from *personal* and nothing else — it never
-lowers a score, never blocks the top pile, never makes anything weak. The report
-contains no legal vocabulary at all: no releases, no trademarks, no
-editorial-only. Somebody photographing their own family should not be told their
-picture has a licensing problem. (All of it is still computed, and it is one
-click away under *Expert details* for whoever actually sells work.)
+lowers a score, never blocks the top pile, never makes anything weak. There is
+no legal vocabulary anywhere, in the report or in the code: no releases, no
+trademarks, no editorial-only pile. A vision model cannot know whether a release
+exists, and the guess used to decide which pile a photograph landed in. Somebody
+photographing their own family is never told their picture has a licensing
+problem, because nothing in here can form that thought.
 
 ---
 
@@ -385,9 +386,8 @@ These are stored as different numbers and must never be collapsed:
 | `recoverability` | How safely normal editing can move it |
 | `post_edit_potential` | What it becomes after a realistic edit |
 | `aesthetic_potential` | Whether the result is worth looking at |
-| `stock_potential` | Sellable, findable, legally publishable |
+| `stock_potential` | Sellable and findable |
 | `portfolio_potential` | Represents the photographer's best work |
-| `legal_readiness` | Releases, trademarks, identifiable people |
 | `uniqueness` | Against the rest of *this* collection |
 | `confidence` | How much of the above is actually evidenced |
 | `routing_score` | The single permitted blend, from the calibration profile |
@@ -642,7 +642,7 @@ default summary — nothing was removed, and all of it is still in
 
 Filtering and sorting on `report`: `--media`, `--route-class`, `--route`,
 `--genre`, `--marketplace`, `--min-score`, `--min-potential`, `--min-confidence`,
-`--needs-release`, `--cluster`, `--duplicates-only`, `--sort`, `--format`.
+`--cluster`, `--duplicates-only`, `--sort`, `--format`.
 
 ---
 
@@ -750,8 +750,8 @@ Direct upload adapters are **not implemented** — see *Known limitations*.
 ## Metadata
 
 Generated for stock-ready assets: title, description, ordered keywords, primary
-and secondary category, concepts, location, commercial/editorial route, people
-count, release requirements, trademark warning, AI label, suggested platforms.
+and secondary category, concepts, location, people count, AI label and
+suggested platforms.
 
 Keywords come only from what something actually observed, are deduplicated,
 ordered by centrality, and capped **well below** the platform maximum.

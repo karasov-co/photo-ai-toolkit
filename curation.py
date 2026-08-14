@@ -57,12 +57,12 @@ class PhotoCategory(StrEnum):
     filesystem; this is the answer to "what is this photograph"."""
 
     TOP = "TOP"
+    # Everything sellable. There used to be a GOOD_EDITORIAL beside this, for
+    # frames a release would have restricted -- signs, buildings, faces. The
+    # whole stock-versus-editorial distinction is gone: it made a photographer
+    # answer a licensing question to read their own report, and the tool was
+    # guessing at the answer from a model that had never seen a release form.
     GOOD_STOCK = "GOOD_STOCK"
-    # Sellable, but as editorial rather than commercial: a street of shop
-    # signs, a recognisable building, people in a public place. This exists
-    # because everything that was not commercially clean used to be filed as
-    # personal, which told a photojournalist their work had no market at all.
-    GOOD_EDITORIAL = "GOOD_EDITORIAL"
     GOOD_PERSONAL = "GOOD_PERSONAL"
     WEAK = "WEAK"
     NEEDS_DECISION = "NEEDS_DECISION"
@@ -621,23 +621,22 @@ class Verdict:
 
 
 def commercial_blockers(inp: ScoreInput, scores: AssetScores, profile: CalibrationProfile) -> list[str]:
-    """Why this photograph cannot be sold. Never why it is not good.
+    """Why this photograph would not sell. Never why it is not good.
 
-    Kept as a separate list, reported separately, and excluded from the score,
-    because the failure this replaces was a good family photograph being filed
-    as weak on the grounds that its subjects had not signed anything.
+    Release logic used to live here: faces, trademarks, recognisable property,
+    each blocking commercial stock outright. All of it is gone. The model was
+    being asked to guess at a legal question it cannot answer, the answer then
+    decided which pile a photograph landed in, and a photographer had to learn
+    what "editorial only" meant to read their own report.
+
+    What is left is a commercial judgement the tool can actually make: whether
+    there is demand for a picture like this.
     """
     blocking: list[str] = []
     semantic = inp.semantic
     if not semantic.present:
-        blocking.append("no content check has run, so faces and trademarks are unverified")
+        blocking.append("no content check has run")
         return blocking
-    if semantic.faces or semantic.identifiable_people:
-        blocking.append("a model release is required before this can be licensed")
-    if semantic.brand_mark:
-        blocking.append("a readable trademark is present: editorial only unless cleared")
-    if semantic.recognizable_property:
-        blocking.append("recognisable property: a property release may be required")
     if scores.stock_potential < profile.threshold("stock_standard"):
         blocking.append(
             f"limited commercial demand (stock potential {scores.stock_potential} below "
@@ -720,62 +719,11 @@ def categorise(
         keys.append({"key": "category.good_stock", "params": {"value": final.value}})
         return Verdict(PhotoCategory.GOOD_STOCK.value, final.value, reasons, keys, blockers, final)
 
-    if _is_editorial(inp, artistic, blockers):
-        reasons.append(
-            f"a photograph of a place and a moment, sellable as editorial "
-            f"(scores {final.value} after editing)"
-        )
-        keys.append({"key": "category.good_editorial", "params": {"value": final.value}})
-        return Verdict(
-            PhotoCategory.GOOD_EDITORIAL.value, final.value, reasons, keys, blockers, final
-        )
-
     reasons.append(
         f"a photograph worth keeping and printing (scores {final.value} after editing)"
     )
     keys.append({"key": "category.good_personal", "params": {"value": final.value}})
     return Verdict(PhotoCategory.GOOD_PERSONAL.value, final.value, reasons, keys, blockers, final)
-
-
-# Documentary weight a frame needs before an editorial restriction is read as a
-# market rather than as a dead end.
-EDITORIAL_DOCUMENTARY = 60
-
-
-def _is_editorial(
-    inp: ScoreInput,
-    artistic: stage3_module.ArtisticAssessment | None,
-    blockers: list[str],
-) -> bool:
-    """Editorial is a market, not a consolation prize.
-
-    Two conditions, both required. Nothing may be blocking commercial use
-    *except* the things editorial licensing exists to accommodate -- signs in
-    the street, a recognisable building, people who have not signed anything.
-    A dominant brand mark is not on that list and still blocks.
-
-    And the frame has to be worth something as a document. A blurred snapshot
-    of a shop front is not editorial material because it contains a sign; a
-    photograph of a place at a moment is, and `documentary_significance` is the
-    measurement that separates them. Without Stage 3, `axis_c` answers the same
-    question less precisely and is used instead.
-    """
-    semantic = inp.semantic
-    if not semantic.present:
-        return False
-    if semantic.brand_mark:
-        return False
-    if not (semantic.signage_text or semantic.recognizable_property
-            or semantic.faces or semantic.identifiable_people):
-        return False
-    # Anything else on the list -- no demand, for instance -- is a commercial
-    # judgement that editorial does not answer.
-    if any("demand" in blocker for blocker in blockers):
-        return False
-
-    if artistic is not None and artistic.usable:
-        return artistic.score("documentary_significance") >= EDITORIAL_DOCUMENTARY
-    return semantic.axis_c >= EDITORIAL_DOCUMENTARY
 
 
 def _clears_top(
@@ -857,7 +805,6 @@ def _ambiguity_reason(
 CATEGORY_ORDER = (
     PhotoCategory.TOP,
     PhotoCategory.GOOD_STOCK,
-    PhotoCategory.GOOD_EDITORIAL,
     PhotoCategory.GOOD_PERSONAL,
     PhotoCategory.NEEDS_DECISION,
     PhotoCategory.WEAK,

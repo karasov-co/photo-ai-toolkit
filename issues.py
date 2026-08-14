@@ -277,7 +277,7 @@ def detect_photo_issues(
 
     # Only genuine unusability is an issue here. Being below a particular
     # marketplace's 4 MP floor is a *marketplace* fact, not a defect in the
-    # photograph -- a 3 MP frame is still fine for editorial, for print at size,
+    # photograph -- a 3 MP frame is still fine for the press, for print at size,
     # and for the portfolio. `marketplaces.py` is what refuses it, per platform.
     if megapixels < MIN_MEGAPIXELS_ANY:
         found.add(IssueCode.INSUFFICIENT_RESOLUTION, f"{megapixels} MP is unusable at any size")

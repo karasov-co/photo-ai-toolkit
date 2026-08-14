@@ -57,9 +57,9 @@ def test_the_run_works_offline_with_no_api_key(options):
     assert all(r.status == "ok" for r in result.records)
 
 
-def test_every_record_carries_all_ten_dimensions(options):
+def test_every_record_carries_all_nine_dimensions(options):
     for record in run(options).records:
-        assert len(record.scores) == 10
+        assert len(record.scores) == 9
         assert all(0 <= v <= 100 for v in record.scores.values())
 
 
@@ -374,7 +374,7 @@ def test_the_analyze_command_writes_every_report(archive, tmp_path, capsys):
     assert (out / ".internal" / "reports" / "analysis.csv").exists()
     assert (out / ".internal" / "reports" / "full_report.html").exists()
     # What a photographer actually opens, at the root and nowhere else.
-    assert (out / "report.html").exists()
+    assert (out / "report" / "index.html").exists()
     assert (out / "photographer_insights.html").exists()
     assert (out / ".internal" / "reports" / "distribution.csv").exists()
     assert (out / ".internal" / "reports" / "delete_candidates.txt").exists()

@@ -27,7 +27,7 @@ def asset(route=Route.COMMERCIAL, stock=70, aesthetic=70):
 
 
 def clean(**kwargs):
-    base = {"present": True, "faces": False, "brand_mark": False, "identifiable_people": False}
+    base = {"present": True}
     return Semantic(**{**base, **kwargs})
 
 
@@ -150,52 +150,6 @@ def test_a_clean_frame_is_offered_commercially(rules):
     recs = marketplaces.evaluate(asset(), photo_facts(), clean(), CAMERA, rules=rules)
     assert any(r.eligible for r in recs)
     assert all(r.route == "commercial" for r in recs)
-
-
-def test_a_frame_with_a_face_is_offered_editorially_only(rules):
-    recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(), clean(faces=True), CAMERA, rules=rules
-    )
-    assert all(r.route == "editorial" for r in recs)
-
-
-def test_a_missing_model_release_is_named(rules):
-    recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(), clean(faces=True), CAMERA, rules=rules
-    )
-    assert any("model release" in r.missing_releases for r in recs)
-
-
-def test_a_held_release_is_not_reported_as_missing(rules):
-    recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(), clean(faces=True), CAMERA,
-        rules=rules, has_model_release=True,
-    )
-    assert all("model release" not in r.missing_releases for r in recs)
-
-
-def test_a_missing_property_release_is_named(rules):
-    recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(),
-        clean(recognizable_property=True, faces=True), CAMERA, rules=rules,
-    )
-    assert any("property release" in r.missing_releases for r in recs)
-
-
-def test_a_trademark_is_reported_as_a_policy_concern(rules):
-    recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(), clean(brand_mark=True), CAMERA, rules=rules
-    )
-    assert any(any("trademark" in c for c in r.policy_conflicts) for r in recs)
-
-
-def test_alamy_is_ranked_up_for_editorial_work(rules):
-    """Its editorial market is stronger, which is a real ordering difference."""
-    recs = marketplaces.evaluate(
-        asset(route=Route.EDITORIAL), photo_facts(), clean(faces=True), CAMERA, rules=rules
-    )
-    alamy = next(r for r in recs if r.platform_id == "alamy")
-    assert "editorial" in " ".join(alamy.reasons).lower()
 
 
 # --- provenance -------------------------------------------------------------
@@ -321,3 +275,19 @@ def test_no_recommendation_ever_promises_acceptance(rules):
     assert "guarantee" not in text
     assert "will be accepted" not in text
     assert "will sell" not in text
+
+
+def test_no_platform_row_talks_about_releases_any_more(rules):
+    """Six tests lived here, each one a release or an editorial ranking.
+
+    A marketplace does need that paperwork. What it does not need is a vision
+    model's guess at it, filed as fact in a submission CSV.
+    """
+    recs = marketplaces.evaluate(asset(), photo_facts(), clean(), CAMERA, rules=rules)
+    assert recs
+    for rec in recs:
+        assert rec.route == "commercial"
+        assert not hasattr(rec, "missing_releases")
+        assert "missing_releases" not in rec.to_dict()
+        assert not any("release" in c.lower() for c in rec.policy_conflicts)
+    assert "EDITORIAL" not in Route.__members__

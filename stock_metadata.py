@@ -124,10 +124,6 @@ class StockMetadata:
     location: str = ""
     route: str = "commercial"
     people_count: int = 0
-    recognizable_person: bool = False
-    model_release_required: bool = False
-    property_release_required: bool = False
-    logo_warning: str = ""
     ai_label: str = ""
     suggested_marketplaces: list[str] = field(default_factory=list)
     copyright: str = ""
@@ -151,10 +147,6 @@ class StockMetadata:
             "location": self.location,
             "route": self.route,
             "people_count": self.people_count,
-            "recognizable_person": self.recognizable_person,
-            "model_release_required": self.model_release_required,
-            "property_release_required": self.property_release_required,
-            "logo_warning": self.logo_warning,
             "ai_label": self.ai_label,
             "suggested_marketplaces": self.suggested_marketplaces,
             "copyright": self.copyright,
@@ -238,8 +230,6 @@ def build_description(description: str, concepts: list[str], route: str) -> str:
     parts = [(description or "").strip().rstrip(".")]
     if concepts:
         parts.append("Concepts: " + ", ".join(concepts[:4]))
-    if route == "editorial":
-        parts.append("Editorial use only")
     text = ". ".join(p for p in parts if p)
     return text[:MAX_DESCRIPTION_CHARS].rstrip(" ,;") + ("." if text else "")
 
@@ -284,14 +274,6 @@ def generate(
         location=location,
         route=route,
         people_count=int(semantic.people_count or 0),
-        recognizable_person=bool(semantic.faces or semantic.identifiable_people),
-        model_release_required=bool(semantic.faces or semantic.identifiable_people),
-        property_release_required=bool(semantic.recognizable_property),
-        logo_warning=(
-            "Readable brand mark or trademark present: editorial only unless cleared"
-            if semantic.brand_mark
-            else ""
-        ),
         ai_label=provenance_label,
         suggested_marketplaces=list(marketplaces or []),
         copyright=copyright_holder,
@@ -341,8 +323,6 @@ XMP_TEMPLATE = """<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
    <Iptc4xmpCore:Location>{location}</Iptc4xmpCore:Location>
    <pat:route>{route}</pat:route>
    <pat:aiLabel>{ai_label}</pat:aiLabel>
-   <pat:modelReleaseRequired>{model_release}</pat:modelReleaseRequired>
-   <pat:propertyReleaseRequired>{property_release}</pat:propertyReleaseRequired>
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>
@@ -362,8 +342,6 @@ def write_xmp_sidecar(metadata: StockMetadata, target: Path) -> Path:
         location=escape(metadata.location),
         route=escape(metadata.route),
         ai_label=escape(metadata.ai_label),
-        model_release=str(metadata.model_release_required).lower(),
-        property_release=str(metadata.property_release_required).lower(),
     )
     path = target.with_suffix(".xmp")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -379,9 +357,6 @@ SUBMISSION_CSV_FIELDS = [
     "category",
     "secondary_category",
     "route",
-    "model_release_required",
-    "property_release_required",
-    "logo_warning",
     "ai_label",
     "location",
     "suggested_marketplaces",
@@ -404,9 +379,6 @@ def write_submission_csv(rows: list[tuple[str, StockMetadata]], path: Path) -> P
                     "category": meta.primary_category,
                     "secondary_category": meta.secondary_category,
                     "route": meta.route,
-                    "model_release_required": meta.model_release_required,
-                    "property_release_required": meta.property_release_required,
-                    "logo_warning": meta.logo_warning,
                     "ai_label": meta.ai_label,
                     "location": meta.location,
                     "suggested_marketplaces": ", ".join(meta.suggested_marketplaces),

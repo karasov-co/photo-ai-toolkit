@@ -36,14 +36,19 @@ logger = logging.getLogger(__name__)
 
 INTERNAL = ".internal"
 RECIPES = "edit_recipes"
+# The report is a directory, not a file: index.html plus the images it shows,
+# so the whole thing can be zipped and sent. Pointing at previews elsewhere in
+# the run is what left every tile blank -- the page was written in a staging
+# directory, the paths were right relative to that, and publishing moved it.
+REPORT_DIRNAME = "report"
 REPORT_NAME = "report.html"
+STANDALONE_NAME = "report_standalone.html"
 INSIGHTS_NAME = "photographer_insights.html"
 
 # The five piles, in the order they are shown. Keyed by `AssetRecord.category`.
 CATEGORY_DIRS: dict[str, str] = {
     "TOP": "top",
     "GOOD_STOCK": "good_stock",
-    "GOOD_EDITORIAL": "good_editorial",
     "GOOD_PERSONAL": "good_personal",
     "NEEDS_DECISION": "needs_decision",
     "WEAK": "weak",
@@ -82,8 +87,21 @@ class Workspace:
     # --- what a photographer opens ---------------------------------------
 
     @property
+    def report_dir(self) -> Path:
+        return self.root / REPORT_DIRNAME
+
+    @property
     def report(self) -> Path:
-        return self.root / REPORT_NAME
+        """The page a person opens."""
+        return self.report_dir / "index.html"
+
+    @property
+    def standalone(self) -> Path:
+        return self.root / STANDALONE_NAME
+
+    @property
+    def thumb_cache(self) -> Path:
+        return self.internal / "thumbs"
 
     @property
     def insights(self) -> Path:
@@ -137,6 +155,7 @@ class Workspace:
         for name in CATEGORY_DIRS.values():
             (self.root / name).mkdir(exist_ok=True)
         self.recipes.mkdir(exist_ok=True)
+        self.report_dir.mkdir(exist_ok=True)
         self.previews.mkdir(parents=True, exist_ok=True)
         self.reports.mkdir(parents=True, exist_ok=True)
         return self
@@ -226,7 +245,7 @@ STAGED = "staging"
 
 # What a complete run must have produced. Validated before anything is swapped,
 # because "the staging directory exists" is not the same as "the run worked".
-REQUIRED_ARTEFACTS = (REPORT_NAME, INSIGHTS_NAME)
+REQUIRED_ARTEFACTS = (f"{REPORT_DIRNAME}/index.html", INSIGHTS_NAME)
 
 
 class PublishError(RuntimeError):
@@ -259,8 +278,11 @@ def publish(space: Workspace, staged: Path) -> list[str]:
     if missing:
         raise PublishError(f"the run did not produce: {', '.join(missing)}")
 
-    entries = [name for name in (*REQUIRED_ARTEFACTS, RECIPES, *CATEGORY_DIRS.values())
-               if (staged / name).exists()]
+    entries = [
+        name
+        for name in (REPORT_DIRNAME, INSIGHTS_NAME, RECIPES, *CATEGORY_DIRS.values())
+        if (staged / name).exists()
+    ]
     backups: list[tuple[Path, Path]] = []
     published: list[str] = []
 

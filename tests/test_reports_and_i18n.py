@@ -25,7 +25,7 @@ def record(**kwargs):
         "scores": {
             "current_quality": 44, "recoverability": 100, "post_edit_potential": 81,
             "aesthetic_potential": 62, "stock_potential": 55, "portfolio_potential": 69,
-            "legal_readiness": 100, "uniqueness": 100, "confidence": 78, "routing_score": 71,
+            "uniqueness": 100, "confidence": 78, "routing_score": 71,
         },
         "expected_gain": 37,
         "issues": {"fixable": ["underexposed: mean luma 44"], "partially_fixable": [], "unrecoverable": []},
@@ -276,7 +276,7 @@ def test_every_route_class_has_a_label_in_both_languages():
 def test_every_score_dimension_has_a_label_in_both_languages():
     for dimension in (
         "current_quality", "recoverability", "post_edit_potential", "aesthetic_potential",
-        "stock_potential", "portfolio_potential", "legal_readiness", "uniqueness",
+        "stock_potential", "portfolio_potential", "uniqueness",
         "confidence", "routing_score",
     ):
         for language in ("en", "ru"):

@@ -471,7 +471,7 @@ def routed(profile, artistic):
         asset_id="a", filename="a.RW2", technical_quality=92, uplift=6, is_raw=True,
         artistic=artistic,
         semantic=scoring.Semantic(
-            present=True, faces=False, brand_mark=False, identifiable_people=False, axis_b=98
+            present=True, axis_b=98
         ),
     )
     return scoring.classify(inp, scoring.score(inp, profile), profile, flagship_selected=True)
@@ -597,7 +597,7 @@ def stage2_ranking(count: int) -> str:
             {
                 "n": i + 1, "genre": "portrait", "axis_a": i + 1,
                 "axis_b": count - i, "axis_c": i + 1, "recover": "easy",
-                "faces": True, "brand_mark": False, "note": "lift shadows",
+                "note": "lift shadows",
             }
             for i in range(count)
         ]

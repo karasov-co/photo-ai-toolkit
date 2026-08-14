@@ -22,10 +22,10 @@ decides an order, and a dark, flat, tilted file that will come back beautifully
 outranks a bright one that will not.
 
 **No legal vocabulary.** Not "model release", not "editorial only", not
-"trademark", not "commercial blocker". Those checks still run and still decide
-whether a good photograph is filed under stock or personal, and the reader never
-has to learn what they mean. Someone shooting their family should never be told
-their photograph has a licensing problem.
+"trademark". Those checks no longer exist at all: the model was being asked a
+legal question it cannot answer, and the answer decided which pile a photograph
+landed in. Somebody shooting their family should never have been told their
+picture has a licensing problem, and now nothing can.
 
 **No scores without a sentence.** Every card carries one plain explanation of
 why it landed where it did, and up to three concrete things to do in the edit.
@@ -36,7 +36,6 @@ argue with is one they stop trusting the first time it is wrong.
 from __future__ import annotations
 
 import html
-import os
 from pathlib import Path
 
 from curation import DEFAULT_THRESHOLDS as CURATION_THRESHOLDS
@@ -46,7 +45,6 @@ from i18n import t
 SECTIONS = (
     ("TOP", "#a978c4"),
     ("GOOD_STOCK", "#5fb98a"),
-    ("GOOD_EDITORIAL", "#7fb86a"),
     ("GOOD_PERSONAL", "#6aa9d8"),
     ("NEEDS_DECISION", "#d8c06a"),
     ("WEAK", "#8a8a8a"),
@@ -76,6 +74,7 @@ FORBIDDEN_IN_DEFAULT_UI = (
 # the list above because these are *only* filtered out of sentences -- the
 # checks behind them still run, and still decide stock from personal.
 LEGAL_WORDS = (
+    "editorial",
     "release",
     "licen",  # licence, license, licensing
     "commercial",
@@ -83,10 +82,9 @@ LEGAL_WORDS = (
     "rights",
 )
 
-# "editorial" is deliberately NOT on that list any more. It used to be legal
-# jargon here -- "editorial only", a restriction stated as a warning. It is now
-# the name of a pile, in a sentence that tells a photographer their picture has
-# a market. The legalistic phrasing is still filtered by the entry above.
+# `editorial` is back on the forbidden list above: the bucket it named is gone,
+# so any appearance of the word is a leak from something that should have been
+# deleted.
 
 MAX_RECOMMENDATIONS = 3
 
@@ -94,6 +92,35 @@ MAX_RECOMMENDATIONS = 3
 # same number the decision used, or its explanation of an empty TOP section is
 # fiction the moment somebody tunes the threshold.
 TOP_THRESHOLD = CURATION_THRESHOLDS.top
+
+
+# Vanilla, inline, no libraries. A report that fetches anything is a report that
+# stops working on a plane, behind a firewall, or in five years -- and the whole
+# point of the folder is that it survives being moved and emailed.
+SCRIPT = """
+(function () {
+  var box = document.getElementById('lightbox');
+  var img = box.querySelector('img');
+  function close() { box.hidden = true; img.removeAttribute('src'); }
+  document.addEventListener('click', function (e) {
+    var thumb = e.target.closest('.card img');
+    if (thumb) { img.src = thumb.dataset.full || thumb.src; box.hidden = false; return; }
+    if (e.target.closest('#lightbox')) { close(); return; }
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    var want = chip.dataset.bucket;
+    document.querySelectorAll('.chip').forEach(function (c) {
+      c.classList.toggle('on', c === chip);
+    });
+    document.querySelectorAll('section[data-bucket]').forEach(function (s) {
+      s.hidden = want !== 'ALL' && s.dataset.bucket !== want;
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !box.hidden) close();
+  });
+})();
+"""
 
 
 def potential(record) -> int:
@@ -225,6 +252,31 @@ details.expert th, details.expert td { text-align:left; padding:5px 9px;
 details.expert th { color:#8c8c8c; font-weight:500; }
 .foot { max-width:1180px; margin:34px auto 0; color:#767676; font-size:12px; }
 .caveat { color:#8a7a5a; }
+.scale { color:#8c8c8c; font-size:13px; margin:8px 0 0; }
+.missing { color:#c8a06a; font-size:13px; margin:12px 0 0; max-width:72ch; }
+.noimg { aspect-ratio:3/2; display:flex; align-items:center; justify-content:center;
+         background:#191919; color:#8a8a8a; font-size:12px; text-align:center;
+         padding:12px; border-bottom:1px solid #292929; }
+.filters { position:sticky; top:0; z-index:5; background:#121212ee;
+           backdrop-filter:blur(6px); padding:10px 0 12px; margin:0 auto 4px;
+           max-width:1180px; display:flex; flex-wrap:wrap; gap:8px;
+           border-bottom:1px solid #242424; }
+.chip { background:#1d1d1d; color:#c9c9c9; border:1px solid #2e2e2e; border-radius:99px;
+        padding:6px 13px; font:inherit; font-size:13px; cursor:pointer; }
+.chip .n { color:#8c8c8c; margin-left:7px; font-size:12px; }
+.chip.on { background:#2b2b2b; color:#fff; border-color:#454545; }
+.card img { cursor:zoom-in; }
+#lightbox { position:fixed; inset:0; background:#000000ee; z-index:20;
+            display:flex; align-items:center; justify-content:center; }
+#lightbox[hidden] { display:none; }
+#lightbox img { max-width:94vw; max-height:94vh; object-fit:contain; }
+#lightbox button { position:absolute; top:14px; right:18px; background:none; border:0;
+                   color:#ddd; font-size:34px; line-height:1; cursor:pointer; }
+@media (max-width:640px) {
+  body { padding:18px 12px 48px; }
+  .grid { grid-template-columns:1fr; }
+  .filters { gap:6px; }
+}
 a { color:#8fb8d8; }
 """
 
@@ -236,16 +288,27 @@ def write(
     language: str = "en",
     insights_link: str | None = None,
     expert: bool = True,
+    assets=None,
+    standalone: bool = False,
 ) -> Path:
-    """The default report. One number, five piles, nothing else."""
+    """The default report. One number, five piles, nothing else.
+
+    `assets` maps each record to the image it should show, or to the reason it
+    cannot show one. When it is None the page renders placeholders throughout,
+    which is the honest result for a caller that did not build derivatives --
+    and it is never a silent black tile.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     sections = by_section(records)
     counts = {name: len(items) for name, _, items in sections}
     best = max((potential(r) for r in records), default=0)
+    lookup = (assets.derivatives if assets else {}) or {}
+    missing = (assets.reasons() if assets else {}) or {}
+
     body = "".join(
-        _section(name, accent, items, path.parent, language, best)
+        _section(name, accent, items, language, best, lookup)
         for name, accent, items in sections
     )
 
@@ -268,19 +331,103 @@ def write(
 <header>
 <h1>{html.escape(t("report.title", language))}</h1>
 <p class="lede">{html.escape(t("report.lede", language))}</p>
+<p class="scale">{html.escape(t("report.scale", language, top=TOP_THRESHOLD))}</p>
 {link}
+{_missing_html(missing, language)}
 <div class="counts">{_counts_html(counts, language)}</div>
 </header>
+<nav class="filters">{_filter_html(counts, language)}</nav>
 <main>
 {body}
 </main>
 {_expert_html(records, language) if expert else ""}
 <p class="foot">{_uplift_note(records, language)}{html.escape(t("report.footer", language))}</p>
+<div id="lightbox" hidden><img alt=""><button type="button" aria-label="close">&times;</button></div>
+<script>{SCRIPT}</script>
 </body>
 </html>
 """
     path.write_text(document, encoding="utf-8")
     return path
+
+
+def write_folder(
+    records,
+    report_dir: Path,
+    *,
+    cache_dir: Path,
+    language: str = "en",
+    insights_link: str | None = None,
+    expert: bool = True,
+):
+    """A portable `report/` directory: index.html plus its own assets.
+
+    Every `src` is `assets/...`, relative to the page, so the folder can be
+    zipped and opened anywhere. Pointing at images elsewhere in the run is what
+    broke before: the page was rendered in a staging directory, the paths were
+    correct relative to *that*, and publishing moved the file two levels up.
+    """
+    import report_assets
+
+    report_dir = Path(report_dir)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    assets = report_assets.build(records, report_dir, cache_dir)
+    write(
+        records,
+        report_dir / "index.html",
+        language=language,
+        insights_link=insights_link,
+        expert=expert,
+        assets=assets,
+    )
+    return assets
+
+
+def write_standalone(
+    records,
+    path: Path,
+    *,
+    language: str = "en",
+    expert: bool = True,
+    width: int = None,
+    quality: int = None,
+):
+    """One file, every thumbnail inlined. Nothing external, nothing beside it."""
+    import report_assets
+
+    assets = report_assets.inline(
+        records,
+        width=width or report_assets.EMBED_PX,
+        quality=quality or report_assets.EMBED_QUALITY,
+    )
+    write(records, Path(path), language=language, expert=expert, assets=assets)
+    return assets
+
+
+def _missing_html(reasons: dict[str, int], language: str) -> str:
+    """Say how many cards have no image, and why. Never leave it to be noticed."""
+    if not reasons:
+        return ""
+    total = sum(reasons.values())
+    detail = "; ".join(f"{count} — {reason}" for reason, count in sorted(reasons.items()))
+    return (
+        f'<p class="missing">{html.escape(t("report.missing_images", language, count=total))} '
+        f"({html.escape(detail)})</p>"
+    )
+
+
+def _filter_html(counts: dict[str, int], language: str) -> str:
+    buttons = "".join(
+        f'<button type="button" data-bucket="{name}" class="chip">'
+        f'{html.escape(t(f"category.{name}", language))}'
+        f'<span class="n">{counts.get(name, 0)}</span></button>'
+        for name, _ in SECTIONS
+    )
+    return (
+        f'<button type="button" data-bucket="ALL" class="chip on">'
+        f'{html.escape(t("report.all", language))}'
+        f'<span class="n">{sum(counts.values())}</span></button>{buttons}'
+    )
 
 
 def _uplift_note(records, language: str) -> str:
@@ -304,7 +451,8 @@ def _counts_html(counts: dict[str, int], language: str) -> str:
 
 
 def _section(
-    name: str, accent: str, items: list, base: Path, language: str, best: int = 0
+    name: str, accent: str, items: list, language: str, best: int = 0,
+    lookup: dict | None = None,
 ) -> str:
     heading = html.escape(t(f"category.{name}", language))
     note = t(f"category.note.{name}", language)
@@ -315,24 +463,34 @@ def _section(
         if name == "TOP" and best:
             empty = t("report.no_top", language, best=best, threshold=TOP_THRESHOLD)
         return (
-            f'<section><div class="section-head" style="border-color:{accent}44">'
+            f'<section data-bucket="{name}">'
+            f'<div class="section-head" style="border-color:{accent}44">'
             f"<h2>{heading}</h2><span class=\"n\">0</span></div>"
             f'<p class="empty">{html.escape(empty)}</p></section>'
         )
-    cards = "".join(_card(record, base, accent, language) for record in items)
+    cards = "".join(_card(record, accent, language, lookup or {}) for record in items)
     return (
-        f'<section><div class="section-head" style="border-color:{accent}44">'
+        f'<section data-bucket="{name}">'
+        f'<div class="section-head" style="border-color:{accent}44">'
         f'<h2>{heading}</h2><span class="n">{len(items)}</span></div>'
         f'<p class="section-note">{html.escape(note)}</p>'
         f'<div class="grid">{cards}</div></section>'
     )
 
 
-def _card(record, base: Path, accent: str, language: str) -> str:
-    preview = _relative(record.preview_path, base)
-    image = (
-        f'<img src="{html.escape(preview)}" alt="" loading="lazy">' if preview else ""
-    )
+def _card(record, accent: str, language: str, lookup: dict) -> str:
+    derivative = lookup.get(record.asset_key or record.filename)
+    if derivative is not None and derivative.thumb:
+        image = (
+            f'<img src="{html.escape(derivative.thumb)}" alt="" loading="lazy" '
+            f'data-full="{html.escape(derivative.full or derivative.thumb)}">'
+        )
+    else:
+        # A visible statement, not a black rectangle. A missing image that
+        # looks like a rendering bug sends somebody debugging the report.
+        why = derivative.reason if derivative is not None else t("report.no_preview", language)
+        image = f'<div class="noimg">{html.escape(why)}</div>'
+
     steps = recommendations(record)
     todo = (
         "<ul class=\"todo\">"
@@ -395,10 +553,6 @@ def _expert_html(records, language: str) -> str:
     )
 
 
-def _relative(preview_path: str, base: Path) -> str:
-    if not preview_path:
-        return ""
-    try:
-        return os.path.relpath(Path(preview_path), base)
-    except ValueError:  # pragma: no cover - different drives on Windows
-        return str(preview_path)
+# `_relative` used to live here, turning `record.preview_path` into a path
+# relative to wherever the page happened to be written. It is gone with the
+# whole idea: the report owns its images now, so there is no path to get wrong.

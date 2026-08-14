@@ -14,10 +14,9 @@ suitability score for ordering the recommendations. Acceptance is a human
 reviewer's decision at every one of these platforms, and sales are a market
 outcome. Both are outside what any local analysis can know.
 
-The commercial/editorial split is not advisory here either. An asset with a face
-or a readable trademark and no release is editorial-only, full stop, and the
-platform recommendation reflects that rather than suggesting the user "consider"
-getting a release.
+There used to be a commercial/editorial split here, driven by whether a vision
+model thought it saw a face or a trademark. It is gone. Guessing at paperwork is
+not analysis, and the guess decided which platforms an asset was offered to.
 """
 
 from __future__ import annotations
@@ -89,7 +88,6 @@ class Recommendation:
     route: str
     reasons: list[str] = field(default_factory=list)
     blockers: list[str] = field(default_factory=list)
-    missing_releases: list[str] = field(default_factory=list)
     missing_metadata: list[str] = field(default_factory=list)
     policy_conflicts: list[str] = field(default_factory=list)
     manual_submission_required: bool = False
@@ -106,7 +104,6 @@ class Recommendation:
             "route": self.route,
             "reasons": self.reasons,
             "blockers": self.blockers,
-            "missing_releases": self.missing_releases,
             "missing_metadata": self.missing_metadata,
             "policy_conflicts": self.policy_conflicts,
             "manual_submission_required": self.manual_submission_required,
@@ -170,8 +167,6 @@ def evaluate(
     record: ProvenanceRecord,
     *,
     rules: Ruleset | None = None,
-    has_model_release: bool = False,
-    has_property_release: bool = False,
     metadata_complete: bool = False,
 ) -> list[Recommendation]:
     """Rank the platforms this asset could realistically go to.
@@ -187,28 +182,10 @@ def evaluate(
     for platform in rules.platforms:
         blockers = check_technical(platform, facts)
         reasons: list[str] = []
-        missing_releases: list[str] = []
         missing_metadata: list[str] = []
         policy_notes: list[str] = []
 
         route = asset.route
-        if route is Route.EDITORIAL and not platform.get("editorial_accepted", True):
-            blockers.append(f"{platform.get('name')} has no editorial route for this asset")
-
-        if route is Route.COMMERCIAL:
-            reasons.append("no release needed: commercial licensing is open")
-        else:
-            reasons.append(
-                "editorial only: a face or trademark is present and commercial stock is blocked"
-            )
-            if (semantic.faces or semantic.identifiable_people) and not has_model_release:
-                missing_releases.append("model release")
-            if semantic.recognizable_property and not has_property_release:
-                missing_releases.append("property release")
-            if semantic.brand_mark:
-                policy_notes.append(
-                    "readable trademark present: editorial use only, and some buyers will still refuse it"
-                )
 
         conflict = conflicts.get(platform.get("id", ""))
         if conflict:
@@ -222,10 +199,6 @@ def evaluate(
         suitability = _suitability(asset, platform, facts, route)
         eligible = not blockers
 
-        if platform.get("editorial_strength") == "high" and route is Route.EDITORIAL:
-            suitability = min(100, suitability + 12)
-            reasons.append("strong editorial market")
-
         recommendations.append(
             Recommendation(
                 platform_id=str(platform.get("id", "")),
@@ -235,11 +208,10 @@ def evaluate(
                 route=route.value,
                 reasons=reasons,
                 blockers=blockers,
-                missing_releases=missing_releases,
                 missing_metadata=missing_metadata,
                 policy_conflicts=policy_notes,
                 manual_submission_required=bool(platform.get("manual_submission_required", False)),
-                export_ready=eligible and not missing_releases and metadata_complete,
+                export_ready=eligible and metadata_complete,
                 max_keywords=int(platform.get("max_keywords", 50)),
                 verified_on=str(platform.get("verified_on", "")),
             )
@@ -251,8 +223,6 @@ def evaluate(
 def _suitability(asset: ScoredAsset, platform: dict, facts: TechnicalFacts, route: Route) -> int:
     """How well this asset fits this platform, 0-100. Ordering only."""
     base = asset.scores.stock_potential
-    if route is Route.EDITORIAL:
-        base = int(0.55 * asset.scores.stock_potential + 0.45 * asset.scores.aesthetic_potential)
 
     spec = platform.get(facts.kind) or {}
     if facts.kind == "photo":

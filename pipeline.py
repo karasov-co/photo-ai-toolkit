@@ -865,7 +865,7 @@ def stage3_pass(
             has_unrecoverable=bool(hint.get("has_unrecoverable")),
             intentionality_likelihood=int(hint.get("intentionality_likelihood", 50)),
             curatorial_uncertainty=int(hint.get("curatorial_uncertainty", 100)),
-            faces_present=bool(hint.get("faces_present")),
+            faces_present=False,
             corrupt=bool(measurement.error),
         )
         if not needed:
@@ -1318,9 +1318,9 @@ def _darkroom_pass(assets, measurements, records, options: PipelineOptions) -> N
                 asset, measurement, scores,
                 out_dir=options.output_dir,
                 renderer_name=options.darkroom_renderer,
-                faces_present=record.semantic_present and (
-                    "needs_model_release" in (record.tags or [])
-                ),
+                # Nothing reports faces any more, and `None` is the honest
+                # value: the skin check still runs, it just cannot be fatal.
+                faces_present=None,
             )
         except Exception as e:
             logger.warning("Darkroom failed for %s: %s", record.filename, reports.redact(str(e)))
@@ -1346,7 +1346,6 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
             "has_unrecoverable": bool(r.issues.get("unrecoverable")),
             "intentionality_likelihood": (r.artistic or {}).get("intentionality_likelihood", 50),
             "curatorial_uncertainty": (r.artistic or {}).get("curatorial_uncertainty", 100),
-            "faces_present": semantics.get(r.asset_key, Semantic()).faces,
         }
         for r in provisional
     }
@@ -1704,11 +1703,9 @@ def _build_record(
     stage3_payload, portrait_verdict = _stage3_payload(inp)
     verdict = curation.categorise(inp, scored.scores, calibration.for_kind(inp.kind))
 
+    # Release warnings are gone: they came from a model guessing at a legal
+    # question. Provenance is a fact about the file and stays.
     legal_warnings = []
-    if inp.semantic.faces or inp.semantic.identifiable_people:
-        legal_warnings.append("Model release required before commercial licensing")
-    if inp.semantic.brand_mark:
-        legal_warnings.append("Readable trademark present: editorial only unless cleared")
     if record.is_uncertain:
         legal_warnings.append("Provenance undeclared: confirm this is a camera original")
 
@@ -1971,14 +1968,9 @@ def reclassify(analysis_path: Path, calibration: CalibrationSet) -> list[dict]:
             except ValueError:
                 found.add(issues_module.IssueCode.DEAD_MOMENT, described)
 
-        tags = row.get("tags") or []
         semantic = Semantic(
             present=bool(row.get("semantic_present", False)),
             genre=row.get("genre") or "other",
-            faces="needs_model_release" in tags,
-            brand_mark="legal_review" in tags,
-            signage_text="editorial_only" in tags and "needs_model_release" not in tags,
-            identifiable_people="needs_model_release" in tags,
         )
         inp = ScoreInput(
             asset_id=row.get("asset_id", ""),

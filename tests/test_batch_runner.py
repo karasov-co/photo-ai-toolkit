@@ -195,8 +195,6 @@ VALID_ITEM = {
     "axis_b": 2,
     "axis_c": 3,
     "recover": "easy",
-    "faces": False,
-    "brand_mark": False,
     "note": "lift shadows",
 }
 

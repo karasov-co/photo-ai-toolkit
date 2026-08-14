@@ -244,6 +244,7 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
         _write_outputs(
             result, space, language,
             insights_scope=getattr(args, "insights_scope", "new"),
+            args=args,
         )
     except workspace.PublishError as e:
         print(f"\nThe run did not produce a complete result: {e}", file=sys.stderr)
@@ -293,6 +294,7 @@ def _write_outputs(
     language: str,
     *,
     insights_scope: str = "new",
+    args=None,
 ) -> None:
     """Build the run in staging, validate it, then swap it in.
 
@@ -318,12 +320,23 @@ def _write_outputs(
         result.records, workspace.Workspace(staged)
     )
 
-    simple_report.write(
+    # The report is built inside its own folder so every src is `assets/...`
+    # and the whole directory can be moved, zipped or emailed.
+    images = simple_report.write_folder(
         result.records,
-        staged / workspace.REPORT_NAME,
+        staged / workspace.REPORT_DIRNAME,
+        cache_dir=space.thumb_cache,
         language=language,
-        insights_link=workspace.INSIGHTS_NAME,
+        insights_link=f"../{workspace.INSIGHTS_NAME}",
     )
+    if getattr(args, "standalone", False):
+        simple_report.write_standalone(
+            result.records,
+            staged / workspace.STANDALONE_NAME,
+            language=language,
+            width=getattr(args, "embed_width", None),
+            quality=getattr(args, "embed_quality", None),
+        )
 
     manifest = batches.latest(space.internal / batches.MANIFEST_NAME)
     scoped, actual_scope = batches.scope_records(result.records, manifest, insights_scope)
@@ -370,6 +383,10 @@ def _write_outputs(
     print()
     print(f"  {space.report}")
     print(f"  {space.insights}")
+    if images.missing:
+        print(f"  {len(images.missing)} card(s) without an image: {images.reasons()}")
+    if getattr(args, "standalone", False):
+        print(f"  {space.standalone}  (one file, images inlined)")
     print("  " + ", ".join(f"{name}/ {n}" for name, n in _folder_counts(counts).items()))
     if recipes["written"]:
         print(f"  {workspace.RECIPES}/ {len(recipes['written'])} edit recipe(s)")
@@ -547,8 +564,6 @@ def _filter(records: list[AssetRecord], args: argparse.Namespace) -> list[AssetR
         out = [r for r in out if r.scores.get("post_edit_potential", 0) >= args.min_potential]
     if args.min_confidence is not None:
         out = [r for r in out if r.confidence >= args.min_confidence]
-    if args.needs_release:
-        out = [r for r in out if "needs_model_release" in r.tags]
     if args.cluster:
         out = [r for r in out if r.cluster_id == args.cluster]
     if args.duplicates_only:
@@ -975,12 +990,6 @@ def cmd_export(args: argparse.Namespace) -> int:
             if k in stock_metadata.StockMetadata.__dataclass_fields__
         })
         rows.append((record.filename, meta))
-        if meta.model_release_required:
-            checklist.append(f"{record.filename}: model release required")
-        if meta.property_release_required:
-            checklist.append(f"{record.filename}: property release required")
-        if meta.logo_warning:
-            checklist.append(f"{record.filename}: {meta.logo_warning}")
         stock_metadata.write_xmp_sidecar(meta, out_dir / record.filename)
 
     csv_path = stock_metadata.write_submission_csv(rows, out_dir / "submission.csv")
@@ -1122,6 +1131,18 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument("--force", action="store_true", help="ignore the analysis cache")
         parser.add_argument("--limit", type=int)
         parser.add_argument(
+            "--standalone", action="store_true",
+            help="also write one self-contained HTML file with images inlined",
+        )
+        parser.add_argument(
+            "--embed-width", type=int, default=None,
+            help="long side of inlined thumbnails in --standalone (default 480)",
+        )
+        parser.add_argument(
+            "--embed-quality", type=int, default=None,
+            help="JPEG quality of inlined thumbnails in --standalone (default 75)",
+        )
+        parser.add_argument(
             "--jobs", type=int, default=None,
             help=(
                 "worker processes for decoding (default: one per core). "
@@ -1219,13 +1240,12 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--sort", default="score", choices=list(SORT_KEYS))
     report.add_argument("--media", choices=["photo", "video"])
     report.add_argument("--route-class", action="append", choices=[c.value for c in RouteClass])
-    report.add_argument("--route", choices=["commercial", "editorial"])
+    report.add_argument("--route", choices=["commercial"])
     report.add_argument("--genre")
     report.add_argument("--marketplace")
     report.add_argument("--min-score", type=int)
     report.add_argument("--min-potential", type=int)
     report.add_argument("--min-confidence", type=int)
-    report.add_argument("--needs-release", action="store_true")
     report.add_argument("--cluster")
     report.add_argument("--duplicates-only", action="store_true")
     report.add_argument("--limit", type=int)

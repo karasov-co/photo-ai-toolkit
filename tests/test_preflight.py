@@ -72,7 +72,7 @@ def stage2_reply(count: int, **overrides) -> str:
             {
                 "n": i + 1, "genre": "landscape", "axis_a": i + 1,
                 "axis_b": count - i, "axis_c": i + 1, "recover": "easy",
-                "faces": False, "brand_mark": False, "note": "lift shadows",
+                "note": "lift shadows",
                 "intended_frame": True, "subject_strength": 75,
                 "accidental_probability": 2, "dead_moment_probability": 3,
                 **overrides,
@@ -164,6 +164,7 @@ def test_a_missing_key_stops_before_anything_is_opened(archive, tmp_path, watchf
 def test_a_missing_key_leaves_an_existing_run_exactly_as_it_was(archive, tmp_path, watchful):
     out = tmp_path / "run"
     space = workspace.Workspace(out).create()
+    space.report.parent.mkdir(parents=True, exist_ok=True)
     space.report.write_text("the previous report")
     (space.root / "top" / "keep.jpg").write_text("a link from last time")
 
@@ -219,6 +220,7 @@ def test_an_unavailable_model_preserves_the_previous_report(archive, tmp_path, m
     with_client(monkeypatch, Client(error=ModelUnavailable()))
     out = tmp_path / "run"
     space = workspace.Workspace(out).create()
+    space.report.parent.mkdir(parents=True, exist_ok=True)
     space.report.write_text("the previous report")
     space.insights.write_text("the previous insights")
 
@@ -472,8 +474,7 @@ def test_h_duplicate_status_alone_never_produces_weak():
     inp = scoring.ScoreInput(
         asset_id="a", filename="a.jpg", technical_quality=80, uplift=6, is_raw=True,
         semantic=scoring.Semantic(present=True, genre="landscape", axis_a=60, axis_b=60,
-                                  axis_c=55, faces=False, brand_mark=False,
-                                  identifiable_people=False, subject_strength=70),
+                                  axis_c=55, subject_strength=70),
         artistic=art, is_best_in_cluster=False, cluster_margin=25, cluster_size=4,
     )
     verdict = curation.categorise(inp, scoring.score(inp, profile), profile)
@@ -527,7 +528,7 @@ def test_j_a_stage2_failure_preserves_the_previous_run(archive, tmp_path, monkey
     out = tmp_path / "run"
     client = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
     assert analyze(archive, out) == 0
-    good_report = (out / "report.html").read_text()
+    good_report = (out / "report" / "index.html").read_text()
     good_top = sorted(p.name for p in (out / "top").iterdir())
 
     # A second run whose content pass returns nothing usable at all.
@@ -535,15 +536,17 @@ def test_j_a_stage2_failure_preserves_the_previous_run(archive, tmp_path, monkey
     client.responses.stage2_text = "the model declined"
     assert analyze(archive, out) != 0
 
-    assert (out / "report.html").read_text() == good_report
+    assert (out / "report" / "index.html").read_text() == good_report
     assert sorted(p.name for p in (out / "top").iterdir()) == good_top
 
 
 def test_j_an_incomplete_staging_directory_is_refused(tmp_path):
     space = workspace.Workspace(tmp_path / "run").create()
+    space.report.parent.mkdir(parents=True, exist_ok=True)
     space.report.write_text("the previous report")
     staged = workspace.staging_dir(space, "incomplete")
-    (staged / workspace.REPORT_NAME).write_text("a new report with no insights beside it")
+    (staged / workspace.REPORT_DIRNAME).mkdir(parents=True, exist_ok=True)
+    (staged / workspace.REPORT_DIRNAME / "index.html").write_text("a new report with no insights beside it")
 
     with pytest.raises(workspace.PublishError):
         workspace.publish(space, staged)
@@ -556,7 +559,8 @@ def test_j_publication_replaces_everything_or_nothing(tmp_path):
     space.insights.write_text("old insights")
 
     staged = workspace.staging_dir(space, "complete")
-    (staged / workspace.REPORT_NAME).write_text("new report")
+    (staged / workspace.REPORT_DIRNAME).mkdir(parents=True, exist_ok=True)
+    (staged / workspace.REPORT_DIRNAME / "index.html").write_text("new report")
     (staged / workspace.INSIGHTS_NAME).write_text("new insights")
     (staged / "top").mkdir()
 
@@ -698,7 +702,7 @@ def test_an_exhausted_balance_ends_the_run_instead_of_half_analysing(
     out = tmp_path / "run"
     good = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
     assert analyze(archive, out) == 0
-    previous = (out / "report.html").read_text()
+    previous = (out / "report" / "index.html").read_text()
 
     write_jpeg(photo_like(1200, 900, seed=8), archive / "d.jpg")
     broke = Client(stage2=stage2_reply(1), stage3=stage3_reply(1))
@@ -706,7 +710,7 @@ def test_an_exhausted_balance_ends_the_run_instead_of_half_analysing(
     with_client(monkeypatch, broke)
 
     assert analyze(archive, out) != 0
-    assert (out / "report.html").read_text() == previous, "the good report was replaced"
+    assert (out / "report" / "index.html").read_text() == previous, "the good report was replaced"
     assert good is not broke
 
 

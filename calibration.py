@@ -37,7 +37,6 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "stock_potential": 0.18,
     "portfolio_potential": 0.12,
     "uniqueness": 0.10,
-    "legal_readiness": 0.06,
 }
 
 DEFAULT_THRESHOLDS: dict[str, float] = {
@@ -85,7 +84,6 @@ VIDEO_WEIGHT_OVERRIDES: dict[str, float] = {
     "stock_potential": 0.20,
     "portfolio_potential": 0.08,
     "uniqueness": 0.08,
-    "legal_readiness": 0.06,
 }
 
 
@@ -174,9 +172,8 @@ def stock_first_profile() -> CalibrationProfile:
             "stock_potential": 0.36,
             "portfolio_potential": 0.04,
             "uniqueness": 0.08,
-            "legal_readiness": 0.12,
         },
-        notes="Prioritises sellable, release-clean, legible frames.",
+        notes="Prioritises sellable, legible frames.",
     )
 
 
@@ -191,10 +188,9 @@ def portfolio_first_profile() -> CalibrationProfile:
             "stock_potential": 0.05,
             "portfolio_potential": 0.25,
             "uniqueness": 0.08,
-            "legal_readiness": 0.02,
         },
         thresholds={**DEFAULT_THRESHOLDS, "flagship_portfolio": 66.0, "flagship_top_fraction": 0.15},
-        notes="Prioritises distinctive work; tolerates release problems.",
+        notes="Prioritises distinctive work over sellable work.",
     )
 
 

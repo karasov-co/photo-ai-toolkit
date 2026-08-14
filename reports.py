@@ -238,7 +238,7 @@ CSV_FIELDS = [
     "source_path", "media_type", "route_class", "route",
     "routing_score", "current_quality", "post_edit_potential", "expected_gain",
     "recoverability", "aesthetic_potential", "stock_potential", "portfolio_potential",
-    "legal_readiness", "uniqueness", "confidence",
+    "uniqueness", "confidence",
     "genre", "concepts", "description",
     "unrecoverable", "partially_fixable", "fixable",
     "edit_recipe", "marketplaces", "legal_warnings",
@@ -268,7 +268,6 @@ def _csv_row(record: AssetRecord) -> dict:
         "aesthetic_potential": scores.get("aesthetic_potential", ""),
         "stock_potential": scores.get("stock_potential", ""),
         "portfolio_potential": scores.get("portfolio_potential", ""),
-        "legal_readiness": scores.get("legal_readiness", ""),
         "uniqueness": scores.get("uniqueness", ""),
         "confidence": scores.get("confidence", ""),
         "genre": record.genre,
@@ -335,10 +334,52 @@ def write_json(records: list[AssetRecord], path: Path, *, summary: dict | None =
     return path
 
 
+# Fields a run written before the editorial bucket was removed still carries.
+# Migrating on read rather than invalidating: the expensive part of a run is the
+# API calls, and none of their answers changed meaning -- only the pile a
+# photograph was filed under, which was never the model's to decide.
+_RETIRED_TAGS = frozenset(
+    {"editorial_only", "needs_model_release", "needs_property_release", "legal_review"}
+)
+
+
+def migrate_row(row: dict) -> dict:
+    """One stored asset, brought forward to the current vocabulary.
+
+    Case-insensitive on purpose: `category` has been written both as the enum
+    name and as its value over the life of the format, and a migration that
+    only matches one of them silently leaves a dead bucket in a rebuilt report.
+    """
+    out = dict(row)
+    category = out.get("category")
+    if isinstance(category, str) and category.lower() == "good_editorial":
+        out["category"] = "GOOD_STOCK" if category.isupper() else "good_stock"
+    route = out.get("route")
+    if isinstance(route, str) and route.lower() == "editorial":
+        out["route"] = "COMMERCIAL" if route.isupper() else "commercial"
+    route_class = out.get("route_class")
+    if isinstance(route_class, str) and route_class.lower().endswith("/editorial"):
+        out["route_class"] = route_class.rsplit("/", 1)[0]
+    tags = out.get("tags")
+    if isinstance(tags, list):
+        out["tags"] = [t for t in tags if t not in _RETIRED_TAGS]
+    scores = out.get("scores")
+    if isinstance(scores, dict):
+        out["scores"] = {k: v for k, v in scores.items() if k != "legal_readiness"}
+    return out
+
+
 def read_json(path: Path) -> tuple[list[dict], dict]:
     """Load a previous run so routing can be redone without re-analysing."""
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return list(payload.get("assets") or []), dict(payload.get("summary") or {})
+    assets = [migrate_row(r) for r in (payload.get("assets") or [])]
+    summary = dict(payload.get("summary") or {})
+    if "good_editorial" in summary:
+        summary["good_stock"] = int(summary.get("good_stock", 0)) + int(
+            summary.pop("good_editorial") or 0
+        )
+    summary.pop("missing_releases", None)
+    return assets, summary
 
 
 def write_csv(records: list[AssetRecord], path: Path) -> Path:
@@ -414,7 +455,6 @@ def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict
         "recoverable_bytes": recoverable_bytes,
         "recoverable_mb": round(recoverable_bytes / 1_048_576, 1),
         "top_genres": sorted(genres.items(), key=lambda kv: -kv[1])[:8],
-        "missing_releases": sum(1 for r in ok if "needs_model_release" in r.tags),
         # Technically past the thresholds. Says nothing about content.
         "technically_usable": sum(
             1 for r in ok if r.route_class in ("stock_standard", "stock_strong", "flagship")
@@ -552,7 +592,6 @@ def _expert_summary(summary: dict, language: str) -> list[str]:
 
     if summary.get("semantic_ran"):
         lines.append(
-            _row(t("summary.missing_releases", language), summary.get("missing_releases", 0))
         )
     else:
         lines.append(

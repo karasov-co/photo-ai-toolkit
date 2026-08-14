@@ -6,10 +6,9 @@ a caller -- routing moved into `scoring` and then into `curation`, and the old
 module stayed behind because deleting code that still imports cleanly requires
 somebody to check. The parser was the only living part.
 
-The one idea worth keeping from it was `Destination.EDITORIAL`: a frame that
-cannot be sold as commercial stock is not thereby worthless, because editorial
-is a market. That now lives in `curation.PhotoCategory.GOOD_EDITORIAL`, where it
-affects what a photographer is told.
+The one idea worth keeping from it was that a documentary frame is still a
+good photograph. It is not a separate pile any more -- there is no
+stock-versus-editorial split left to put it on the wrong side of.
 
 What is parsed here is a ranking, not a score. Unknown genres fall back rather
 than failing a photograph; out-of-range ranks are clamped for the same reason; a
@@ -56,17 +55,13 @@ class Assessment:
 
     filename: str
     genre: Genre
-    axis_a: int
     axis_b: int
     axis_c: int
     recover: Recover
-    faces: bool
-    # Split from a single `logos` flag. A registered mark dominating the frame
-    # and a street full of shop signs are different facts with different
-    # consequences, and collapsing them blocked ordinary street photography
-    # from commercial use.
-    brand_mark: bool = False
-    signage_text: bool = False
+    # axis_a is CONTENT: moment, composition, subject. It used to be COMMERCIAL
+    # USABILITY and fed a stock-versus-editorial split that is gone. It keeps a
+    # neutral default because replies cached before the rename lack the key.
+    axis_a: int = 50
     note: str = ""
     model_destination: str | None = None
     is_video: bool = False
@@ -105,10 +100,11 @@ def parse_assessment(
     axis values are clamped for the same reason. A missing required key is a
     real failure and does raise.
     """
-    # `logos` is deliberately absent: a reply that splits it into brand_mark
-    # and signage_text is the current shape, and an older reply that still
-    # carries `logos` is read below for compatibility.
-    required = {"genre", "axis_a", "axis_b", "axis_c", "recover", "faces"}
+    # `axis_a` is asked for but not required: replies cached before it came
+    # back fall through to its neutral default rather than being thrown away.
+    # `faces` and `brand_mark` are no longer asked for at all; a cached reply
+    # that still carries them parses fine, the extra keys are ignored.
+    required = {"genre", "axis_b", "axis_c", "recover"}
     missing = required - payload.keys()
     if missing:
         raise AssessmentParseError(f"{filename}: missing keys {sorted(missing)}")
@@ -116,13 +112,10 @@ def parse_assessment(
     return Assessment(
         filename=filename,
         genre=_enum_or_default(Genre, payload["genre"], Genre.OTHER),
-        axis_a=_clamp_axis(payload["axis_a"]),
+        axis_a=_clamp_axis(payload.get("axis_a", 50)),
         axis_b=_clamp_axis(payload["axis_b"]),
         axis_c=_clamp_axis(payload["axis_c"]),
         recover=_enum_or_default(Recover, payload["recover"], Recover.MODERATE),
-        faces=_as_bool(payload["faces"]),
-        brand_mark=_brand_mark_of(payload),
-        signage_text=_as_bool(payload.get("signage_text", False), default=False),
         note=_trim_note(payload.get("note", "")),
         intended_frame=_as_bool(payload.get("intended_frame", True)),
         subject_strength=_clamp_0_100(payload.get("subject_strength", 50), 50),
@@ -132,21 +125,6 @@ def parse_assessment(
         is_video=is_video,
         technically_rejected_for=list(technically_rejected_for or []),
     )
-
-
-def _brand_mark_of(payload: dict) -> bool:
-    """A dominant registered mark, from either the new field or an old reply.
-
-    A cached or replayed reply from before the split carries `logos`, which
-    conflated a Coca-Cola wall with a noodle-shop sign. Reading it as a brand
-    mark is the conservative choice for that old data and costs nothing going
-    forward, because new replies never contain the key.
-    """
-    if "brand_mark" in payload:
-        return _as_bool(payload["brand_mark"], default=False)
-    if "logos" in payload:
-        return _as_bool(payload["logos"], default=False)
-    return False
 
 
 def _clamp_0_100(value, default: int) -> int:

@@ -6,7 +6,10 @@
     {
       "id": "adobe_stock",
       "name": "Adobe Stock",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
       "sources": [
         "https://helpx.adobe.com/stock/contributor/submit-your-content/submit-photos/technical-legal-requirements-photo-submission.html",
@@ -15,7 +18,9 @@
       "photo": {
         "min_megapixels": 4.0,
         "max_megapixels": 100.0,
-        "formats": ["JPEG"],
+        "formats": [
+          "JPEG"
+        ],
         "color_profile": "sRGB",
         "max_file_size_mb": 45,
         "notes": "12 MP or more is the practical norm even though 4 MP is the floor."
@@ -23,18 +28,24 @@
       "video": {
         "min_duration_s": 5.0,
         "max_duration_s": 60.0,
-        "recommended_duration_s": [10.0, 20.0],
+        "recommended_duration_s": [
+          10.0,
+          20.0
+        ],
         "min_width": 1920,
         "min_height": 1080,
         "max_width": 4096,
-        "containers": ["mov", "mp4", "mpeg"],
+        "containers": [
+          "mov",
+          "mp4",
+          "mpeg"
+        ],
         "notes": "Submit at native capture resolution. Up-ressing HD to 4K is a rejection reason."
       },
       "generative_ai": "accepted_with_label",
       "generative_ai_note": "Generative content is accepted when correctly declared as such at submission.",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "max_keywords": 49,
       "keyword_note": "The first ten keywords carry the most weight; order them deliberately.",
       "manual_submission_required": false
@@ -42,7 +53,10 @@
     {
       "id": "shutterstock",
       "name": "Shutterstock",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
       "sources": [
         "https://submit.shutterstock.com/help/en/articles/10594622-content-policy-updates-ai-generated-content",
@@ -50,7 +64,9 @@
       ],
       "photo": {
         "min_megapixels": 4.0,
-        "formats": ["JPEG"],
+        "formats": [
+          "JPEG"
+        ],
         "color_profile": "sRGB"
       },
       "video": {
@@ -58,25 +74,34 @@
         "max_duration_s": 60.0,
         "min_width": 1920,
         "min_height": 1080,
-        "containers": ["mov", "mp4"]
+        "containers": [
+          "mov",
+          "mp4"
+        ]
       },
       "generative_ai": "rejected",
       "generative_ai_note": "Contributor-submitted AI-generated content from external tools is not accepted. Metadata is scanned automatically for C2PA credentials, IPTC DigitalSourceType and XMP/EXIF signatures from known generators; an undeclared match is auto-rejected and can carry an account strike.",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "max_keywords": 50,
       "manual_submission_required": false
     },
     {
       "id": "getty_istock",
       "name": "Getty Images / iStock",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
-      "sources": ["https://contributors.gettyimages.com/article/10847"],
+      "sources": [
+        "https://contributors.gettyimages.com/article/10847"
+      ],
       "photo": {
         "min_megapixels": 4.0,
-        "formats": ["JPEG"],
+        "formats": [
+          "JPEG"
+        ],
         "color_profile": "sRGB"
       },
       "video": {
@@ -84,13 +109,15 @@
         "max_duration_s": 60.0,
         "min_width": 1920,
         "min_height": 1080,
-        "containers": ["mov", "mp4"]
+        "containers": [
+          "mov",
+          "mp4"
+        ]
       },
       "generative_ai": "rejected",
       "generative_ai_note": "Retouching and modification are governed by an explicit policy; generative alteration of documentary content is not permitted.",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "exclusive_by_default": true,
       "max_keywords": 50,
       "manual_submission_required": true,
@@ -99,7 +126,10 @@
     {
       "id": "alamy",
       "name": "Alamy",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
       "sources": [
         "https://www.alamy.com/blog/capturing-the-real-alamys-commitment-to-championing-authentic-photography",
@@ -107,7 +137,10 @@
       ],
       "photo": {
         "min_megapixels": 4.0,
-        "formats": ["JPEG", "TIFF"],
+        "formats": [
+          "JPEG",
+          "TIFF"
+        ],
         "color_profile": "sRGB"
       },
       "video": {
@@ -115,111 +148,149 @@
         "max_duration_s": 120.0,
         "min_width": 1920,
         "min_height": 1080,
-        "containers": ["mov", "mp4"]
+        "containers": [
+          "mov",
+          "mp4"
+        ]
       },
       "generative_ai": "rejected",
       "generative_ai_note": "AI-generated imagery is classified as unsuitable material and is removed on discovery; repeat breaches can terminate the contributor contract. AI tools that mimic conventional retouching -- denoise in particular -- remain acceptable on an original photograph. Generative Fill and anything that alters the reality of the original does not.",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
-      "editorial_strength": "high",
       "max_keywords": 50,
       "manual_submission_required": false
     },
     {
       "id": "pond5",
       "name": "Pond5",
-      "accepts": ["video", "photo"],
+      "accepts": [
+        "video",
+        "photo"
+      ],
       "verified_on": "2026-08-11",
-      "sources": ["https://contributor.pond5.com/"],
+      "sources": [
+        "https://contributor.pond5.com/"
+      ],
       "photo": {
         "min_megapixels": 4.0,
-        "formats": ["JPEG"]
+        "formats": [
+          "JPEG"
+        ]
       },
       "video": {
         "min_duration_s": 3.0,
         "max_duration_s": 600.0,
         "min_width": 1280,
         "min_height": 720,
-        "containers": ["mov", "mp4", "mxf"],
+        "containers": [
+          "mov",
+          "mp4",
+          "mxf"
+        ],
         "notes": "The most permissive footage floor of the platforms covered here, and the natural home for a clip that is too short or too long elsewhere."
       },
       "generative_ai": "accepted_with_label",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "max_keywords": 50,
       "manual_submission_required": false
     },
     {
       "id": "dreamstime",
       "name": "Dreamstime",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
-      "sources": ["https://www.dreamstime.com/stock-video-requirements"],
+      "sources": [
+        "https://www.dreamstime.com/stock-video-requirements"
+      ],
       "photo": {
         "min_megapixels": 3.0,
-        "formats": ["JPEG"]
+        "formats": [
+          "JPEG"
+        ]
       },
       "video": {
         "min_duration_s": 5.0,
         "max_duration_s": 120.0,
         "min_width": 1280,
         "min_height": 720,
-        "containers": ["mov", "mp4"]
+        "containers": [
+          "mov",
+          "mp4"
+        ]
       },
       "generative_ai": "accepted_with_label",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "max_keywords": 50,
       "manual_submission_required": false
     },
     {
       "id": "depositphotos",
       "name": "Depositphotos",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
-      "sources": ["https://depositphotos.com/contributor.html"],
+      "sources": [
+        "https://depositphotos.com/contributor.html"
+      ],
       "photo": {
         "min_megapixels": 4.0,
-        "formats": ["JPEG"]
+        "formats": [
+          "JPEG"
+        ]
       },
       "video": {
         "min_duration_s": 5.0,
         "max_duration_s": 60.0,
         "min_width": 1920,
         "min_height": 1080,
-        "containers": ["mov", "mp4"]
+        "containers": [
+          "mov",
+          "mp4"
+        ]
       },
       "generative_ai": "accepted_with_label",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "max_keywords": 50,
       "manual_submission_required": false
     },
     {
       "id": "123rf",
       "name": "123RF",
-      "accepts": ["photo", "video"],
+      "accepts": [
+        "photo",
+        "video"
+      ],
       "verified_on": "2026-08-11",
-      "sources": ["https://www.123rf.com/contributor/"],
+      "sources": [
+        "https://www.123rf.com/contributor/"
+      ],
       "photo": {
         "min_megapixels": 4.0,
-        "formats": ["JPEG"]
+        "formats": [
+          "JPEG"
+        ]
       },
       "video": {
         "min_duration_s": 5.0,
         "max_duration_s": 60.0,
         "min_width": 1920,
         "min_height": 1080,
-        "containers": ["mov", "mp4"]
+        "containers": [
+          "mov",
+          "mp4"
+        ]
       },
       "generative_ai": "accepted_with_label",
       "requires_model_release": true,
       "requires_property_release": true,
-      "editorial_accepted": true,
       "max_keywords": 50,
       "manual_submission_required": false
     }

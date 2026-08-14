@@ -17,7 +17,7 @@ import scoring
 from artistic import ArtisticScores, ArtRoute, IntentSignal, apply_conservative_art
 from issues import IssueCode, IssueSet
 from media import FileState
-from scoring import RouteClass, ScoreInput, Semantic
+from scoring import RouteClass, ScoreInput
 
 
 def array(image):
@@ -565,8 +565,7 @@ def test_an_unknown_group_size_yields_unknown_axes_rather_than_a_raw_rank():
     assessment = routing.parse_assessment(
         {
             "n": 1, "genre": "street", "axis_a": 1, "axis_b": 1, "axis_c": 1,
-            "recover": "easy", "faces": False, "brand_mark": False,
-        },
+            "recover": "easy", },
         "best.RW2",
     )
     semantic = scoring.semantic_from_assessment(assessment)
@@ -582,10 +581,6 @@ def test_a_malformed_ranking_is_rejected_rather_than_aggregated():
     repeated = [{"n": 1, "axis_a": 1, "axis_b": 1, "axis_c": 1},
                 {"n": 2, "axis_a": 1, "axis_b": 2, "axis_c": 2}]
     assert batch_runner.validate_group_ranks(repeated, 2)
-
-
-def test_an_unexamined_frame_keeps_a_neutral_legal_score_not_a_guilty_one():
-    assert scoring.legal_readiness_score(Semantic()) == scoring.UNKNOWN_LEGAL_READINESS
 
 
 def test_a_confirmed_blocker_still_outranks_everything(tmp_path):

@@ -51,6 +51,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "report.potential": "after editing",
         "report.current": "technical quality now",
         "report.empty_section": "Nothing here.",
+        "report.all": "All",
+        "report.scale": (
+            "Ranked 0-100 by potential after editing. Top starts at {top}; below it, "
+            "stock and personal are the same quality and differ only in where they sell; "
+            "weak is a shelf, not a bin."
+        ),
+        "report.missing_images": "{count} photograph(s) could not be shown:",
+        "report.no_preview": "no preview was generated",
         "report.no_top": (
             "Nothing reached the top this time: the strongest photograph scored {best}, "
             "and this section starts at {threshold}. That is a normal result for a "
@@ -73,10 +81,6 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "category.note.TOP": "The strongest work here. Edit these first.",
         "category.note.GOOD_STOCK": "Good photographs that also work as stock material.",
-        "category.note.GOOD_EDITORIAL": (
-            "Good photographs of real places and moments. Sellable as editorial — "
-            "news, travel, documentary — rather than as advertising."
-        ),
         "category.note.GOOD_PERSONAL": "Good photographs worth keeping and printing.",
         "category.note.NEEDS_DECISION": "Genuinely borderline. A quick look settles them.",
         "category.note.WEAK": (
@@ -130,14 +134,12 @@ STRINGS: dict[str, dict[str, str]] = {
         # categories
         "category.TOP": "Top",
         "category.GOOD_STOCK": "Good — stock",
-        "category.GOOD_EDITORIAL": "Good — editorial",
         "category.GOOD_PERSONAL": "Good — personal",
         "category.NEEDS_DECISION": "Needs decision",
         "category.WEAK": "Weak",
         "category.top": "final score {value}: a completed artistic read and no critical defect",
         "category.weak": "final score {value} is below the keep threshold",
         "category.good_stock": "final score {value}, no release needed and commercially usable",
-        "category.good_editorial": "final score {value}: a place and a moment, sellable as editorial",
         "category.good_personal": "final score {value}: worth keeping, but not stock material",
         "category.needs_decision": "on the boundary at {value} and the analysis is unsure",
         "category.defect.bad_expression": "the expression failed: {detail}",
@@ -168,7 +170,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "score.aesthetic_potential": "Aesthetic potential",
         "score.stock_potential": "Stock potential",
         "score.portfolio_potential": "Portfolio potential",
-        "score.legal_readiness": "Legal readiness",
         "score.uniqueness": "Uniqueness",
         "score.confidence": "Confidence",
         "score.routing_score": "Overall",
@@ -330,6 +331,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "report.potential": "после обработки",
         "report.current": "техническое качество файла",
         "report.empty_section": "Здесь пусто.",
+        "report.all": "Все",
+        "report.scale": (
+            "Оценка 0-100 по потенциалу после обработки. «Лучшие» начинаются с {top}; "
+            "ниже — сток и «для себя» одинакового качества, отличаются только тем, где "
+            "продаются; «слабые» — это полка, а не корзина."
+        ),
+        "report.missing_images": "Не удалось показать фотографий: {count}.",
+        "report.no_preview": "превью не создавалось",
         "report.no_top": (
             "В этот раз сюда никто не попал: лучшая фотография набрала {best}, а раздел "
             "начинается с {threshold}. Для съёмки это нормально, и кадры ниже — всё "
@@ -352,10 +361,6 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "category.note.TOP": "Самое сильное здесь. Начните обработку с них.",
         "category.note.GOOD_STOCK": "Хорошие фотографии, которые годятся и для стока.",
-        "category.note.GOOD_EDITORIAL": (
-            "Хорошие снимки реальных мест и моментов. Продаются как редакционные — "
-            "новости, travel, документалистика, — а не как реклама."
-        ),
         "category.note.GOOD_PERSONAL": "Хорошие фотографии — оставить и напечатать.",
         "category.note.NEEDS_DECISION": "Действительно на грани. Одного взгляда хватит.",
         "category.note.WEAK": (
@@ -407,14 +412,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "summary.stage3_completed": "Художественный разбор выполнен",
         "category.TOP": "Лучшие",
         "category.GOOD_STOCK": "Хорошие — сток",
-        "category.GOOD_EDITORIAL": "Хорошие — редакционные",
         "category.GOOD_PERSONAL": "Хорошие — для себя",
         "category.NEEDS_DECISION": "Нужно решение",
         "category.WEAK": "Слабые",
         "category.top": "итоговая оценка {value}: художественный разбор выполнен, критических дефектов нет",
         "category.weak": "итоговая оценка {value} ниже порога сохранения",
         "category.good_stock": "итоговая оценка {value}, релиз не нужен, коммерчески пригодно",
-        "category.good_editorial": "итоговая оценка {value}: место и момент, годится для редакционного использования",
         "category.good_personal": "итоговая оценка {value}: стоит оставить, но не для стока",
         "category.needs_decision": "на границе ({value}), и разбор не уверен",
         "category.defect.bad_expression": "неудачное выражение лица: {detail}",
@@ -442,7 +445,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "score.aesthetic_potential": "Художественный потенциал",
         "score.stock_potential": "Стоковый потенциал",
         "score.portfolio_potential": "Потенциал для портфолио",
-        "score.legal_readiness": "Юридическая готовность",
         "score.uniqueness": "Неповторимость",
         "score.confidence": "Уверенность оценки",
         "score.routing_score": "Итог",

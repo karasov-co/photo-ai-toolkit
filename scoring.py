@@ -13,7 +13,6 @@ computed from its own evidence and stored separately, and only the last one --
     D aesthetic_potential    whether the result is worth looking at
     E stock_potential        whether it is sellable, findable and legal
     F portfolio_potential    whether it represents the photographer's best
-    G legal_readiness        releases, marks, identifiable people
     H uniqueness             against the rest of this collection
     I confidence             how much of the above is actually evidenced
     J routing_score          the single blend, from the calibration profile
@@ -63,10 +62,6 @@ class AssetTag(StrEnum):
 
     PORTFOLIO = "portfolio"
     COMMERCIAL_OK = "commercial_ok"
-    EDITORIAL_ONLY = "editorial_only"
-    NEEDS_MODEL_RELEASE = "needs_model_release"
-    NEEDS_PROPERTY_RELEASE = "needs_property_release"
-    LEGAL_REVIEW = "legal_review"
     ARCHIVE_ONLY = "archive_only"
     # A near-identical sibling scored higher. A proposal for a person to compare,
     # never a deletion: the difference between two takes is usually a gesture or
@@ -78,8 +73,14 @@ class AssetTag(StrEnum):
 
 
 class Route(StrEnum):
+    """One value, kept as a type rather than deleted.
+
+    EDITORIAL used to sit beside COMMERCIAL and decided which pile a photograph
+    landed in, off a model's guess about faces and trademarks. The enum stays so
+    stored runs and marketplace rows keep a stable `route` field.
+    """
+
     COMMERCIAL = "commercial"
-    EDITORIAL = "editorial"
 
 
 # Issues that end the conversation regardless of anything else measured.
@@ -131,16 +132,10 @@ class Semantic:
     axis_b: int = 50
     axis_c: int = 50
     recover: str = "moderate"
-    faces: bool = True
-    # A registered mark large enough that the photograph is partly about that
-    # brand. Defaults False: guessing "brand" on a frame nobody checked removes
-    # street photography from commercial use, which is the more expensive error.
-    brand_mark: bool = False
-    # Shop signs, neon, transit navigation -- the written texture of a place.
-    # Restricts a frame to editorial use, which is a category, not a fault.
-    signage_text: bool = False
-    identifiable_people: bool = True
-    recognizable_property: bool = False
+    # No faces, no brand_mark, no release flags. The model was being asked a
+    # legal question it cannot answer, and the answer decided which pile a
+    # photograph landed in. `people_count` stays: how many people are in a
+    # frame is an observation, not a licensing verdict.
     people_count: int = 0
     description: str = ""
     concepts: list[str] = field(default_factory=list)
@@ -171,20 +166,6 @@ class Semantic:
     def from_dict(cls, payload: dict) -> Semantic:
         known = set(cls.__dataclass_fields__)
         return cls(**{k: v for k, v in (payload or {}).items() if k in known})
-
-    @property
-    def needs_release(self) -> bool:
-        return self.faces or self.identifiable_people or self.recognizable_property
-
-    @property
-    def blocks_commercial(self) -> bool:
-        """The hard rule for *commercial* stock: a release would be required."""
-        return self.faces or self.brand_mark
-
-    @property
-    def editorial_only(self) -> bool:
-        """Sellable as editorial, not as commercial. Not a defect."""
-        return self.signage_text or self.recognizable_property
 
 
 UNKNOWN_AXIS = 50
@@ -228,10 +209,6 @@ def semantic_from_assessment(assessment, *, group_size: int | None = None) -> Se
         axis_b=axis_b,
         axis_c=axis_c,
         recover=str(assessment.recover),
-        faces=bool(assessment.faces),
-        brand_mark=bool(getattr(assessment, "brand_mark", False)),
-        signage_text=bool(getattr(assessment, "signage_text", False)),
-        identifiable_people=bool(assessment.faces),
         intended_frame=bool(getattr(assessment, "intended_frame", True)),
         subject_strength=int(getattr(assessment, "subject_strength", 50)),
         accidental_probability=int(getattr(assessment, "accidental_probability", 0)),
@@ -248,7 +225,6 @@ class AssetScores:
     aesthetic_potential: int = 0
     stock_potential: int = 0
     portfolio_potential: int = 0
-    legal_readiness: int = 0
     uniqueness: int = 0
     confidence: int = 0
     routing_score: int = 0
@@ -399,36 +375,10 @@ def post_edit_potential_score(
     return _clamp(projected)
 
 
-UNKNOWN_LEGAL_READINESS = 50
-
-
-def legal_readiness_score(semantic: Semantic) -> int:
-    """G: how close this is to being publishable without paperwork.
-
-    "Nobody has looked" and "there is a face and a logo in it" are different
-    states and must not produce the same number. The pessimistic defaults on
-    `Semantic` exist to make `blocks_commercial` fail safe -- an unchecked frame
-    is never sold as commercial stock -- but scoring an unchecked frame as
-    though both problems were confirmed drags every other dimension down with
-    it and makes the whole stock axis meaningless before the vision pass runs.
-
-    So an unchecked frame sits in the middle, and the doubt is carried by
-    `confidence`, which is the dimension that exists to carry doubt.
-    """
-    if not semantic.present:
-        return UNKNOWN_LEGAL_READINESS
-
-    score = 100.0
-    if semantic.faces or semantic.identifiable_people:
-        score -= 45.0
-    if semantic.brand_mark:
-        score -= 40.0
-    if semantic.signage_text:
-        # Editorial-only, which is a smaller restriction than a release.
-        score -= 12.0
-    if semantic.recognizable_property:
-        score -= 20.0
-    return _clamp(score)
+# `legal_readiness_score` used to sit here, subtracting for faces, brand marks
+# and recognisable property. Both the function and the dimension are gone: a
+# vision model cannot know whether a release exists, and the guess decided which
+# pile a photograph landed in.
 
 
 def uniqueness_score(*, cluster_size: int, is_best: bool, similarity: float) -> int:
@@ -455,26 +405,20 @@ def aesthetic_potential_score(semantic: Semantic, potential: int) -> int:
 def stock_potential_score(
     semantic: Semantic,
     potential: int,
-    legal: int,
 ) -> int:
-    """E: sellable, findable, publishable.
+    """E: sellable and findable.
 
-    Legal readiness multiplies rather than subtracts. A frame needing a release
-    is not "slightly less sellable"; without the paperwork it is not sellable at
-    all, and a subtraction lets a strong enough image climb back over the line.
+    A `legal` multiplier used to sit here, standing for releases and marks. It
+    is gone; nothing in this file guesses at paperwork any more. What is left is
+    content strength blended with what the file becomes after a normal edit.
 
-    When no vision pass has run, the legal multiplier is a flat mild discount
-    rather than the unknown-state 50. Compounding "we did not look" into both
-    the base and the multiplier pushed every unanalysed frame under every stock
-    threshold, which collapsed the offline mode into one class.
+    When no vision pass has run the score is a flat mild discount rather than
+    the unknown-state 50, so an offline run still separates its frames instead
+    of collapsing them into one class.
     """
     if semantic.present:
-        base = 0.58 * semantic.axis_a + 0.42 * potential
-        factor = 0.35 + 0.65 * legal / 100.0
-    else:
-        base = potential * 0.80
-        factor = 0.85
-    return _clamp(base * factor)
+        return _clamp(0.58 * semantic.axis_a + 0.42 * potential)
+    return _clamp(potential * 0.80 * 0.85)
 
 
 def portfolio_potential_score(semantic: Semantic, potential: int, aesthetic: int) -> int:
@@ -536,7 +480,6 @@ def score(inp: ScoreInput, profile: CalibrationProfile) -> AssetScores:
         inp.issues,
         recoverability=scores.recoverability,
     )
-    scores.legal_readiness = legal_readiness_score(inp.semantic)
     scores.uniqueness = uniqueness_score(
         cluster_size=inp.cluster_size,
         is_best=inp.is_best_in_cluster,
@@ -544,7 +487,7 @@ def score(inp: ScoreInput, profile: CalibrationProfile) -> AssetScores:
     )
     scores.aesthetic_potential = aesthetic_potential_score(inp.semantic, scores.post_edit_potential)
     scores.stock_potential = stock_potential_score(
-        inp.semantic, scores.post_edit_potential, scores.legal_readiness
+        inp.semantic, scores.post_edit_potential
     )
     scores.portfolio_potential = portfolio_potential_score(
         inp.semantic, scores.post_edit_potential, scores.aesthetic_potential
@@ -560,8 +503,15 @@ def score(inp: ScoreInput, profile: CalibrationProfile) -> AssetScores:
 
 
 def route_for(semantic: Semantic) -> Route:
-    """The blocking rule, in one place so it cannot drift between call sites."""
-    return Route.EDITORIAL if semantic.blocks_commercial else Route.COMMERCIAL
+    """Every frame is commercial now.
+
+    This used to return EDITORIAL when a face or a brand mark was present. The
+    whole split is gone: it rested on a model guessing at a release question,
+    and a photographer had to learn what "editorial only" meant to read their
+    own report. `Route` survives because stored runs and the marketplace code
+    read it, and it has one value that matters.
+    """
+    return Route.COMMERCIAL
 
 
 def classify(
@@ -582,30 +532,7 @@ def classify(
     semantic = inp.semantic
     route = route_for(semantic)
 
-    if route is Route.EDITORIAL:
-        tags.append(AssetTag.EDITORIAL_ONLY)
-        if not semantic.present:
-            reasons.append(
-                "release status unchecked (no vision pass ran): commercial stock is "
-                "blocked until a face and trademark check has actually been done"
-            )
-        else:
-            present = [
-                n for n, v in (("faces", semantic.faces), ("a brand mark", semantic.brand_mark))
-                if v
-            ]
-            reasons.append(
-                f"{' and '.join(present)} present: a release is required, "
-                "so commercial stock is blocked in code"
-            )
-            if semantic.faces or semantic.identifiable_people:
-                tags.append(AssetTag.NEEDS_MODEL_RELEASE)
-            if semantic.brand_mark:
-                tags.append(AssetTag.LEGAL_REVIEW)
-    else:
-        tags.append(AssetTag.COMMERCIAL_OK)
-    if semantic.recognizable_property:
-        tags.append(AssetTag.NEEDS_PROPERTY_RELEASE)
+    tags.append(AssetTag.COMMERCIAL_OK)
 
     tags.append(AssetTag.BEST_IN_CLUSTER if inp.is_best_in_cluster else AssetTag.WEAKER_DUPLICATE)
 
@@ -817,11 +744,9 @@ def _strengths(inp: ScoreInput, scores: AssetScores) -> list[str]:
         if inp.semantic.axis_b >= 70:
             out.append("hard to repeat: moment, light or subject will not return")
         if inp.semantic.axis_a >= 70:
-            out.append("clean, legible composition with commercial usability")
+            out.append("strong content: moment, composition and subject hold up")
         if inp.semantic.axis_c >= 70:
             out.append("documentary value: place, event or cultural context")
-    if scores.legal_readiness >= 90:
-        out.append("no release required")
     if not inp.issues.unrecoverable and not inp.issues.partial:
         out.append("every detected problem is a routine edit")
     return out

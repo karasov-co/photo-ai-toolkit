@@ -263,7 +263,7 @@ def ranking_for(count: int) -> str:
             {
                 "n": i + 1, "genre": "landscape",
                 "axis_a": i + 1, "axis_b": count - i, "axis_c": i + 1,
-                "recover": "easy", "faces": False, "brand_mark": False, "note": "lift shadows",
+                "recover": "easy", "note": "lift shadows",
             }
             for i in range(count)
         ]

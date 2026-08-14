@@ -9,6 +9,7 @@ that generates it.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -162,7 +163,7 @@ def test_the_root_holds_only_what_a_photographer_opens(tmp_path):
 
     visible = {p.name for p in space.root.iterdir() if not p.name.startswith(".")}
     assert visible == {
-        "report.html", "photographer_insights.html", "edit_recipes",
+        "report", "photographer_insights.html", "edit_recipes",
         *workspace.CATEGORY_DIRS.values(),
     }
 
@@ -489,7 +490,7 @@ def test_the_default_run_produces_the_simplified_tree(archive, tmp_path):
     out = tmp_path / "out"
     assert cli.main(["measure", "--input", str(archive), "--output", str(out)]) == 0
 
-    assert (out / "report.html").exists()
+    assert (out / "report" / "index.html").exists()
     assert (out / "photographer_insights.html").exists()
     for folder in workspace.CATEGORY_DIRS.values():
         assert (out / folder).is_dir()
@@ -503,7 +504,7 @@ def test_the_default_report_has_no_legal_or_routing_vocabulary(archive, tmp_path
 
     out = tmp_path / "out"
     cli.main(["measure", "--input", str(archive), "--output", str(out)])
-    page = (out / "report.html").read_text().lower()
+    page = (out / "report" / "index.html").read_text().lower()
 
     body = page.split("<details", 1)[0]
     for phrase in simple_report.FORBIDDEN_IN_DEFAULT_UI:
@@ -557,7 +558,7 @@ def test_a_second_run_over_an_old_layout_tidies_it(archive, tmp_path):
     cli.main(["measure", "--input", str(archive), "--output", str(out)])
 
     assert (out / ".internal" / "reports" / "stale.json").exists()
-    assert (out / "report.html").exists()
+    assert (out / "report" / "index.html").exists()
 
 
 def test_no_development_artefacts_in_the_output(archive, tmp_path):
@@ -584,10 +585,25 @@ def test_the_report_links_to_the_insights(tmp_path, collection):
     assert workspace.INSIGHTS_NAME in page
 
 
-def test_a_preview_path_outside_the_report_directory_still_resolves(tmp_path):
-    subject = record(preview_path=str(tmp_path / "elsewhere" / "a.jpg"))
-    page = simple_report.write([subject], tmp_path / "out" / "report.html").read_text()
-    assert "elsewhere" in page
+def test_no_card_points_outside_the_report_folder(tmp_path):
+    """The report owns its images. Nothing it shows lives anywhere else.
+
+    This replaces a test that asserted the opposite -- that a preview stored
+    elsewhere would be linked from where it lay. That is exactly what broke:
+    the page was written in a staging directory, `../../previews/x.jpg` was
+    correct relative to *that*, and publishing moved the file two levels up.
+    """
+    source = tmp_path / "photos" / "a.jpg"
+    write_jpeg(photo_like(600, 400), source)
+    subject = record(source_path=str(source), preview_path=str(tmp_path / "elsewhere" / "a.jpg"))
+
+    simple_report.write_folder(
+        [subject], tmp_path / "out" / "report", cache_dir=tmp_path / "cache"
+    )
+    page = (tmp_path / "out" / "report" / "index.html").read_text()
+
+    for src in re.findall(r'src="([^"]+)"', page):
+        assert src.startswith("assets/"), src
 
 
 def test_a_record_with_no_preview_renders_without_one(tmp_path):
@@ -600,15 +616,20 @@ def test_the_report_is_written_atomically_enough_to_be_readable(tmp_path, collec
     assert path.read_text().rstrip().endswith("</html>")
 
 
-def test_paths_in_the_report_are_relative(tmp_path, collection):
-    preview = tmp_path / "out" / ".internal" / "previews" / "top.jpg"
-    preview.parent.mkdir(parents=True)
-    write_jpeg(photo_like(40, 30), preview)
-    collection[0].preview_path = str(preview)
+def test_no_absolute_path_reaches_the_page(tmp_path, collection):
+    source = tmp_path / "photos" / "top.jpg"
+    write_jpeg(photo_like(600, 400), source)
+    collection[0].source_path = str(source)
 
-    page = simple_report.write(collection, tmp_path / "out" / "report.html").read_text()
-    assert ".internal/previews/top.jpg" in page
+    simple_report.write_folder(
+        collection, tmp_path / "out" / "report", cache_dir=tmp_path / "cache"
+    )
+    page = (tmp_path / "out" / "report" / "index.html").read_text()
+
     assert str(tmp_path) not in page
+    assert "/Users/" not in page
+    assert 'src="/' not in page
+    assert "file://" not in page
 
 
 def test_the_recipes_folder_is_named_where_the_report_says_it_is():
