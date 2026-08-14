@@ -273,11 +273,23 @@ def test_a_reply_that_is_not_json_fails_the_preflight(monkeypatch):
 
 
 def test_the_preflight_never_sends_a_user_photograph():
-    """It generates its own 16x16 image. A configuration check is not a reason
+    """It generates its own tiny image. A configuration check is not a reason
     to upload somebody's photographs."""
     encoded = preflight.test_image_base64()
     assert len(encoded) < 4000
-    assert preflight.TEST_IMAGE_PX == 16
+    assert preflight.TEST_IMAGE_PX <= 64, "a check image, not a photograph"
+
+
+def test_the_test_image_clears_every_providers_minimum():
+    """xAI rejects anything under 512 total pixels.
+
+    A 16x16 image is 256, and it came back as `invalid_image` *after* the key
+    had authenticated -- so the preflight reported a model-access failure on an
+    account that was working. The floor is asserted rather than commented,
+    because the next person to shrink this constant will be optimising a
+    request that already costs almost nothing.
+    """
+    assert preflight.TEST_IMAGE_PX**2 >= preflight.MIN_PROVIDER_PIXELS
 
 
 def test_the_preflight_never_prints_the_key(monkeypatch):

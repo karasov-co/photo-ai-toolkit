@@ -8,7 +8,7 @@ produced no report, the previous report had already been moved, and the user had
 waited through all of it to learn that a configuration string was wrong.
 
 Every one of those minutes was spent on work that could not possibly be used.
-The check that would have caught it costs one request against a 16x16 image.
+The check that would have caught it costs one request against a 32x32 image.
 
 So this module runs first, always, and it is deliberately strict. It does not
 ask "can I authenticate" -- an authenticated key with no access to the
@@ -43,7 +43,21 @@ from enum import StrEnum
 logger = logging.getLogger(__name__)
 
 # Small enough to be free, large enough that a vision endpoint accepts it.
-TEST_IMAGE_PX = 16
+#
+# 32 rather than 16 because xAI enforces a floor of 512 *total* pixels, and a
+# 16x16 image is 256 -- it was rejected with `invalid_image` after the key had
+# already authenticated, so the preflight failed at "model access" on a
+# configuration that was fine. 32x32 is 1024, which clears the floor with room
+# to spare and still encodes to well under a kilobyte.
+#
+# Anything smaller is a false failure waiting for the next provider with a
+# minimum. Anything much larger costs tokens on a check that runs on every run.
+TEST_IMAGE_PX = 32
+
+# The smallest total pixel count any supported provider accepts. Asserted
+# against the constant above rather than left as a comment, because the failure
+# it prevents looks like a broken account rather than a too-small image.
+MIN_PROVIDER_PIXELS = 512
 
 # The reply has to parse the way Stage 2's replies are parsed, or the pipeline
 # would fail on its first real group for a reason this check had declared fine.
@@ -148,7 +162,7 @@ class PreflightResult:
 
 
 def test_image_base64() -> str:
-    """A 16x16 JPEG, generated here. Never a user photograph."""
+    """A 32x32 JPEG, generated here. Never a user photograph."""
     from PIL import Image
 
     image = Image.new("RGB", (TEST_IMAGE_PX, TEST_IMAGE_PX), (128, 128, 128))

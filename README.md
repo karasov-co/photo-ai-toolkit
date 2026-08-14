@@ -28,11 +28,10 @@ check, and the artistic read — and it either does all of it or it does none of
 it.
 
 **Your model access is verified before a single photograph is opened.** The run
-starts by sending one 16×16 test image and checking the answer:
+starts by sending one 32×32 test image and checking the answer:
 
 ```
 LLM preflight
-  Provider: OpenAI
   Provider: grok
   Model: grok-4.6
   Authentication: verified
@@ -846,7 +845,7 @@ account, and the tool says exactly that.
 
 **What is sent:** 512px JPEG previews, in groups of twelve, plus the measured
 clipping figures. No original file is uploaded. No video frames are sent. The
-preflight sends a generated 16×16 test image and never one of your photographs.
+preflight sends a generated 32×32 test image and never one of your photographs.
 
 **What it costs:** a few cents per hundred photographs, and only for the ones
 that are new. The run prints the number of calls it made.
