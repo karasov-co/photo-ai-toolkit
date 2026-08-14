@@ -48,3 +48,9 @@ stories_picks/
 .coverage
 coverage.xml
 htmlcov/
+
+# Packaging
+photo_ai_toolkit.egg-info/
+*.egg-info/
+build/
+dist/

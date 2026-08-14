@@ -1,3 +1,88 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photo-ai-toolkit"
+version = "0.1.0"
+description = "Sorts a shoot into five piles and says what each photograph becomes after a normal edit"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "pillow>=10.0",
+    "openai>=1.40",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+photoai = "cli:main"
+
+# A flat layout, deliberately, for now. Every module here imports its siblings
+# by bare name -- `import scoring`, `import media` -- which is what a directory
+# of scripts does and not what a package does. Moving them under `src/photoai/`
+# means rewriting every one of those imports across 48 modules and the tests
+# that reach into them; done carelessly it breaks everything at once. The
+# console script below is the part that was actually missing, and it works
+# against the layout that exists.
+[tool.setuptools]
+py-modules = [
+    "active_learning",
+    "aggregate",
+    "artistic",
+    "assessment_parser",
+    "batch_runner",
+    "batches",
+    "bench_quality",
+    "bootstrap",
+    "calibration",
+    "cli",
+    "curation",
+    "darkroom",
+    "duplicates",
+    "edit_recipe",
+    "edit_schema",
+    "exif_reader",
+    "i18n",
+    "insights",
+    "issues",
+    "layout",
+    "llm_provider",
+    "marketplaces",
+    "media",
+    "model_monitoring",
+    "overrides",
+    "pipeline",
+    "preference_model",
+    "preference_store",
+    "preflight",
+    "preview_generator",
+    "prompts",
+    "provenance",
+    "quarantine",
+    "raw_measurements",
+    "recipe_export",
+    "recipe_generator",
+    "recipe_optimizer",
+    "recipe_validator",
+    "report_assets",
+    "reports",
+    "scoring",
+    "selective_policy",
+    "simple_report",
+    "stage3",
+    "stock_metadata",
+    "technical_filter",
+    "video_analyzer",
+    "workspace",
+]
+
+# `exporters` and `renderers` are real packages and ship as themselves.
+packages = ["exporters", "renderers"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py312"
