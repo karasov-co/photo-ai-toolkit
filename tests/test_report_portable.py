@@ -10,6 +10,7 @@ A better relative path would have fixed that one bug. Owning the images fixes
 the class of them, and makes the folder something you can send to somebody.
 """
 
+import pathlib
 import re
 import shutil
 import subprocess
@@ -315,5 +316,54 @@ def test_the_script_is_inline_vanilla_javascript(built):
 def test_the_header_explains_the_scale_and_the_thresholds(built):
     report_dir, _, _ = built
     page = (report_dir / "index.html").read_text()
-    assert "potential after editing" in page
+    assert "after a normal edit" in page
     assert str(simple_report.TOP_THRESHOLD) in page
+
+
+# --- the three numbers on a card ---------------------------------------------
+
+
+def rendered(*records):
+    """One card's own markup, so CSS in the same page cannot satisfy a match."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        path = pathlib.Path(d) / "r.html"
+        simple_report.write(list(records), path)
+        text = path.read_text()
+    return "\n".join(re.findall(r'<div class="now">.*?</div>', text)) + "\n" + "\n".join(
+        re.findall(r'<span class="score".*?</span>', text, re.S)
+    )
+
+
+def header(*records):
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        path = pathlib.Path(d) / "r.html"
+        simple_report.write(list(records), path)
+        return re.search(r'<p class="scale">(.*?)</p>', path.read_text()).group(1)
+
+
+def test_the_score_caption_says_what_the_number_is():
+    page = rendered(
+        record("a.jpg", final_score=71, scores={"current_quality": 64, "content": 80})
+    )
+    assert "final score after editing" in page
+    assert "technical quality: 64" in page
+    assert "content: 80" in page
+    assert "technical quality now" not in page
+
+
+def test_content_is_absent_rather_than_zero_when_nothing_looked():
+    """An offline run has no content read. A 0 would print as a verdict."""
+    page = rendered(record("a.jpg", scores={"current_quality": 64}))
+    assert "technical quality: 64" in page
+    assert "content:" not in page
+
+
+def test_the_header_names_both_bucket_thresholds():
+    line = header(record("a.jpg"))
+    assert f"Top starts at {simple_report.TOP_THRESHOLD}" in line
+    assert f"under {simple_report.WEAK_THRESHOLD} is weak" in line
+    assert "stock" in line and "personal" in line

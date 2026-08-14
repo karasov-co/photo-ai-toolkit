@@ -48,14 +48,18 @@ STRINGS: dict[str, dict[str, str]] = {
             "Ranked by how good each photograph can realistically become after a normal "
             "edit -- not by how the untouched file looks right now."
         ),
-        "report.potential": "after editing",
-        "report.current": "technical quality now",
+        "report.potential": "final score after editing",
+        "report.current": "technical quality",
+        "report.content": "content",
         "report.empty_section": "Nothing here.",
         "report.all": "All",
         "report.scale": (
-            "Ranked 0-100 by potential after editing. Top starts at {top}; below it, "
-            "stock and personal are the same quality and differ only in where they sell; "
-            "weak is a shelf, not a bin."
+            "Every photograph is scored 0-100 on what it becomes after a normal edit. "
+            "Top starts at {top}. Below that, stock and personal are the same quality "
+            "and differ only in whether the frame has a market; under {weak} is weak, "
+            "which is a shelf, not a bin. Two smaller numbers sit under each score: "
+            "technical quality is how clean the file is, content is what is in the "
+            "frame -- they measure different things and are not meant to agree."
         ),
         "report.missing_images": "{count} photograph(s) could not be shown:",
         "report.no_preview": "no preview was generated",
@@ -165,6 +169,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "route.editorial": "Editorial only",
         # scores
         "score.current_quality": "Current quality",
+        "score.content": "Content: moment, composition, subject",
         "score.recoverability": "Recoverability",
         "score.post_edit_potential": "Realistic post-edit potential",
         "score.aesthetic_potential": "Aesthetic potential",
@@ -328,14 +333,18 @@ STRINGS: dict[str, dict[str, str]] = {
             "Отсортировано по тому, насколько сильной фотография реально может стать "
             "после обычной обработки, а не по тому, как выглядит необработанный файл."
         ),
-        "report.potential": "после обработки",
-        "report.current": "техническое качество файла",
+        "report.potential": "итоговая оценка после обработки",
+        "report.current": "техническое качество",
+        "report.content": "содержание",
         "report.empty_section": "Здесь пусто.",
         "report.all": "Все",
         "report.scale": (
-            "Оценка 0-100 по потенциалу после обработки. «Лучшие» начинаются с {top}; "
-            "ниже — сток и «для себя» одинакового качества, отличаются только тем, где "
-            "продаются; «слабые» — это полка, а не корзина."
+            "Каждая фотография оценена 0-100 по тому, какой она станет после обычной "
+            "обработки. «Лучшие» начинаются с {top}. Ниже — сток и «для себя» одного "
+            "качества, разница только в том, есть ли у кадра рынок; ниже {weak} — "
+            "«слабые», это полка, а не корзина. Под оценкой два числа поменьше: "
+            "техническое качество — насколько чист файл, содержание — что в кадре; "
+            "они измеряют разное и не обязаны совпадать."
         ),
         "report.missing_images": "Не удалось показать фотографий: {count}.",
         "report.no_preview": "превью не создавалось",
@@ -440,6 +449,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "route.commercial": "Коммерческое",
         "route.editorial": "Только редакционное",
         "score.current_quality": "Текущее качество",
+        "score.content": "Содержание: момент, композиция, сюжет",
         "score.recoverability": "Запас на обработку",
         "score.post_edit_potential": "Реальный потенциал после обработки",
         "score.aesthetic_potential": "Художественный потенциал",

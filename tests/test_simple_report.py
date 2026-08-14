@@ -84,7 +84,8 @@ def test_a_dark_file_that_recovers_outranks_a_bright_one_that_does_not():
 
 def test_current_quality_is_shown_but_never_ranks(collection, tmp_path):
     page = simple_report.write(collection, tmp_path / "report.html").read_text()
-    assert "technical quality now" in page
+    assert "technical quality" in page
+    assert "technical quality now" not in page  # "now" implied it would change
     assert "51" in page  # top.jpg's current quality is still visible
 
 
@@ -94,7 +95,7 @@ def test_the_two_numbers_are_labelled_as_different_axes(collection, tmp_path):
     as "editing made it worse", which is not what either number means."""
     page = simple_report.write(collection, tmp_path / "report.html").read_text()
     assert "as shot" not in page
-    assert "after editing" in page
+    assert "final score after editing" in page
 
 
 def test_every_category_gets_a_section_even_when_empty(collection, tmp_path):

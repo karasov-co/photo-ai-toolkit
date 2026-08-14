@@ -57,9 +57,9 @@ def test_the_run_works_offline_with_no_api_key(options):
     assert all(r.status == "ok" for r in result.records)
 
 
-def test_every_record_carries_all_nine_dimensions(options):
+def test_every_record_carries_all_ten_dimensions(options):
     for record in run(options).records:
-        assert len(record.scores) == 9
+        assert len(record.scores) == 10
         assert all(0 <= v <= 100 for v in record.scores.values())
 
 

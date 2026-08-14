@@ -8,6 +8,7 @@ computed from its own evidence and stored separately, and only the last one --
 `routing_score` -- is allowed to be a blend.
 
     A current_quality        what the unedited file looks like now
+    K content                the moment, the composition, the subject
     B recoverability         how safely normal editing can move it
     C post_edit_potential    what it becomes after a realistic edit
     D aesthetic_potential    whether the result is worth looking at
@@ -221,6 +222,12 @@ def semantic_from_assessment(assessment, *, group_size: int | None = None) -> Se
 class AssetScores:
     current_quality: int = 0
     recoverability: int = 0
+    # The content read, carried through rather than only consumed. It fed
+    # `aesthetic_potential` and `stock_potential` and then vanished, so a report
+    # could show what a photograph became after editing and how clean the file
+    # was, but not whether there was anything in the frame. 0 means the content
+    # pass did not run; nothing here invents a number for an unseen photograph.
+    content: int = 0
     post_edit_potential: int = 0
     aesthetic_potential: int = 0
     stock_potential: int = 0
@@ -474,6 +481,7 @@ def score(inp: ScoreInput, profile: CalibrationProfile) -> AssetScores:
     scores = AssetScores()
     scores.current_quality = current_quality_score(inp.technical_quality)
     scores.recoverability = recoverability_score(inp.issues, is_raw=inp.is_raw)
+    scores.content = inp.semantic.axis_a if inp.semantic.present else 0
     scores.post_edit_potential = post_edit_potential_score(
         scores.current_quality,
         inp.uplift,

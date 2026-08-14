@@ -92,6 +92,7 @@ MAX_RECOMMENDATIONS = 3
 # same number the decision used, or its explanation of an empty TOP section is
 # fiction the moment somebody tunes the threshold.
 TOP_THRESHOLD = CURATION_THRESHOLDS.top
+WEAK_THRESHOLD = CURATION_THRESHOLDS.weak
 
 
 # Vanilla, inline, no libraries. A report that fetches anything is a report that
@@ -131,14 +132,28 @@ def potential(record) -> int:
 def current_quality(record) -> int:
     """How clean the unedited file is. Secondary, always, and a different axis.
 
-    Labelled "technical quality now" rather than "as shot" on purpose. The two
-    numbers on a card measure different things -- one is how good the
-    photograph is, the other is how clean the file is -- and a technically
-    pristine picture of nothing legitimately shows 87 here beside a 67 above
-    it. Calling them "as shot" and "after editing" made that pair read as the
-    same measurement taken twice, which says editing made the photograph worse.
+    Labelled "technical quality" rather than "as shot" on purpose. The numbers
+    on a card measure different things -- one is how good the photograph is,
+    another is how clean the file is, a third is what is in the frame -- and a
+    technically pristine picture of nothing legitimately shows 87 here beside a
+    67 above it. Calling them "as shot" and "after editing" made that pair read
+    as the same measurement taken twice, which says editing made the photograph
+    worse. "now" went too: it implied the number would change, and it does not.
     """
     return int((record.scores or {}).get("current_quality", 0))
+
+
+def content(record) -> int | None:
+    """What is in the frame, or None when nothing looked.
+
+    This is the content axis of the Stage 2 read, aggregated across the groups a
+    photograph appeared in. It was already computed and already fed two other
+    dimensions; it was simply never carried out to where a person could see it.
+    None rather than 0 for an offline run: no number at all is honest, and a
+    zero would read as a verdict.
+    """
+    value = int((record.scores or {}).get("content", 0))
+    return value or None
 
 
 def explanation(record, language: str = "en") -> str:
@@ -331,7 +346,7 @@ def write(
 <header>
 <h1>{html.escape(t("report.title", language))}</h1>
 <p class="lede">{html.escape(t("report.lede", language))}</p>
-<p class="scale">{html.escape(t("report.scale", language, top=TOP_THRESHOLD))}</p>
+<p class="scale">{html.escape(t("report.scale", language, top=TOP_THRESHOLD, weak=WEAK_THRESHOLD))}</p>
 {link}
 {_missing_html(missing, language)}
 <div class="counts">{_counts_html(counts, language)}</div>
@@ -505,6 +520,13 @@ def _card(record, accent: str, language: str, lookup: dict) -> str:
         if getattr(record, "recipe_path", "")
         else ""
     )
+    # Two secondary numbers, on one line, under the score. `content` is absent
+    # rather than zero when no content pass ran.
+    secondary = f'{html.escape(t("report.current", language))}: {current_quality(record)}'
+    read = content(record)
+    if read is not None:
+        secondary += f' &middot; {html.escape(t("report.content", language))}: {read}'
+
     return f"""<div class="card">
 {image}
 <div class="body">
@@ -513,7 +535,7 @@ def _card(record, accent: str, language: str, lookup: dict) -> str:
   <span class="score" style="color:{accent}">{potential(record)}
     <small>{html.escape(t("report.potential", language))}</small></span>
 </div>
-<div class="now">{html.escape(t("report.current", language))}: {current_quality(record)}</div>
+<div class="now">{secondary}</div>
 {f'<div class="why">{html.escape(why)}</div>' if why else ""}
 {todo}
 {recipe}

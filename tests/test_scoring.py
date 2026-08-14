@@ -57,7 +57,8 @@ def test_every_dimension_is_present_and_in_range(profile):
     scores = score(inp, profile)
     payload = scores.to_dict()
     assert set(payload) == {
-        "current_quality", "recoverability", "post_edit_potential", "aesthetic_potential",
+        "current_quality", "recoverability", "content", "post_edit_potential",
+        "aesthetic_potential",
         "stock_potential", "portfolio_potential", "uniqueness",
         "confidence", "routing_score",
     }
