@@ -4,20 +4,31 @@
     "Not billing: the provider's dashboard is the authority on money.",
     "Re-check when a vendor changes prices; `checked` is when somebody last did."
   ],
-  "checked": "2026-08-13",
+  "checked": "2026-08-14",
   "default_model": "grok-4.6",
-  "default_usd_per_100_photos": 1.0,
-
+  "default_usd_per_100_photos": 1.9,
   "_formula": {
     "note": [
       "usd_per_100_photos = (input_tokens_per_photo * 100 / 1e6) * usd_per_1m_input",
-      "                   + (output_tokens_per_photo * 100 / 1e6) * usd_per_1m_output",
+      "                   + ((output_tokens_per_photo + reasoning_tokens_per_photo)",
+      "                      * 100 / 1e6) * usd_per_1m_output",
       "",
-      "The token counts are measured, not guessed. A live Stage 3 call on this",
-      "archive returned 2170 input and 770 output tokens for two frames, giving",
-      "1085 in / 385 out per photograph. Stage 2 sends the same 512px preview in",
-      "groups of twelve and returns one small JSON object per frame: ~1000 in and",
-      "~70 out. Both stages run on every photograph, so they add.",
+      "Reasoning tokens are billed as output and were missing from this formula.",
+      "That is the whole of the gap between the $2 quoted for a 362-request run",
+      "and the $5 it cost: 627,000 reasoning tokens against 109,000 of completion,",
+      "roughly 5.7 thinking tokens per answering token, none of them counted.",
+      "",
+      "Measured on this archive: 362 requests over 297 photographs, 109K completion",
+      "and 627K reasoning, giving ~367 completion and ~2110 reasoning tokens per",
+      "photograph across both stages. Input stays as measured before: a Stage 3",
+      "call returned 2170 input for two frames and Stage 2 sends the same 512px",
+      "preview in groups of twelve, ~1085 + ~1000 per photograph.",
+      "",
+      "The reasoning figure is what the model spends at its own default, which is",
+      "what every call did while reasoning_effort was being dropped on the way to",
+      "xAI. At --reasoning low it should be lower; this stays as the pessimistic",
+      "number until a run at low has been measured, because quoting the optimistic",
+      "one is how the last estimate came to be less than half the bill.",
       "",
       "Honest caveat: only grok-4.6 is derived this way. The two gpt-5.6 figures",
       "predate the formula and were order-of-magnitude estimates -- they are kept",
@@ -25,17 +36,17 @@
       "recomputed from token prices this project has no published source for."
     ],
     "input_tokens_per_photo": 2085,
-    "output_tokens_per_photo": 455
+    "output_tokens_per_photo": 367,
+    "reasoning_tokens_per_photo": 2110
   },
-
   "models": {
     "grok-4.6": {
       "provider": "grok",
-      "usd_per_1m_input": 2.00,
-      "usd_per_1m_output": 6.00,
-      "usd_per_100_photos": 0.69,
+      "usd_per_1m_input": 2.0,
+      "usd_per_1m_output": 6.0,
+      "usd_per_100_photos": 1.9,
       "derived": true,
-      "checked": "2026-08-13"
+      "checked": "2026-08-14"
     },
     "gpt-5.6-terra": {
       "provider": "openai",
@@ -45,7 +56,7 @@
     },
     "gpt-5.6-sol": {
       "provider": "openai",
-      "usd_per_100_photos": 1.80,
+      "usd_per_100_photos": 1.8,
       "derived": false,
       "checked": "2026-08-13"
     }

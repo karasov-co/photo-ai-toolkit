@@ -52,6 +52,8 @@ class VisionRequest:
     max_tokens: int = 1000
     # "low", "medium", "high", or None for a provider that has no such control.
     reasoning_effort: str | None = "low"
+    # Which pass this is, so the usage log can say where the money went.
+    stage: str = "?"
 
 
 def from_openai_content(
@@ -60,6 +62,7 @@ def from_openai_content(
     *,
     max_tokens: int,
     reasoning_effort: str | None = "low",
+    stage: str = "?",
 ) -> VisionRequest:
     """Adapt the prompt builders' output without rewriting them.
 
@@ -84,6 +87,7 @@ def from_openai_content(
         images=images,
         max_tokens=max_tokens,
         reasoning_effort=reasoning_effort,
+        stage=stage,
     )
 
 
@@ -197,6 +201,7 @@ class OpenAIProvider(Provider):
             kwargs["reasoning"] = {"effort": request.reasoning_effort}
 
         response = self.client.responses.create(**kwargs)
+        record_usage(self.model, request.stage, response)
         self.check_not_truncated(response, request.max_tokens)
         return getattr(response, "output_text", "") or ""
 
@@ -342,14 +347,36 @@ class OpenAICompatibleProvider(Provider):
         for text in request.texts[len(request.images):]:
             content.append({"type": "text", "text": text})
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            max_tokens=request.max_tokens,
-            messages=[
+        # Nothing else goes on the wire. No presence_penalty, no
+        # frequency_penalty, no stop -- xAI rejects parameters it does not
+        # implement, and a 400 on the twelfth group is an expensive way to
+        # learn that a default crept in.
+        payload = {
+            "model": self.model,
+            "max_tokens": request.max_tokens,
+            "messages": [
                 {"role": "system", "content": request.system},
                 {"role": "user", "content": content},
             ],
-        )
+        }
+        marker = (self.name, self.model)
+        wants_effort = bool(request.reasoning_effort) and marker not in _EFFORT_REJECTED
+        if wants_effort:
+            payload["reasoning_effort"] = request.reasoning_effort
+
+        try:
+            response = self.client.chat.completions.create(**payload)
+        except Exception as e:
+            # A server that does not implement the parameter says so, by name.
+            # Retry once without it rather than failing a paid run over a hint.
+            if not wants_effort or "reasoning_effort" not in str(e):
+                raise
+            logger.info("%s rejected reasoning_effort; retrying without it", self.name)
+            _EFFORT_REJECTED.add(marker)
+            payload.pop("reasoning_effort")
+            response = self.client.chat.completions.create(**payload)
+
+        record_usage(self.model, request.stage, response)
         self.check_not_truncated(response, request.max_tokens)
         choices = getattr(response, "choices", []) or []
         return choices[0].message.content if choices else ""
@@ -364,11 +391,12 @@ class GrokProvider(OpenAICompatibleProvider):
 
     Two things it does NOT inherit from the OpenAI path:
 
-    `reasoning_effort` is dropped. xAI has its own reasoning controls with
-    different names and different semantics, and forwarding OpenAI's parameter
-    would either be rejected or -- worse -- accepted and mean something else.
-    Chat completions has no field for it, so this is what already happens;
-    it is stated here so nobody adds one later thinking it is a gap.
+`reasoning_effort` IS forwarded now, in the chat/completions payload. Dropping
+    it was a decision made from caution and it cost money: the model reasoned at
+    its own default on every call, 627K reasoning tokens against 109K of
+    completion over 362 requests, all of it billed as output. A server that does
+    not implement the parameter answers with a 400 naming it, which the base
+    class catches once per model and then stops sending.
 
     Images are jpg or png, 20 MiB each, with no cap on how many per request --
     so a group of twelve frames goes in one call exactly as it does now. The
@@ -400,9 +428,6 @@ class GrokProvider(OpenAICompatibleProvider):
                 raise ProviderError(
                     f"an image exceeds xAI's {self.MAX_IMAGE_BYTES // (1024 * 1024)} MiB limit"
                 )
-        # reasoning_effort is not forwarded: the chat/completions call below has
-        # no field for it, and inventing a mapping would change what the model
-        # does without saying so.
         return super().complete_vision(request)
 
 
@@ -444,6 +469,84 @@ def build(name: str, model: str, *, base_url: str = "", client=None) -> Provider
         # compatible provider has none to supply.
         return factory(model, base_url=base_url, client=client)
     return factory(model, client=client)
+
+
+# --- what it actually cost -----------------------------------------------------
+#
+# A module-level list rather than provider state, because `_provider()` builds a
+# fresh provider for every call and per-instance counters would be thrown away
+# with it. Reset at the start of a pass, drained at the end.
+
+USAGE: list[dict] = []
+
+# xAI, and every OpenAI-compatible server, answer a rejected parameter with a
+# 400 naming it. Recorded per (provider, model) so one rejection is enough --
+# retrying the same parameter on every subsequent call would double the run.
+_EFFORT_REJECTED: set[tuple[str, str]] = set()
+
+
+def _int(value) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def record_usage(model: str, stage: str, response) -> dict:
+    """One row per API call: what was sent, what came back, what was thought.
+
+    Reasoning tokens are billed as output and were invisible here. A run quoted
+    at $2 cost $5, and the gap was 627K reasoning tokens against 109K of actual
+    completion -- six times more thinking than answering, none of it counted.
+    """
+    usage = getattr(response, "usage", None)
+    completion_details = getattr(usage, "completion_tokens_details", None)
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
+    row = {
+        "model": model,
+        "stage": stage,
+        "prompt": _int(getattr(usage, "prompt_tokens", 0) or getattr(usage, "input_tokens", 0)),
+        "completion": _int(
+            getattr(usage, "completion_tokens", 0) or getattr(usage, "output_tokens", 0)
+        ),
+        "reasoning": _int(getattr(completion_details, "reasoning_tokens", 0)),
+        "cached": _int(getattr(prompt_details, "cached_tokens", 0)),
+    }
+    USAGE.append(row)
+    return row
+
+
+def usage_total(rows: list[dict] | None = None) -> dict:
+    """Sum the rows, and price them with reasoning billed as output."""
+    rows = USAGE if rows is None else rows
+    total = {"calls": len(rows), "prompt": 0, "completion": 0, "reasoning": 0, "cached": 0}
+    for row in rows:
+        for field_name in ("prompt", "completion", "reasoning", "cached"):
+            total[field_name] += _int(row.get(field_name))
+    pricing = load_pricing()
+    models = pricing.get("models") or {}
+    usd = 0.0
+    for row in rows:
+        entry = models.get(row.get("model", "")) or {}
+        rate_in = float(entry.get("usd_per_1m_input", 0.0) or 0.0)
+        rate_out = float(entry.get("usd_per_1m_output", 0.0) or 0.0)
+        billed_out = _int(row.get("completion")) + _int(row.get("reasoning"))
+        usd += _int(row.get("prompt")) / 1e6 * rate_in + billed_out / 1e6 * rate_out
+    total["usd"] = round(usd, 4)
+    return total
+
+
+def write_usage(path, rows: list[dict] | None = None):
+    """Append the rows to `usage.jsonl` and return the total."""
+    from pathlib import Path as _Path
+
+    rows = USAGE if rows is None else rows
+    target = _Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "a", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return usage_total(rows)
 
 
 # --- what it costs -------------------------------------------------------------

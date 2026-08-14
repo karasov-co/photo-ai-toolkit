@@ -182,6 +182,7 @@ def _analyze(args: argparse.Namespace, *, semantic: bool) -> int:
         shadow_mode=not args.no_shadow_mode,
         insights_scope=getattr(args, "insights_scope", "new"),
         jobs=getattr(args, "jobs", None),
+        reasoning=getattr(args, "reasoning", "low"),
     )
 
     printed = {"n": 0, "analysed": 0, "reused": 0, "announced": False}
@@ -483,6 +484,17 @@ def _print_run_tally(result: pipeline.RunResult, space: workspace.Workspace) -> 
     failures = sum(1 for r in result.records if r.status != "ok")
     if failures:
         lines.append(f"  Failed to analyse:        {failures}")
+    spend = result.usage_total or {}
+    if spend.get("calls"):
+        # Measured, not estimated. The estimate said $2 and the bill was $5,
+        # and the difference was reasoning tokens nothing here was counting.
+        lines += [
+            f"  Tokens in / out:          {spend['prompt']:,} / {spend['completion']:,}"
+            + (f"  (cached {spend['cached']:,})" if spend.get("cached") else ""),
+            f"  Reasoning tokens:         {spend['reasoning']:,}  (billed as output)",
+            f"  Cost this run:            ${spend['usd']:.2f}",
+            f"  Per-call log:             {space.usage_log}",
+        ]
     lines.append(f"  Report:                   {space.report}")
     print("\n".join(lines))
 
@@ -1141,6 +1153,14 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument(
             "--embed-quality", type=int, default=None,
             help="JPEG quality of inlined thumbnails in --standalone (default 75)",
+        )
+        parser.add_argument(
+            "--reasoning", choices=["low", "medium", "high"], default="low",
+            help=(
+                "how hard the model is asked to think (default: low). "
+                "Reasoning tokens are billed as output, and this is the only "
+                "control over how many of them a run buys"
+            ),
         )
         parser.add_argument(
             "--jobs", type=int, default=None,

@@ -799,13 +799,15 @@ def detect_primary_face(image: Image.Image) -> tuple[int, int, int, int] | None:
     return (int(x), int(y), int(x + w), int(y + h))
 
 
-def cache_key(checksum: str, model: str) -> str:
+def cache_key(checksum: str, model: str, reasoning: str | None = "low") -> str:
     """Stage 3 results are keyed apart from Stage 2, and by prompt version.
 
     A valid Stage 2 entry must never suppress missing Stage 3 work, which is
-    what a shared key would do.
+    what a shared key would do. The reasoning effort is in the key too: the same
+    prompt at a different effort is a different answer, and serving one for the
+    other hides a change the user paid for.
     """
-    return f"stage3:{checksum}:{model}:{PROMPT_VERSION}:{SCHEMA_VERSION}"
+    return f"stage3:{checksum}:{model}:{PROMPT_VERSION}:{SCHEMA_VERSION}:{reasoning or 'none'}"
 
 
 def summarise(assessment: ArtisticAssessment) -> str:

@@ -278,15 +278,86 @@ def test_grok_speaks_chat_completions_like_the_compatible_provider():
     assert blocks[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
 
 
-def test_grok_never_sends_reasoning_effort():
-    """xAI's reasoning controls are its own; forwarding OpenAI's would either be
-    rejected or, worse, accepted and mean something else."""
+def test_grok_forwards_the_reasoning_effort():
+    """It used to be dropped, so every call reasoned at the vendor's default.
+
+    That is where the money went: 627K reasoning tokens against 109K of
+    completion, all billed as output, on a run quoted at less than half its
+    eventual cost.
+    """
     client = FakeCompatible()
     llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(
         request(reasoning_effort="high")
     )
-    assert "reasoning" not in client.chat.kwargs
-    assert "reasoning_effort" not in client.chat.kwargs
+    assert client.chat.kwargs["reasoning_effort"] == "high"
+
+
+def test_nothing_unsupported_goes_to_xai():
+    """xAI rejects parameters it does not implement, with a 400, mid-run."""
+    client = FakeCompatible()
+    llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(request())
+    assert set(client.chat.kwargs) <= {
+        "model", "max_tokens", "messages", "reasoning_effort"
+    }
+    for unsupported in ("presence_penalty", "frequency_penalty", "stop", "temperature",
+                        "top_p", "n", "logprobs"):
+        assert unsupported not in client.chat.kwargs
+
+
+def test_a_rejected_effort_is_dropped_once_and_not_retried_forever():
+    """A server without the parameter says so by name. Retry once, then stop."""
+
+    client = FakeCompatible()
+    attempts = []
+    original = client.chat.completions.create
+
+    def create(**kwargs):
+        attempts.append(dict(kwargs))
+        if "reasoning_effort" in kwargs:
+            raise ValueError("400: unsupported parameter: reasoning_effort")
+        return original(**kwargs)
+
+    client.chat.completions.create = create
+    llm_provider._EFFORT_REJECTED.discard(("grok", "picky-model"))
+    provider = llm_provider.GrokProvider("picky-model", client=client)
+    provider.complete_vision(request(reasoning_effort="high"))
+    assert len(attempts) == 2
+    assert "reasoning_effort" not in attempts[1]
+
+    provider.complete_vision(request(reasoning_effort="high"))
+    assert len(attempts) == 3  # remembered; not tried a second time
+    llm_provider._EFFORT_REJECTED.discard(("grok", "picky-model"))
+
+
+def test_usage_is_recorded_per_call_with_reasoning_separated():
+    llm_provider.USAGE.clear()
+    client = FakeCompatible()
+    llm_provider.GrokProvider("grok-4.6", client=client).complete_vision(request())
+    total = llm_provider.usage_total()
+    assert total["calls"] == 1
+    assert set(total) >= {"prompt", "completion", "reasoning", "cached", "usd"}
+    llm_provider.USAGE.clear()
+
+
+def test_reasoning_tokens_are_priced_as_output():
+    rows = [{"model": "grok-4.6", "stage": "stage2", "prompt": 1_000_000,
+             "completion": 0, "reasoning": 1_000_000, "cached": 0}]
+    entry = llm_provider.load_pricing()["models"]["grok-4.6"]
+    expected = entry["usd_per_1m_input"] + entry["usd_per_1m_output"]
+    assert llm_provider.usage_total(rows)["usd"] == round(expected, 4)
+
+
+def test_the_price_estimate_includes_a_reasoning_term():
+    """It did not, and the estimate came in at less than half the bill."""
+    formula = llm_provider.load_pricing()["_formula"]
+    assert formula["reasoning_tokens_per_photo"] > 0
+    entry = llm_provider.load_pricing()["models"]["grok-4.6"]
+    expected = (
+        formula["input_tokens_per_photo"] * 100 / 1e6 * entry["usd_per_1m_input"]
+        + (formula["output_tokens_per_photo"] + formula["reasoning_tokens_per_photo"])
+        * 100 / 1e6 * entry["usd_per_1m_output"]
+    )
+    assert abs(entry["usd_per_100_photos"] - expected) < 0.01
 
 
 def test_all_twelve_frames_go_in_one_request():
@@ -385,7 +456,8 @@ def test_the_grok_price_is_derived_from_its_token_rates():
 
     expected = (
         formula["input_tokens_per_photo"] * 100 / 1e6 * entry["usd_per_1m_input"]
-        + formula["output_tokens_per_photo"] * 100 / 1e6 * entry["usd_per_1m_output"]
+        + (formula["output_tokens_per_photo"] + formula["reasoning_tokens_per_photo"])
+        * 100 / 1e6 * entry["usd_per_1m_output"]
     )
     assert entry["usd_per_100_photos"] == pytest.approx(expected, abs=0.01)
     assert entry["derived"] is True

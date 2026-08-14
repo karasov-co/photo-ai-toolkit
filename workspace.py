@@ -100,6 +100,16 @@ class Workspace:
         return self.root / STANDALONE_NAME
 
     @property
+    def usage_log(self) -> Path:
+        """One JSON object per API call: tokens in, out, reasoning, cached.
+
+        Appended to rather than replaced. What a run cost is a fact about that
+        run, and the next one overwriting it removes the only record of where
+        the money went.
+        """
+        return self.internal / "usage.jsonl"
+
+    @property
     def thumb_cache(self) -> Path:
         return self.internal / "thumbs"
 

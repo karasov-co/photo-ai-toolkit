@@ -112,6 +112,11 @@ class PipelineOptions:
     # one"; 1 keeps the single-process path, which is what to use when a file
     # is crashing the run and you need a traceback rather than a dead pool.
     jobs: int | None = None
+    # How hard the model is asked to think. "low" by default and forwarded to
+    # the provider: it used to be dropped on the way to xAI, so every call
+    # reasoned at the vendor's default and the bill was two and a half times
+    # the quote. None means "do not send the parameter at all".
+    reasoning: str | None = "low"
 
     def resolved_quarantine(self) -> Path:
         """The *physical* quarantine directory, deliberately not the farm folder.
@@ -163,6 +168,9 @@ class RunResult:
     # answered from store. Printed at the end, because "252 analysed, 47 reused,
     # 26 calls" is the only honest account of what a run cost.
     llm_calls: dict = field(default_factory=dict)
+    # Tokens and dollars, measured from the provider's own usage figures rather
+    # than estimated from a per-photo constant.
+    usage_total: dict = field(default_factory=dict)
     new_assets: list = field(default_factory=list)
     reused_assets: list = field(default_factory=list)
     modified_assets: list = field(default_factory=list)
@@ -232,15 +240,19 @@ class AnalysisCache:
     # AND prompt version, so changing the prompt invalidates exactly the work
     # whose meaning changed.
 
-    def get_stage3(self, checksum: str, model: str) -> dict | None:
+    def get_stage3(
+        self, checksum: str, model: str, reasoning: str | None = "low"
+    ) -> dict | None:
         import stage3
 
-        return self._data.get(stage3.cache_key(checksum, model))
+        return self._data.get(stage3.cache_key(checksum, model, reasoning))
 
-    def put_stage3(self, checksum: str, model: str, payload: dict) -> None:
+    def put_stage3(
+        self, checksum: str, model: str, payload: dict, reasoning: str | None = "low"
+    ) -> None:
         import stage3
 
-        self._data[stage3.cache_key(checksum, model)] = payload
+        self._data[stage3.cache_key(checksum, model, reasoning)] = payload
 
     # Stage 2 is cached per asset for a reason that is not about cost.
     #
@@ -250,16 +262,25 @@ class AnalysisCache:
     # about the photograph changed. A stored result is that asset's answer,
     # fixed at the moment it was analysed, and a later batch cannot rewrite it.
 
-    def semantic_key(self, checksum: str, model: str) -> str:
+    def semantic_key(self, checksum: str, model: str, reasoning: str | None = "low") -> str:
         import prompts
 
-        return f"stage2:{checksum}:{model}:{prompts.STAGE2_PROMPT_VERSION}"
+        # Model, prompt version AND reasoning effort. The effort was missing:
+        # a run at "low" served answers a run at "high" had paid for, and the
+        # two are different answers from a different amount of thinking.
+        return (
+            f"stage2:{checksum}:{model}:{prompts.STAGE2_PROMPT_VERSION}:{reasoning or 'none'}"
+        )
 
-    def get_semantic(self, checksum: str, model: str) -> dict | None:
-        return self._data.get(self.semantic_key(checksum, model))
+    def get_semantic(
+        self, checksum: str, model: str, reasoning: str | None = "low"
+    ) -> dict | None:
+        return self._data.get(self.semantic_key(checksum, model, reasoning))
 
-    def put_semantic(self, checksum: str, model: str, payload: dict) -> None:
-        self._data[self.semantic_key(checksum, model)] = payload
+    def put_semantic(
+        self, checksum: str, model: str, payload: dict, reasoning: str | None = "low"
+    ) -> None:
+        self._data[self.semantic_key(checksum, model, reasoning)] = payload
 
     def get(self, checksum: str) -> dict | None:
         return self._data.get(self.key(checksum))
@@ -560,6 +581,7 @@ def semantic_pass(
     group_size: int = 12,
     cache: AnalysisCache | None = None,
     calls: dict | None = None,
+    reasoning: str | None = "low",
 ) -> dict[str, Semantic]:
     """Rank frames against each other in groups, then stitch to a global order.
 
@@ -594,7 +616,9 @@ def semantic_pass(
             continue
         if not measurements.get(asset.key, Measurement()).preview_path:
             continue
-        stored = cache.get_semantic(asset.checksum, model) if cache is not None else None
+        stored = (
+            cache.get_semantic(asset.checksum, model, reasoning) if cache is not None else None
+        )
         if stored is not None:
             cached_raw[asset.key] = stored
             continue
@@ -643,6 +667,8 @@ def semantic_pass(
                     prompts.STAGE2_SYSTEM,
                     prompts.stage2_user_content(frames),
                     max_tokens=900 + 260 * len(frames),
+                    reasoning_effort=reasoning,
+                    stage="stage2",
                 )
             )
             items = batch_runner.parse_group_json(text)
@@ -717,7 +743,7 @@ def semantic_pass(
             # against everything else in a later run.
             cached_raw.setdefault(name, entry)
             if cache is not None:
-                cache.put_semantic(asset.checksum, model, entry)
+                cache.put_semantic(asset.checksum, model, entry, reasoning)
 
     return _stitch(cached_raw, by_name, out)
 
@@ -835,6 +861,7 @@ def stage3_pass(
     client,
     cache: AnalysisCache | None = None,
     group_size: int = 6,
+    reasoning: str | None = "low",
 ) -> dict:
     """The artistic read, in small groups, with crops for anything with a face.
 
@@ -873,7 +900,7 @@ def stage3_pass(
             continue
 
         if cache is not None:
-            cached = cache.get_stage3(asset.checksum, model)
+            cached = cache.get_stage3(asset.checksum, model, reasoning)
             if cached is not None:
                 out[key] = stage3_module.ArtisticAssessment.from_dict(cached)
                 continue
@@ -899,7 +926,8 @@ def stage3_pass(
             continue
 
         assessments = _stage3_call(
-            frames, model=model, client=client, stage3_module=stage3_module
+            frames, model=model, client=client, stage3_module=stage3_module,
+            reasoning=reasoning,
         )
         for frame in frames:
             key = frame["key"]
@@ -908,7 +936,9 @@ def stage3_pass(
                 ["the model returned nothing usable for this frame"], model=model
             )
             if cache is not None and out[key].completed:
-                cache.put_stage3(by_key[key].checksum, model, out[key].to_dict())
+                cache.put_stage3(
+                    by_key[key].checksum, model, out[key].to_dict(), reasoning
+                )
 
     return out
 
@@ -977,7 +1007,8 @@ def _truncated(response) -> bool:
     return bool(details and "max_output_tokens" in str(getattr(details, "reason", details)))
 
 
-def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float = 1.0):
+def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float = 1.0,
+                 reasoning: str | None = "low"):
     """One group, with bounded retries on a malformed reply.
 
     Two failure modes, handled differently. A malformed reply is retried as-is,
@@ -1004,13 +1035,15 @@ def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float =
                         prompts.STAGE3_SYSTEM,
                         prompts.stage3_user_content(frames),
                         max_tokens=budget,
+                        reasoning_effort=reasoning,
+                        stage="stage3",
                     )
                 )
             except llm_provider.Truncated as e:
                 errors.append(f"attempt {attempt + 1}: {e}")
                 return _split_or_widen(
                     frames, model=model, client=client, stage3_module=stage3_module,
-                    budget_factor=budget_factor, errors=errors,
+                    budget_factor=budget_factor, errors=errors, reasoning=reasoning,
                 )
             parsed = stage3_module.parse_group(text, group, model=model)
             if parsed:
@@ -1051,7 +1084,8 @@ def _stage3_call(frames, *, model, client, stage3_module, budget_factor: float =
 STAGE3_BUDGET_LIMIT = 3.0
 
 
-def _split_or_widen(frames, *, model, client, stage3_module, budget_factor, errors):
+def _split_or_widen(frames, *, model, client, stage3_module, budget_factor, errors,
+                    reasoning: str | None = "low"):
     """Halve the group, or -- when it is already one frame -- widen the budget."""
     if len(frames) > 1:
         middle = len(frames) // 2
@@ -1061,7 +1095,7 @@ def _split_or_widen(frames, *, model, client, stage3_module, budget_factor, erro
             out.update(
                 _stage3_call(
                     half, model=model, client=client, stage3_module=stage3_module,
-                    budget_factor=budget_factor,
+                    budget_factor=budget_factor, reasoning=reasoning,
                 )
             )
         return out
@@ -1071,7 +1105,7 @@ def _split_or_widen(frames, *, model, client, stage3_module, budget_factor, erro
         logger.info("Stage 3 reply truncated on a single frame; widening the budget")
         return _stage3_call(
             frames, model=model, client=client, stage3_module=stage3_module,
-            budget_factor=widened,
+            budget_factor=widened, reasoning=reasoning,
         )
 
     logger.error("Stage 3 truncated even at the widest budget: %s", "; ".join(errors[:2]))
@@ -1199,6 +1233,14 @@ def run(
         record.semantic_requested = result.semantic_requested
         record.semantic_completed = result.semantic_completed
         record.semantic_error = result.semantic_error
+
+    # Drained here rather than per pass: one file, appended once, whatever
+    # combination of stages ran. An empty list writes nothing.
+    if llm_provider.USAGE:
+        result.usage_total = llm_provider.write_usage(
+            options.internal / "usage.jsonl", llm_provider.USAGE
+        )
+        llm_provider.USAGE.clear()
 
     _write_manifest(options, result, assets, model)
     result.planned_operations = _plan_operations(assets, result.records, options)
@@ -1372,6 +1414,7 @@ def _stage3(assets, measurements, provisional, semantics, options, client, resul
         assessments = stage3_pass(
             assets, measurements, routed, hints,
             model=stage3_model, client=client, cache=cache,
+            reasoning=options.reasoning,
         )
     except bootstrap.SemanticUnavailable as e:
         # Already classified as fatal downstream: an exhausted balance or a
@@ -1465,7 +1508,7 @@ def _semantics(
     try:
         semantics = semantic_pass(
             assets, measurements, model=model, client=client,
-            cache=cache, calls=result.llm_calls,
+            cache=cache, calls=result.llm_calls, reasoning=options.reasoning,
         )
     except bootstrap.SemanticUnavailable as e:
         # Already classified where it happened -- re-running it through
