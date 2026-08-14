@@ -635,88 +635,107 @@ def semantic_pass(
     first_error: Exception | None = None
     succeeded = 0
 
-    for index, group in enumerate(groups):
-        frames = []
-        for name in group:
-            measurement = measurements[name]
-            with open(measurement.preview_path, "rb") as f:
-                encoded = base64.standard_b64encode(f.read()).decode()
-            # For a RAW, hand over what the *sensor* saturated at. For anything
-            # else, hand over the rendered figure and say so. The two mean
-            # different things and the prompt must not conflate them.
-            if measurement.raw_available:
-                highlights = measurement.raw_clipped_all_channels
-                shadows = measurement.clipped_shadows
-            else:
-                highlights = measurement.clipped_highlights
-                shadows = measurement.clipped_shadows
-            frames.append(
-                {
-                    "filename": name,
-                    "clipped_highlights": highlights,
-                    "clipped_shadows": shadows,
-                    "measurement_domain": measurement.measurement_domain,
-                    "headroom_stops": measurement.raw_highlight_headroom_stops,
-                    "encoded": encoded,
-                }
-            )
-
-        try:
-            text = _provider(model, client).complete_vision(
-                llm_provider.from_openai_content(
-                    prompts.STAGE2_SYSTEM,
-                    prompts.stage2_user_content(frames),
-                    max_tokens=900 + 260 * len(frames),
-                    reasoning_effort=reasoning,
-                    stage="stage2",
+    # The loop is wrapped rather than left bare: a fatal API error, a Ctrl-C or
+    # a bug in here all used to end the process with every answer bought in this
+    # pass still only in memory. `cache.save()` ran once, after both passes
+    # completed, which is the one moment a failing run never reaches.
+    try:
+        for index, group in enumerate(groups):
+            frames = []
+            for name in group:
+                measurement = measurements[name]
+                with open(measurement.preview_path, "rb") as f:
+                    encoded = base64.standard_b64encode(f.read()).decode()
+                # For a RAW, hand over what the *sensor* saturated at. For anything
+                # else, hand over the rendered figure and say so. The two mean
+                # different things and the prompt must not conflate them.
+                if measurement.raw_available:
+                    highlights = measurement.raw_clipped_all_channels
+                    shadows = measurement.clipped_shadows
+                else:
+                    highlights = measurement.clipped_highlights
+                    shadows = measurement.clipped_shadows
+                frames.append(
+                    {
+                        "filename": name,
+                        "clipped_highlights": highlights,
+                        "clipped_shadows": shadows,
+                        "measurement_domain": measurement.measurement_domain,
+                        "headroom_stops": measurement.raw_highlight_headroom_stops,
+                        "encoded": encoded,
+                    }
                 )
-            )
-            items = batch_runner.parse_group_json(text)
-            succeeded += 1
-            if calls is not None:
-                calls["stage2"] = calls.get("stage2", 0) + 1
-        except Exception as e:
-            import bootstrap
 
-            # An account-level failure hits every remaining group identically.
-            # Without this, a wrong key produced thirty-one identical 401s --
-            # one per group, each logged in full -- before the run gave up. On
-            # a paid key the same loop would keep hammering a rate limit or an
-            # exhausted balance to the end of the archive.
-            #
-            # `_stage3_call` has had this check since the balance ran out
-            # mid-run; Stage 2 was missed.
-            if bootstrap.is_fatal_api_error(e):
-                kind, message = bootstrap.classify_api_error(e)
-                logger.error("Semantic pass stopped at group %d: %s", index, message)
-                raise bootstrap.SemanticUnavailable(message, kind=kind) from e
-            first_error = first_error or e
-            logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
-            continue
+            try:
+                text = _provider(model, client).complete_vision(
+                    llm_provider.from_openai_content(
+                        prompts.STAGE2_SYSTEM,
+                        prompts.stage2_user_content(frames),
+                        max_tokens=900 + 260 * len(frames),
+                        reasoning_effort=reasoning,
+                        stage="stage2",
+                    )
+                )
+                items = batch_runner.parse_group_json(text)
+                succeeded += 1
+                if calls is not None:
+                    calls["stage2"] = calls.get("stage2", 0) + 1
+            except Exception as e:
+                import bootstrap
 
-        # A near-ranking is repaired before it is judged. Discarding a group
-        # costs twelve photographs their genre, their faces and their subject
-        # strength -- and on this archive a single duplicated rank did exactly
-        # that to eight frames, taking the portrait gate with it. The repair is
-        # recorded, never silent.
-        items, repairs = batch_runner.repair_group_ranks(items, len(group))
-        if repairs:
-            logger.info("Group %d repaired: %s", index, "; ".join(repairs))
+                # An account-level failure hits every remaining group identically.
+                # Without this, a wrong key produced thirty-one identical 401s --
+                # one per group, each logged in full -- before the run gave up. On
+                # a paid key the same loop would keep hammering a rate limit or an
+                # exhausted balance to the end of the archive.
+                #
+                # `_stage3_call` has had this check since the balance ran out
+                # mid-run; Stage 2 was missed.
+                if bootstrap.is_fatal_api_error(e):
+                    kind, message = bootstrap.classify_api_error(e)
+                    logger.error("Semantic pass stopped at group %d: %s", index, message)
+                    raise bootstrap.SemanticUnavailable(message, kind=kind) from e
+                first_error = first_error or e
+                logger.error("Semantic group %d failed: %s", index, reports.redact(str(e)))
+                continue
 
-        problems = batch_runner.validate_group_ranks(items, len(group))
-        if problems:
-            # Still not a ranking. Feeding it to Bradley-Terry would manufacture
-            # a confident order out of a malformed reply, so the group is
-            # dropped and its frames simply go unranked -- which lowers their
-            # confidence and sends them to review, the safe direction.
-            logger.warning("Group %d rejected: %s", index, "; ".join(problems))
-            continue
+            # A near-ranking is repaired before it is judged. Discarding a group
+            # costs twelve photographs their genre, their faces and their subject
+            # strength -- and on this archive a single duplicated rank did exactly
+            # that to eight frames, taking the portrait gate with it. The repair is
+            # recorded, never silent.
+            items, repairs = batch_runner.repair_group_ranks(items, len(group))
+            if repairs:
+                logger.info("Group %d repaired: %s", index, "; ".join(repairs))
 
-        placed = batch_runner.attach_filenames(items, group)
-        parsed_groups.append(placed)
-        for item in placed:
-            per_frame.setdefault(item["filename"], item)
-            item["_group_size"] = len(group)
+            problems = batch_runner.validate_group_ranks(items, len(group))
+            if problems:
+                # Still not a ranking. Feeding it to Bradley-Terry would manufacture
+                # a confident order out of a malformed reply, so the group is
+                # dropped and its frames simply go unranked -- which lowers their
+                # confidence and sends them to review, the safe direction.
+                logger.warning("Group %d rejected: %s", index, "; ".join(problems))
+                continue
+
+            placed = batch_runner.attach_filenames(items, group)
+            parsed_groups.append(placed)
+            for item in placed:
+                per_frame.setdefault(item["filename"], item)
+                item["_group_size"] = len(group)
+
+            _store_group(placed, by_name, cached_raw, cache, model, reasoning)
+            # Every third group, not at the end. The end is exactly where a run
+            # stops when a balance runs out, and everything paid for up to that
+            # point used to be discarded with the process.
+            if cache is not None and (index + 1) % CACHE_SAVE_EVERY == 0:
+                cache.save()
+
+    except KeyboardInterrupt:
+        logger.warning("Interrupted; keeping the %d group(s) already paid for", succeeded)
+        raise
+    finally:
+        if cache is not None:
+            cache.save()
 
     if first_error is not None and succeeded == 0:
         # Nothing got through. Re-raise so the caller decides whether that ends
@@ -724,28 +743,32 @@ def semantic_pass(
         # model had no opinion".
         raise first_error
 
-    # Store the raw reply and the group it was ranked in, never the stitched
-    # result. Percentiles are a property of the population, so caching them
-    # freezes one run's population into an asset that outlives it -- and the
-    # next run then puts those old percentiles beside percentiles computed over
-    # a different set, in one report, on one axis, as though they were the same
-    # scale. The ranks are the durable fact; the scale is rebuilt below.
-    for group in parsed_groups:
-        members = [item.get("filename", "") for item in group]
-        for item in group:
-            name = item.get("filename", "")
-            asset = by_name.get(name)
-            if asset is None:
-                continue
-            entry = {"item": item, "group": members}
-            # The same record in memory and on disk: a frame keeps the group it
-            # was ranked against, which is what Bradley-Terry needs to place it
-            # against everything else in a later run.
-            cached_raw.setdefault(name, entry)
-            if cache is not None:
-                cache.put_semantic(asset.checksum, model, entry, reasoning)
-
     return _stitch(cached_raw, by_name, out)
+
+
+def _store_group(placed, by_name, cached_raw, cache, model, reasoning) -> None:
+    """One parsed group, into memory and into the cache, immediately.
+
+    Store the raw reply and the group it was ranked in, never the stitched
+    result. Percentiles are a property of the population, so caching them
+    freezes one run's population into an asset that outlives it -- and the next
+    run then puts those old percentiles beside percentiles computed over a
+    different set, in one report, on one axis, as though they were the same
+    scale. The ranks are the durable fact; the scale is rebuilt later.
+
+    This used to run after every group had been ranked. A run that died on group
+    nineteen of thirty-one therefore paid for eighteen groups and kept none.
+    """
+    members = [item.get("filename", "") for item in placed]
+    for item in placed:
+        name = item.get("filename", "")
+        asset = by_name.get(name)
+        if asset is None:
+            continue
+        entry = {"item": item, "group": members}
+        cached_raw.setdefault(name, entry)
+        if cache is not None:
+            cache.put_semantic(asset.checksum, model, entry, reasoning)
 
 
 def _measure_one(args):
@@ -754,6 +777,12 @@ def _measure_one(args):
     if asset.kind is media.MediaKind.VIDEO:
         return measure_video(asset, previews_dir, samples=video_samples)
     return measure_photo(asset, previews_dir)
+
+
+# How often a pass flushes the cache to disk, in groups. Three rather than one
+# because a save is a full JSON rewrite, and three rather than thirty because
+# the thing being protected is money already spent.
+CACHE_SAVE_EVERY = 3
 
 
 # Below this, a process pool costs more than it saves: starting an interpreter
@@ -909,36 +938,64 @@ def stage3_pass(
     if not pending:
         return out
 
+    import bootstrap
+
     by_key = {a.key: a for a in assets}
-    for start in range(0, len(pending), group_size):
-        group = pending[start : start + group_size]
-        frames = []
-        for key in group:
-            measurement = measurements[key]
-            preview = Path(measurement.preview_path)
-            if not preview.exists():
-                out[key] = stage3_module.ArtisticAssessment.skipped("no preview was generated")
+    done = 0
+    try:
+        for start in range(0, len(pending), group_size):
+            group = pending[start : start + group_size]
+            frames = []
+            for key in group:
+                measurement = measurements[key]
+                preview = Path(measurement.preview_path)
+                if not preview.exists():
+                    out[key] = stage3_module.ArtisticAssessment.skipped(
+                        "no preview was generated"
+                    )
+                    continue
+                views = _stage3_views(by_key[key], preview, artistic_hints.get(key, {}))
+                frames.append({"key": key, "views": views, "encoded": views[0][1]})
+
+            if not frames:
                 continue
-            views = _stage3_views(by_key[key], preview, artistic_hints.get(key, {}))
-            frames.append({"key": key, "views": views, "encoded": views[0][1]})
 
-        if not frames:
-            continue
-
-        assessments = _stage3_call(
-            frames, model=model, client=client, stage3_module=stage3_module,
-            reasoning=reasoning,
-        )
-        for frame in frames:
-            key = frame["key"]
-            assessment = assessments.get(key)
-            out[key] = assessment or stage3_module.ArtisticAssessment.failed(
-                ["the model returned nothing usable for this frame"], model=model
-            )
-            if cache is not None and out[key].completed:
-                cache.put_stage3(
-                    by_key[key].checksum, model, out[key].to_dict(), reasoning
+            try:
+                assessments = _stage3_call(
+                    frames, model=model, client=client, stage3_module=stage3_module,
+                    reasoning=reasoning,
                 )
+            except Exception as e:
+                # Stage 2 has had this check since a wrong key produced
+                # thirty-one identical 401s. Stage 3 did not, so an exhausted
+                # balance was retried once per group to the end of the archive.
+                # An account-level failure hits every remaining group the same
+                # way; the run ends and what it already bought is saved first.
+                if not bootstrap.is_fatal_api_error(e):
+                    raise
+                kind, message = bootstrap.classify_api_error(e)
+                logger.error("Stage 3 stopped after %d group(s): %s", done, message)
+                raise bootstrap.SemanticUnavailable(message, kind=kind) from e
+
+            for frame in frames:
+                key = frame["key"]
+                assessment = assessments.get(key)
+                out[key] = assessment or stage3_module.ArtisticAssessment.failed(
+                    ["the model returned nothing usable for this frame"], model=model
+                )
+                if cache is not None and out[key].completed:
+                    cache.put_stage3(
+                        by_key[key].checksum, model, out[key].to_dict(), reasoning
+                    )
+            done += 1
+            if cache is not None and done % CACHE_SAVE_EVERY == 0:
+                cache.save()
+    except KeyboardInterrupt:
+        logger.warning("Interrupted; keeping the %d group(s) already paid for", done)
+        raise
+    finally:
+        if cache is not None:
+            cache.save()
 
     return out
 

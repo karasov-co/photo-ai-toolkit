@@ -704,3 +704,91 @@ def test_the_pool_works_under_every_start_method(method, tmp_path):
     context = multiprocessing.get_context(method)
     with ProcessPoolExecutor(max_workers=2, mp_context=context) as pool:
         assert list(pool.map(abs, [-1, -2, -3])) == [1, 2, 3]
+
+
+# --- paid work survives a failed run -----------------------------------------
+
+
+def test_a_run_that_dies_mid_pass_keeps_what_it_already_paid_for(tmp_path, monkeypatch):
+    """The cache used to be written once, after both passes completed -- the one
+    moment a failing run never reaches. Eighteen paid groups, discarded."""
+    import json as _json
+
+    import bootstrap
+    import media
+
+    preview = tmp_path / "p.jpg"
+    preview.write_bytes(b"x")
+
+    assets, measurements, names = [], {}, []
+    for i in range(48):  # four groups of twelve
+        name = f"f{i}.jpg"
+        names.append(name)
+        assets.append(type("A", (), {
+            "key": name, "checksum": f"sum{i}",
+            "kind": media.MediaKind.PHOTO, "path": preview,
+        })())
+        measurements[name] = type("M", (), {
+            "preview_path": str(preview), "error": "", "raw_available": False,
+            "clipped_highlights": 0.0, "clipped_shadows": 0.0,
+            "raw_clipped_all_channels": 0.0, "measurement_domain": "rendered",
+            "raw_highlight_headroom_stops": 0.0,
+        })()
+
+    calls = {"n": 0}
+
+    def reply(group_names):
+        return _json.dumps([
+            {"n": i + 1, "genre": "street", "axis_a": i + 1, "axis_b": i + 1,
+             "axis_c": i + 1, "recover": "easy"}
+            for i in range(len(group_names))
+        ])
+
+    class Stub:
+        def complete_vision(self, request):
+            calls["n"] += 1
+            if calls["n"] > 3:
+                raise RuntimeError("Error code: 403 - insufficient credits")
+            return reply(range(12))
+
+    monkeypatch.setattr(pipeline, "_provider", lambda *a, **k: Stub())
+    cache = pipeline.AnalysisCache(tmp_path / "c.json")
+
+    with pytest.raises(bootstrap.SemanticUnavailable):
+        pipeline.semantic_pass(assets, measurements, model="m", cache=cache)
+
+    # The file exists and holds the three groups that were paid for, written
+    # before the exception left the function.
+    stored = _json.loads((tmp_path / "c.json").read_text())["entries"]
+    kept = sum(1 for k in stored if k.startswith("stage2:"))
+    # Fewer than 3 x 12: the groups overlap, so the same frame appears in more
+    # than one of them. What matters is that three groups' worth of answers are
+    # on disk and not in a dead process.
+    assert kept >= 24
+    assert pipeline.CACHE_SAVE_EVERY == 3
+
+
+def test_a_fatal_error_in_stage_3_ends_the_run_instead_of_repeating(monkeypatch, tmp_path):
+    """Stage 2 has had this check since a wrong key produced 31 identical 401s."""
+    import bootstrap
+
+    calls = {"n": 0}
+
+    def explode(*a, **k):
+        calls["n"] += 1
+        raise RuntimeError("Error code: 403 - insufficient credits")
+
+    monkeypatch.setattr(pipeline, "_stage3_call", explode)
+    monkeypatch.setattr(pipeline, "_stage3_views", lambda *a, **k: [("full frame", "x")])
+
+    asset = type("A", (), {"key": "a.jpg", "checksum": "abc"})()
+    preview = tmp_path / "p.jpg"
+    preview.write_bytes(b"x")
+    measurement = type("M", (), {"preview_path": str(preview), "error": ""})()
+
+    with pytest.raises(bootstrap.SemanticUnavailable):
+        pipeline.stage3_pass(
+            [asset], {"a.jpg": measurement}, {"a.jpg": "portfolio"}, {},
+            model="m", client=object(), cache=None,
+        )
+    assert calls["n"] == 1  # not once per group to the end of the archive
