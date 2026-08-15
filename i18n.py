@@ -76,8 +76,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "report.recipe_ready": "Edit recipe written to edit_recipes/",
         "report.insights_link": "What this collection says about your photography",
         "report.uplift_unvalidated": (
-            "The gain after editing is an estimate from an internal metric that has "
-            "not been checked against a labelled set."
+            "The gain figure compares frames, it does not measure photographs. The "
+            "metric it comes from is both what the edit search optimises and the "
+            "ruler that reports the result, so it can only say this frame has more "
+            "room than that one -- not that editing makes a picture 12 points "
+            "better. `bench-quality` against your own ranking is what would change "
+            "that."
         ),
         "report.footer": (
             "Scores are suggestions, not verdicts. Nothing has been moved, changed or "
@@ -185,7 +189,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "issues.none": "None detected",
         # recipe
         "recipe.title": "Suggested edit",
-        "recipe.expected_gain": "Expected realistic improvement",
+        "recipe.expected_gain": "Room to improve, relative to the other frames",
         "recipe.none": "No edit needed",
         # actions
         "action.proposed": "Proposed action",
@@ -361,8 +365,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "report.recipe_ready": "Рецепт обработки сохранён в edit_recipes/",
         "report.insights_link": "Что эта съёмка говорит о вашей фотографии",
         "report.uplift_unvalidated": (
-            "Прирост после обработки — оценка внутренней метрики, не проверенная "
-            "на размеченном наборе."
+            "Прирост сравнивает кадры между собой, а не измеряет фотографии. "
+            "Метрика, из которой он получен, — одновременно и то, что оптимизирует "
+            "подбор обработки, и линейка, которой меряют результат: она может "
+            "сказать, что у этого кадра запаса больше, чем у того, но не что "
+            "обработка делает снимок лучше на 12 пунктов. Это меняет "
+            "`bench-quality` на вашей собственной разметке."
         ),
         "report.footer": (
             "Оценки — это подсказки, а не приговор. Ничего не перемещено, не изменено "
@@ -463,7 +471,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "issues.unrecoverable": "Неисправимые проблемы",
         "issues.none": "Не обнаружено",
         "recipe.title": "Рекомендуемая обработка",
-        "recipe.expected_gain": "Ожидаемый реальный прирост",
+        "recipe.expected_gain": "Запас на улучшение, относительно других кадров",
         "recipe.none": "Обработка не требуется",
         "action.proposed": "Предлагаемое действие",
         "action.none": "Оставить на месте",

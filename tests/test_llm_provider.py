@@ -252,9 +252,22 @@ class FakeCompatible:
         self.chat = FakeChat(choice)
 
 
-def test_grok_is_registered_and_unverified():
+def test_grok_is_registered_and_has_met_the_endpoint():
+    """281 photographs through grok-4.6 at api.x.ai, Stage 2 and Stage 3.
+
+    `verified` says the adapter has met the endpoint rather than only the docs.
+    It is not a claim that it is correct.
+    """
     assert llm_provider.PROVIDERS["grok"] is llm_provider.GrokProvider
-    assert llm_provider.GrokProvider.verified is False
+    assert llm_provider.GrokProvider.verified is True
+
+
+def test_the_adapters_nobody_has_run_still_say_so():
+    """Three of five. A default that has been run and three that have not is a
+    different situation from four unverified adapters, and the startup note has
+    to keep telling the difference."""
+    for name in ("anthropic", "gemini", "openai-compatible"):
+        assert llm_provider.PROVIDERS[name].verified is False
 
 
 def test_grok_points_at_xai_by_default():

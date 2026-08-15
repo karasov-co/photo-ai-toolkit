@@ -8,12 +8,12 @@ from duplicates import (
     Cluster,
     DupItem,
     cluster_items,
-    embedding_similarity,
     hamming,
     is_burst,
     phash_similarity,
     select_diverse,
     strongest_per_genre,
+    visual_similarity,
 )
 
 # Hex phashes one bit apart, then progressively further.
@@ -196,12 +196,12 @@ def test_the_same_genre_counts_as_more_alike_than_a_different_one():
     a = item("a", "00000000000000ff", genre="landscape")
     same = item("b", "000000000000ff00", genre="landscape")
     other = item("c", "000000000000ff00", genre="street")
-    assert embedding_similarity(a, same) > embedding_similarity(a, other)
+    assert visual_similarity(a, same) > visual_similarity(a, other)
 
 
 def test_similarity_never_exceeds_one_even_with_the_genre_bonus():
     a = item("a", H0, genre="landscape")
-    assert embedding_similarity(a, a) == 1.0
+    assert visual_similarity(a, a) == 1.0
 
 
 # --- per-genre selection ----------------------------------------------------
@@ -319,3 +319,16 @@ def test_two_thousand_files_cluster_quickly():
     started = time.perf_counter()
     duplicates.cluster_items(items)
     assert time.perf_counter() - started < 5.0
+
+
+def test_the_similarity_function_does_not_claim_to_be_an_embedding():
+    """It was called `embedding_similarity` and does a hash comparison.
+
+    A name that promises a semantic comparison is the kind of thing a reader
+    believes, and the consequence is real: two different subjects shot with the
+    same palette and framing are merged as near-identical.
+    """
+    import duplicates
+
+    assert not hasattr(duplicates, "embedding_similarity")
+    assert "not implemented" in duplicates.visual_similarity.__doc__

@@ -405,7 +405,11 @@ class GrokProvider(OpenAICompatibleProvider):
     """
 
     name = "grok"
-    verified = False
+    # Run against api.x.ai for real: 281 photographs through grok-4.6 across
+    # Stage 2 and Stage 3, plus the preflight on every run. `verified` means
+    # exactly that and nothing more -- it is not a statement that the adapter is
+    # correct, only that it has met the endpoint rather than only the docs.
+    verified = True
 
     DEFAULT_BASE_URL = "https://api.x.ai/v1"
     # 20 MiB per image, per xAI's documented limit. Nothing this project sends

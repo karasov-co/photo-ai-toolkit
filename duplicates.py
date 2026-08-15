@@ -20,7 +20,7 @@ The similarity function is injectable. The default is perceptual-hash distance
 combined with genre, which is cheap, offline, and good enough to catch bursts
 and repeated framings. A CLIP or SigLIP embedding would separate "two different
 photographs that happen to share a colour palette" more reliably; that is the
-documented extension point, and `embedding_similarity` is where it plugs in.
+documented extension point, and the `similarity=` argument is where it plugs in.
 """
 
 from __future__ import annotations
@@ -89,12 +89,23 @@ def phash_similarity(a: str, b: str) -> float:
     return round(1.0 - hamming(a, b) / HASH_BITS, 4)
 
 
-def embedding_similarity(a: DupItem, b: DupItem) -> float:
-    """Default similarity: perceptual hash, nudged by genre.
+def visual_similarity(a: DupItem, b: DupItem) -> float:
+    """Perceptual hash, nudged by genre. Not an embedding, despite the old name.
 
-    Two frames of the same genre are more interchangeable in a portfolio than
-    two of different genres even at equal visual distance, which is the property
-    the diversity pass actually wants.
+    This was called `embedding_similarity`, which described the extension point
+    rather than the function, and a name that promises a semantic comparison
+    while doing a hash comparison is the kind of thing a reader believes.
+
+    What it actually measures is layout and tone at 8x8. Two different subjects
+    photographed with the same palette and framing score as near-identical, and
+    the diversity pass will treat one as a repeat of the other. A CLIP or SigLIP
+    embedding is what separates "two frames of one moment" from "two frames that
+    happen to be beige"; it is not implemented, and `similarity=` on the caller
+    below is where one would go.
+
+    The genre nudge stands on its own: two frames of the same genre are more
+    interchangeable in a portfolio than two of different genres at equal visual
+    distance, which is the property the diversity pass wants.
     """
     visual = phash_similarity(a.phash, b.phash)
     same_genre = 0.12 if a.genre == b.genre else 0.0
@@ -258,7 +269,7 @@ def select_diverse(
     limit: int,
     lambda_: float = 0.65,
     max_per_genre: int | None = None,
-    similarity: Callable[[DupItem, DupItem], float] = embedding_similarity,
+    similarity: Callable[[DupItem, DupItem], float] = visual_similarity,
 ) -> list[str]:
     """Maximal marginal relevance: quality, discounted by redundancy.
 

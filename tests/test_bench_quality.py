@@ -119,13 +119,20 @@ def test_uplift_is_declared_unvalidated_until_somebody_measures_it():
     assert edit_recipe.UPLIFT_VALIDATED is False
 
 
-def test_the_report_says_the_gain_is_unchecked(tmp_path):
+def test_the_report_says_the_gain_compares_frames_rather_than_measuring_them(tmp_path):
+    """It used to say only "not checked against a labelled set", which reads as
+    a number that is probably right and merely unaudited. The circularity is
+    sharper than that: the metric is both the objective the edit search climbs
+    and the ruler that reports the climb, so +12 is a comparison between frames
+    and cannot be a measurement of a photograph."""
     import simple_report
 
     page = simple_report.write(
         [record("a.jpg", 50, 70)], tmp_path / "report.html", expert=False
     ).read_text()
-    assert "not been checked against a labelled set" in page
+    assert "compares frames" in page
+    assert "does not measure photographs" in page
+    assert "bench-quality" in page
 
 
 def test_a_validated_run_would_drop_the_caveat(tmp_path):

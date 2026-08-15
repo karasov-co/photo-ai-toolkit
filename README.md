@@ -50,7 +50,8 @@ gitignored and never committed.
 
 ## Before you trust it
 
-Three things a stranger should know before running this on their own archive.
+What a stranger should know before running this on their own archive. None of it
+is buried in the docs.
 
 **The five piles are not calibrated against anybody but the author.** The
 thresholds (top at 85, weak under 45) were tuned on one person's archive. That
@@ -75,10 +76,36 @@ The sheet is shuffled and carries no score, on purpose: a sheet showing what the
 tool decided measures how persuadable you are, not whether the thresholds are
 right.
 
-**Only the OpenAI path has been run against a live endpoint.** grok is the
-default and is exercised in a live preflight; anthropic, gemini and
-openai-compatible are written from the documented request shape and say so at
-startup.
+**Two of five provider adapters have met a live endpoint.** grok (the default,
+281 photographs through it) and openai. anthropic, gemini and openai-compatible
+are written from the documented request shape, have never been run, and say so
+at startup.
+
+**The gain figure compares frames; it does not measure photographs.** The metric
+it comes from is both what the edit search optimises and the ruler that reports
+the result, so "+12" means this frame has more room than that one, not that
+editing makes a picture 12 points better. The report says so on every page, and
+`bench-quality` against your own ranking is the only thing that changes it.
+
+**Sharpness is measured on a 512px preview, on the sharpest tile.** So a frame
+where the *wrong* object is sharp passes the gate, and a focus miss that only
+shows at 100% is not caught at all. This is a deliberate trade — full-resolution
+focus checking on every frame is a different tool — but it is a limit of the
+product, not a detail of the implementation.
+
+**Near-duplicates are grouped by perceptual hash, not by content.** Two
+different subjects with the same palette and framing can be merged, and the
+weaker one filed as a repeat. There is no embedding model in here.
+
+**The rendering adapters for darktable and RawTherapee have never been run.**
+No binaries were available to test against; they report themselves as
+`[unverified]` at runtime. Lightroom XMP sidecars are the path that has been
+exercised.
+
+**Nothing auto-deletes, and it is not one flag away.** Ten gates have to open
+together — 1,000 recorded decisions, 3,000 holdout checks, a certified monitor,
+and six more. `--no-shadow-mode` opens exactly one of them. `photoai policy`
+prints the other nine and what each is waiting for.
 
 **A score is one opinion.** Nothing is a verdict, nothing moves without
 `--apply`, and every original file is untouched throughout.

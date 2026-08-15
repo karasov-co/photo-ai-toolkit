@@ -877,11 +877,13 @@ def cmd_policy(args: argparse.Namespace) -> int:
         print(f"  {bucket:<28}{count:>6}  {count / total:>6.1%}")
     print(f"\n  needs a full human decision : {needs_human} ({needs_human / total:.1%})")
     print(f"  handled without one         : {1 - needs_human / total:.1%}")
-    acting = sum(
+    proposed = sum(
         1 for r in records
         if r.decision_bucket == selective_policy.Bucket.SAFE_QUARANTINE_CANDIDATE.value
     )
-    print(f"  acts on files               : {acting}")
+    # "acts on files" is what this line used to say, and in shadow mode nothing
+    # acts on anything. These are proposals waiting for a person.
+    print(f"  proposed for quarantine     : {proposed}")
 
     held = [r for r in records if r.policy_evidence and r.abstained]
     if held:
@@ -891,6 +893,35 @@ def cmd_policy(args: argparse.Namespace) -> int:
             counts[record.policy_evidence[0]] = counts.get(record.policy_evidence[0], 0) + 1
         for reason, count in sorted(counts.items(), key=lambda kv: -kv[1])[:6]:
             print(f"  {count:>5}  {reason}")
+
+    # `--no-shadow-mode` reads as "let it act", and on a fresh install it does
+    # not, because it opens one gate out of ten. Somebody who passed the flag and
+    # saw nothing happen deserves the list rather than a guess. Printed always:
+    # naming what is holding each gate shut is what this command is for.
+    print(
+        "\nTen gates open together before this moves a file by itself. "
+        "Nine are earned:"
+    )
+    for line in (
+        f"{selective_policy.MIN_DECISIONS_TO_DECIDE} recorded decisions "
+        "(`photoai record`) before a personal model may move anything",
+        f"{selective_policy.EVIDENCE_FOR_ONE_IN_A_THOUSAND} holdout checks, to "
+        "bound the false-trash rate below 0.1%",
+        "a monitor that has certified the model (`photoai monitor`)",
+        "the model in-distribution on this camera and genre, and not abstaining",
+        "the personal model and the curatorial prior pointing the same way",
+        "no artistic, emotional or documentary signal on the frame",
+        "the same prediction across two runs",
+        "discard confidence above the threshold",
+        "the frame not drawn into the random audit sample",
+    ):
+        print(f"  - {line}")
+    print("  - shadow mode off (`--no-shadow-mode`) -- the tenth, and the only one "
+          "that is a flag")
+    print(
+        "\nUntil the other nine are earned, this proposes and you decide. That is "
+        "the only\nhonest state for something whose mistake is a deleted photograph."
+    )
     return 0
 
 
@@ -1223,7 +1254,11 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument("--renderer", help="darkroom engine: builtin, darktable, rawtherapee")
         parser.add_argument(
             "--no-shadow-mode", action="store_true",
-            help="let the policy act instead of only recording what it would do",
+            help=(
+                "open the shadow-mode gate. It is one of ten, and the other "
+                "nine are earned rather than switched on, so on a fresh install "
+                "this changes nothing. `photoai policy` prints which are holding"
+            ),
         )
 
     analyze = sub.add_parser(
