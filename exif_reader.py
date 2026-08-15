@@ -19,6 +19,11 @@ EXIF_EMPTY = {
     "date_shot": None,
     "gps_lat": None,
     "gps_lon": None,
+    # Camera Raw needs an absolute Kelvin value to accept a white-balance
+    # correction on a RAW. Most cameras do not record one -- it lives in the
+    # MakerNote when it exists at all -- so this is None more often than not,
+    # and the exporter says what it could not write rather than guessing.
+    "color_temperature": None,
 }
 
 
@@ -99,6 +104,15 @@ def _extract_raw(path: Path) -> dict:
 _RAWPY_FILLABLE = ("lens", "iso", "shutter_speed", "aperture", "focal_length", "date_shot")
 
 
+COLOR_TEMPERATURE_TAGS = (
+    "EXIF ColorTemperature",
+    "MakerNote ColorTemperature",
+    "MakerNote ColorTempAsShot",
+    "MakerNote WB_ColorTemp",
+    "Image ColorTemperature",
+)
+
+
 def _read_raw_exifread(path: Path) -> dict:
     with open(path, "rb") as f:
         tags = exifread.process_file(f, details=False)
@@ -115,6 +129,7 @@ def _read_raw_exifread(path: Path) -> dict:
         "focal_length": _parse_rational(_tag(tags, "EXIF FocalLength")),
         "shutter_speed": _parse_shutter(_tag(tags, "EXIF ExposureTime")),
         "date_shot": _parse_date(_str_or_none(_tag(tags, "EXIF DateTimeOriginal", "Image DateTime"))),
+        "color_temperature": _int_or_none(_tag(tags, *COLOR_TEMPERATURE_TAGS)),
     }
 
     named_gps = {

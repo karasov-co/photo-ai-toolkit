@@ -97,10 +97,22 @@ product, not a detail of the implementation.
 different subjects with the same palette and framing can be merged, and the
 weaker one filed as a repeat. There is no embedding model in here.
 
-**The rendering adapters for darktable and RawTherapee have never been run.**
-No binaries were available to test against; they report themselves as
-`[unverified]` at runtime. Lightroom XMP sidecars are the path that has been
-exercised.
+**No export path has been confirmed working by its author.** The Lightroom
+sidecar was the one that looked exercised and was not: it is develop settings
+with no preset identity, so imported as a preset it appears as `<x:xmpmet` with
+an Amount slider that does nothing, and beside a JPEG Lightroom ignores it
+entirely. That is fixed -- there is now a real preset in `edit_recipes/presets/`
+that works on any format -- but fixed from Adobe's documented preset structure,
+not from watching Lightroom load one. The darktable and RawTherapee renderers
+have never been run at all; no binaries were available, and they report
+themselves `[unverified]`.
+
+**The recipes correct, they do not style.** Exposure, white balance, highlight
+and shadow recovery, some contrast and clarity, with the measurement that earned
+each step. No HSL, no tone curve, no split toning. Next to a photographer's
+preset the result will look like almost nothing happened, and that is the
+design: a style applied to an unrelated photograph is a lie about the picture.
+If you want a look, this is what goes under it.
 
 **Nothing auto-deletes, and it is not one flag away.** Ten gates have to open
 together — 1,000 recorded decisions, 3,000 holdout checks, a certified monitor,

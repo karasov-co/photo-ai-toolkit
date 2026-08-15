@@ -40,6 +40,10 @@ import recipe_generator
 from edit_schema import Variant
 from exporters import adobe_xmp
 
+# Presets live in their own folder so "import everything in here" cannot pick up
+# the sidecars by accident, which is how a panel fills with `<x:xmpmet` entries.
+PRESETS_DIRNAME = "presets"
+
 logger = logging.getLogger(__name__)
 
 # Below this, an edit recipe is not worth a photographer's attention -- and
@@ -229,9 +233,54 @@ def export_one(record, measurement, out_dir: Path) -> Path:
         is_raw=_is_raw(source),
     )
     recipe = _faithful(recipes)
+    is_raw = _is_raw(source)
+    as_shot_k = _as_shot_temperature(source)
+
     path = out_dir / f"{source.stem}.xmp"
-    path.write_text(adobe_xmp.to_adobe_xmp(recipe), encoding="utf-8")
+    path.write_text(
+        adobe_xmp.to_adobe_xmp(recipe, is_raw=is_raw, as_shot_temperature_k=as_shot_k),
+        encoding="utf-8",
+    )
+
+    # And the same recipe as a preset. The sidecar only works beside a RAW; a
+    # preset works on any file and is the only route this tool has to a JPEG at
+    # all. It is also what a person expects when they are told "import this into
+    # Lightroom" -- the sidecar, imported, shows up named after an XML tag with
+    # an Amount slider that does nothing.
+    presets = out_dir / PRESETS_DIRNAME
+    presets.mkdir(parents=True, exist_ok=True)
+    (presets / f"{source.stem}.xmp").write_text(
+        adobe_xmp.to_lightroom_preset(
+            recipe, stem=source.stem, is_raw=is_raw, as_shot_temperature_k=as_shot_k
+        ),
+        encoding="utf-8",
+    )
     return path
+
+
+def _as_shot_temperature(source: Path) -> int | None:
+    """The camera's own colour temperature, when the file carries one.
+
+    Needed only for RAW: Camera Raw's Temperature is absolute Kelvin there, so
+    a measured delta cannot be written without it. Many cameras never record it
+    -- Panasonic RW2 among them -- and returning None is the honest answer,
+    which makes the exporter say what it could not write rather than writing a
+    delta into an absolute field.
+    """
+    try:
+        import exif_reader
+
+        data = exif_reader.extract_exif(source, "RAW" if _is_raw(source) else "PHOTO") or {}
+    except Exception:  # pragma: no cover - unreadable EXIF is not a crash
+        return None
+    for key in ("color_temperature", "as_shot_temperature_k", "white_balance_k"):
+        value = data.get(key)
+        if value:
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                continue
+    return None
 
 
 def _faithful(recipes: list):
@@ -276,11 +325,28 @@ there. Every creative decision is still yours.
 
 Nothing in this folder has touched your originals, and nothing here will.
 
-Lightroom Classic
------------------
+There are two files per photograph and they are not interchangeable.
+
+  <name>.xmp            a Camera Raw sidecar. Works only when copied next to a
+                        RAW. Do NOT import this as a preset -- it has no preset
+                        fields, so Lightroom lists it as `<x:xmpmet` with an
+                        Amount slider that does nothing.
+
+  presets/<name>.xmp    a Lightroom preset. Works on any file, including JPEG,
+                        and is the only route that works for a JPEG at all.
+
+Lightroom (preset -- start here, and the only option for JPEG)
+--------------------------------------------------------------
+1. Develop module > Presets panel > the + menu > Import Presets.
+2. Choose the file from `presets/`. It appears under "photo-ai-toolkit",
+   named after the photograph.
+3. Click it. The Amount slider dials the whole correction up and down.
+
+Lightroom Classic (sidecar, RAW only)
+-------------------------------------
 1. Copy the .xmp file next to the original photograph, so that `PICTURE.xmp`
-   sits beside `PICTURE.RW2` / `PICTURE.JPG`. Do this only for the frames you
-   want; a sidecar you copy over an existing one replaces your own work.
+   sits beside `PICTURE.RW2`. Do this only for the frames you want; a sidecar
+   you copy over an existing one replaces your own work.
 2. In Lightroom, select those photographs in the Library module.
 3. Metadata > Read Metadata from File. Confirm when asked.
 
@@ -290,8 +356,25 @@ back from.
 
 Adobe Camera Raw / Bridge
 -------------------------
-Copy the sidecar next to the original and open the photograph. Camera Raw reads
-`<name>.xmp` automatically.
+Copy the sidecar next to the original RAW and open the photograph. Camera Raw
+reads `<name>.xmp` automatically.
+
+About white balance
+-------------------
+On a JPEG the correction is written to the Temperature slider directly. On a
+RAW, Camera Raw wants an absolute Kelvin value rather than a shift, and most
+cameras never record what they shot at -- when it cannot be read, the sidecar
+says so in its warnings and gives you the number to move by hand. It is the
+correction that matters most on a frame with a colour cast, so it is worth the
+thirty seconds.
+
+What these are not
+------------------
+Corrections, not a look. Exposure, white balance, highlight and shadow recovery,
+a little contrast and clarity. No HSL, no tone curve, no split toning -- the
+things a photographer's preset uses to make a frame *striking* are deliberately
+absent, because a style applied to an unrelated photograph is a lie about the
+picture. If you want a look, put one of your own on top of this.
 
 Capture One, darktable, RawTherapee
 -----------------------------------
