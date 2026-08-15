@@ -1276,14 +1276,22 @@ def build_parser() -> argparse.ArgumentParser:
             "silently replaced"
         ),
     )
+    # Built from the registry rather than written out. The same sentence was
+    # hand-maintained in three places -- here, the module docstring and the
+    # README -- and two of them still said openai was the only verified adapter
+    # after grok had 281 photographs through it.
+    _providers = __import__("llm_provider").PROVIDERS
+    _run = sorted(name for name, factory in _providers.items() if factory.verified)
+    _unrun = sorted(name for name, factory in _providers.items() if not factory.verified)
     analyze.add_argument(
         "--provider",
-        choices=sorted(__import__("llm_provider").PROVIDERS),
+        choices=sorted(_providers),
         default=None,
         help=(
-            "which API to call (default: grok, or PHOTO_AI_PROVIDER). Only "
-            "openai has been run against a live endpoint; the others are "
-            "written from the documented request shape and say so"
+            "which API to call (default: grok, or PHOTO_AI_PROVIDER). "
+            f"Run against a live endpoint: {', '.join(_run)}. "
+            f"Written from the documented request shape and never run: "
+            f"{', '.join(_unrun)} -- these say so at startup"
         ),
     )
     analyze.add_argument(

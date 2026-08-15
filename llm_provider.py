@@ -1,4 +1,4 @@
-"""One interface for "look at these images and answer", four ways to serve it.
+"""One interface for "look at these images and answer", five ways to serve it.
 
 Every call in this project has the same shape: a system prompt that is constant
 across a batch, some images, some text between them, a token budget, and a
@@ -8,16 +8,23 @@ model, the reasoning effort and the payload assembled slightly differently each
 time. Changing provider meant finding all three.
 
 So there is one method. Anything a provider cannot do is stated rather than
-emulated: `reasoning_effort` is a hint, not a contract, and a provider without
-one ignores it instead of pretending. The alternative -- silently mapping it
-onto a thinking budget with different semantics -- produces a run that costs
-what you did not expect and reasons differently than you asked.
+emulated. `reasoning_effort` is sent where the endpoint takes it and dropped
+where it does not, once, after the endpoint says so by name -- rather than
+silently mapped onto a thinking budget with different semantics, which produces
+a run that costs what you did not expect and reasons differently than you asked.
+Dropping it without asking was its own version of that mistake, and cost 627,000
+unbudgeted reasoning tokens before anybody counted them.
 
-**Only the OpenAI provider is exercised.** It is what the live runs used and
-what the tests mock. The other three are written from each vendor's documented
-request shape and have never been run against the real endpoint; they say so in
-`verified`, and the CLI says so when you pick one. That is worth more than
-quietly shipping three untested paths as though they were equivalent.
+**Two of the five have met a live endpoint: `openai` and `grok`.** grok is the
+default and has 281 photographs through it across both passes; openai is what
+the earlier live runs used and what the tests mock. `anthropic`, `gemini` and
+`openai-compatible` are written from each vendor's documented request shape and
+have never been run against the real thing. They say so in `verified`, and the
+CLI says so when you pick one, which is worth more than quietly shipping
+untested paths as though they were equivalent.
+
+`verified` means exactly "this adapter has met the endpoint". It is not a claim
+that it is correct.
 """
 
 from __future__ import annotations

@@ -486,3 +486,74 @@ def test_the_undserived_figures_say_so():
 def test_every_model_carries_the_date_it_was_checked():
     for name, entry in llm_provider.load_pricing()["models"].items():
         assert entry.get("checked"), name
+
+
+# --- the prose has to agree with the code under it ----------------------------
+#
+# The module docstring said "four ways to serve it" with five providers
+# registered, and "Only the OpenAI provider is exercised" directly above grok
+# carrying verified = True. Neither the verified-flags test nor the README test
+# could see it: one reads class attributes, the other walks argparse. Nothing
+# read the prose, so the prose drifted -- which is the exact failure the commit
+# that set verified = True was written against.
+
+COUNT_WORDS = {
+    1: "one", 2: "two", 3: "three", 4: "four", 5: "five",
+    6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten",
+}
+
+
+def test_the_docstring_counts_the_providers_that_exist():
+    total = COUNT_WORDS[len(llm_provider.PROVIDERS)]
+    doc = llm_provider.__doc__
+    assert f"{total} ways to serve it" in doc, (
+        f"{len(llm_provider.PROVIDERS)} providers are registered; the docstring "
+        "says something else"
+    )
+
+
+def test_the_docstring_names_every_provider_that_has_met_an_endpoint():
+    verified = sorted(
+        name for name, factory in llm_provider.PROVIDERS.items() if factory.verified
+    )
+    doc = llm_provider.__doc__
+    for name in verified:
+        assert f"`{name}`" in doc, f"{name} is verified and the docstring does not say so"
+    assert f"{COUNT_WORDS[len(verified)].capitalize()} of the five" in doc
+
+
+def test_the_docstring_does_not_call_a_verified_provider_untested():
+    """The sentence that went stale was "Only the OpenAI provider is exercised"."""
+    doc = llm_provider.__doc__.lower()
+    for name, factory in llm_provider.PROVIDERS.items():
+        if not factory.verified:
+            continue
+        assert f"only the {name} provider is exercised" not in doc
+    unverified = [n for n, f in llm_provider.PROVIDERS.items() if not f.verified]
+    for name in unverified:
+        assert f"`{name}`" in llm_provider.__doc__, (
+            f"{name} has never been run and the docstring does not list it"
+        )
+
+
+def test_the_provider_flag_help_is_built_from_the_registry():
+    """The same sentence lived in three places by hand and two went stale."""
+    import argparse
+
+    import cli
+
+    parser = cli.build_parser()
+    help_text = ""
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for a in action.choices["analyze"]._actions:
+                if "--provider" in a.option_strings:
+                    help_text = a.help
+    assert help_text
+
+    for name in llm_provider.PROVIDERS:
+        assert name in help_text
+    verified = [n for n, f in llm_provider.PROVIDERS.items() if f.verified]
+    run_half = help_text.split("never run:")[0]
+    for name in verified:
+        assert name in run_half, f"{name} has met an endpoint and the help hides it"
