@@ -283,11 +283,31 @@ def cmd_bench_quality(args: argparse.Namespace) -> int:
     import bench_quality
 
     records = _load_records(Path(args.analysis))
+
+    if args.template:
+        count = bench_quality.write_template(records, Path(args.template))
+        print(
+            f"{count} row(s) written to {args.template}.\n\n"
+            "Fill the human_pile column with top, good or weak -- your sorting,\n"
+            "not a guess at the tool's. The rows are shuffled and carry no score\n"
+            "for that reason. 200-300 filled rows is where the answer starts\n"
+            "being one; then run this again with --labels pointing at the file."
+        )
+        return 0
+
+    if not args.labels:
+        print(
+            "Nothing to measure against. Pass --labels with a filled sheet, or "
+            "--template to write a blank one.",
+            file=sys.stderr,
+        )
+        return 1
+
     labels = bench_quality.read_labels(Path(args.labels))
     if not labels:
         print(
             f"No labels found in {args.labels}. Expected CSV with a filename column "
-            "and human_score or human_rank.",
+            "and human_pile (top/good/weak), human_score or human_rank.",
             file=sys.stderr,
         )
         return 1
@@ -1153,7 +1173,7 @@ def build_parser() -> argparse.ArgumentParser:
         parser.add_argument(
             "--expert",
             action="store_true",
-            help="print the route classes, stock counters and release status as well",
+            help="print the route classes and the two stock counters as well",
         )
         parser.add_argument("--no-video", action="store_true")
         parser.add_argument("--video-samples", type=int, default=9)
@@ -1226,7 +1246,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(__import__("llm_provider").PROVIDERS),
         default=None,
         help=(
-            "which API to call (default: openai, or PHOTO_AI_PROVIDER). Only "
+            "which API to call (default: grok, or PHOTO_AI_PROVIDER). Only "
             "openai has been run against a live endpoint; the others are "
             "written from the documented request shape and say so"
         ),
@@ -1273,8 +1293,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--analysis", required=True, help="path to analysis.json")
     bench.add_argument(
-        "--labels", required=True,
-        help="CSV file or directory: filename,human_score (or human_rank)",
+        "--template",
+        help=(
+            "write a blank labelling sheet here instead of measuring: one "
+            "shuffled row per photograph with an empty human_pile column"
+        ),
+    )
+    bench.add_argument(
+        "--labels",
+        help=(
+            "CSV file or directory: filename plus human_pile (top/good/weak), "
+            "and/or human_score or human_rank"
+        ),
     )
     bench.add_argument("--json", help="also write the result as JSON")
     bench.set_defaults(func=cmd_bench_quality)

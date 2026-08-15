@@ -142,3 +142,97 @@ def test_the_flag_reaches_the_stored_record(tmp_path):
     assert AssetRecord(
         asset_id="a", source_path="p", filename="a.jpg", media_type="photo", checksum="c"
     ).to_dict()["uplift_validated"] is False
+
+
+# --- the thresholds against a person ------------------------------------------
+#
+# The correlation above answers "does the score rank photographs the way a
+# person does". It does not answer "do the five piles put a photograph where a
+# person would put it", and that second question is the product's central
+# promise. These cover the second one.
+
+
+def _pairs(spec):
+    """(human pile, final score) pairs from a compact spec."""
+    return [(pile, score) for pile, scores in spec.items() for score in scores]
+
+
+def test_perfect_thresholds_agree_completely():
+    result = bench_quality.agreement(
+        _pairs({"top": [90, 95], "good": [60, 70], "weak": [20, 30]})
+    )
+    assert result.agreement == 1.0
+    assert result.top_precision == 1.0
+    assert result.top_recall == 1.0
+
+
+def test_the_confusion_matrix_says_which_way_it_is_wrong():
+    """'61% agreement' is a complaint. 'It calls your top pile good' is a bug."""
+    result = bench_quality.agreement(_pairs({"top": [70, 72, 74]}))
+    assert result.confusion["top"]["good"] == 3
+    assert result.confusion["top"]["top"] == 0
+    assert result.top_recall == 0.0
+
+
+def test_the_sweep_finds_thresholds_that_would_have_agreed_better():
+    """The number somebody can act on, rather than one they can only regret."""
+    # A person whose "top" starts around 70, not 85.
+    result = bench_quality.agreement(
+        _pairs({"top": [72, 75, 78, 80], "good": [50, 55, 60], "weak": [20, 25, 30]})
+    )
+    assert result.agreement < 1.0
+    assert result.best_agreement > result.agreement
+    assert result.best_top <= 72
+
+
+def test_the_sweep_never_reports_worse_than_what_is_running():
+    result = bench_quality.agreement(
+        _pairs({"top": [90], "good": [60], "weak": [20]})
+    )
+    assert result.best_agreement >= result.agreement
+
+
+def test_too_few_labels_is_not_a_calibration():
+    result = bench_quality.agreement([("top", 90)] * 3)
+    assert result.agreement == 1.0
+    assert not result.meaningful
+    assert not result.calibrated, "3 photographs must never read as calibrated"
+
+
+def test_a_labels_file_can_carry_piles_alone(tmp_path):
+    """Sorting 300 frames into three piles is an evening. Scoring them is not."""
+    sheet = tmp_path / "labels.csv"
+    sheet.write_text("filename,human_pile\na.jpg,top\nb.jpg,weak\nc.jpg,nonsense\n")
+    labels = bench_quality.read_labels(sheet)
+    assert labels["a.jpg"]["pile"] == "top"
+    assert labels["b.jpg"]["pile"] == "weak"
+    assert "c.jpg" not in labels, "an unknown pile is dropped, not guessed at"
+
+
+def test_the_template_is_shuffled_and_carries_no_verdict(tmp_path):
+    """A sheet showing the tool's answer measures how persuadable the labeller
+    is, and an ordered sheet lets the previous row anchor the next one."""
+    records = [
+        AssetRecord(
+            asset_id=f"p{i:03d}", source_path=f"/gone/p{i:03d}.jpg",
+            filename=f"p{i:03d}.jpg", media_type="photo", checksum=f"c{i}",
+            final_score=i, category="TOP",
+        )
+        for i in range(60)
+    ]
+    out = tmp_path / "sheet.csv"
+    assert bench_quality.write_template(records, out) == 60
+
+    lines = out.read_text().splitlines()
+    assert lines[0] == "filename,human_pile"
+    assert all(line.endswith(",") for line in lines[1:]), "no verdict may leak in"
+    names = [line.split(",")[0] for line in lines[1:]]
+    assert names != sorted(names), "an ordered sheet anchors the labeller"
+    assert set(names) == {r.filename for r in records}
+
+
+def test_the_report_says_plainly_when_nothing_has_been_labelled():
+    result = bench_quality.BenchResult()
+    text = bench_quality.format_report(result)
+    assert "no human_pile column" in text
+    assert "nothing has" in text

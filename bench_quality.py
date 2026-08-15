@@ -43,6 +43,29 @@ USEFUL_CORRELATION = 0.5
 # Fewer than this and the correlation is noise whatever it says.
 MIN_SAMPLES = 20
 
+# The buckets a person is asked to reproduce, and why there are three rather
+# than five. `top` and `weak` are quality boundaries -- 85 and 45 -- and those
+# are the two numbers the product's central promise rests on. The stock/personal
+# split is not a quality judgement at all; it is about whether a frame has a
+# market, and asking somebody to guess that conflates two different questions
+# and makes the agreement figure meaningless.
+HUMAN_PILES = ("top", "good", "weak")
+
+# What the tool's own five collapse to, for comparison.
+PILE_OF_CATEGORY = {
+    "TOP": "top",
+    "GOOD_STOCK": "good",
+    "GOOD_PERSONAL": "good",
+    "NEEDS_DECISION": "good",
+    "WEAK": "weak",
+}
+
+# Below this, the thresholds do not reproduce a person's sorting well enough to
+# be described as calibrated. Chosen, not derived: three piles guessed at random
+# would agree about a third of the time, and 0.70 is where the result stops
+# being arguable.
+USEFUL_AGREEMENT = 0.70
+
 
 @dataclass
 class Correlation:
@@ -59,9 +82,52 @@ class Correlation:
 
 
 @dataclass
+class PileAgreement:
+    """How often the thresholds put a photograph where a person put it."""
+
+    n: int = 0
+    agreed: int = 0
+    confusion: dict[str, dict[str, int]] = field(default_factory=dict)
+    top_precision: float = 0.0
+    top_recall: float = 0.0
+    # The (top, weak) pair that would have agreed most often, and by how much.
+    best_top: int = 0
+    best_weak: int = 0
+    best_agreement: float = 0.0
+    current_top: int = 0
+    current_weak: int = 0
+
+    @property
+    def meaningful(self) -> bool:
+        return self.n >= MIN_SAMPLES
+
+    @property
+    def agreement(self) -> float:
+        return self.agreed / self.n if self.n else 0.0
+
+    @property
+    def calibrated(self) -> bool:
+        return self.meaningful and self.agreement >= USEFUL_AGREEMENT
+
+    def to_dict(self) -> dict:
+        return {
+            "n": self.n,
+            "agreement": round(self.agreement, 4),
+            "confusion": self.confusion,
+            "top_precision": round(self.top_precision, 4),
+            "top_recall": round(self.top_recall, 4),
+            "current_thresholds": {"top": self.current_top, "weak": self.current_weak},
+            "best_thresholds": {"top": self.best_top, "weak": self.best_weak},
+            "best_agreement": round(self.best_agreement, 4),
+            "calibrated": self.calibrated,
+        }
+
+
+@dataclass
 class BenchResult:
     quality: Correlation = field(default_factory=Correlation)
     uplift: Correlation = field(default_factory=Correlation)
+    piles: PileAgreement = field(default_factory=PileAgreement)
     missing: list[str] = field(default_factory=list)
     labelled: int = 0
 
@@ -78,6 +144,7 @@ class BenchResult:
             "labelled": self.labelled,
             "quality": self.quality.to_dict(),
             "uplift": self.uplift.to_dict(),
+            "piles": self.piles.to_dict(),
             "missing": self.missing,
             "validates_quality": self.validates_quality,
             "validates_uplift": self.validates_uplift,
@@ -140,7 +207,13 @@ def read_labels(path: Path) -> dict[str, dict]:
                     entry["score"] = -rank if rank is not None else None
                 if row.get("human_score_edited"):
                     entry["edited"] = _number(row["human_score_edited"])
-                if entry.get("score") is not None:
+                pile = (row.get("human_pile") or "").strip().lower()
+                if pile in HUMAN_PILES:
+                    entry["pile"] = pile
+                # A row with only a pile is still a row. Sorting 300 frames into
+                # three piles is an evening; scoring 300 frames 0-100 is not,
+                # and demanding both is how a labelling task never gets done.
+                if entry.get("score") is not None or entry.get("pile"):
                     out[name] = entry
     return out
 
@@ -152,6 +225,28 @@ def _number(value) -> float | None:
         return None
 
 
+def write_template(records, path: Path, *, seed: int = 0) -> int:
+    """A CSV of filenames with an empty `human_pile` column, shuffled.
+
+    Shuffled, and without the tool's own verdict in it, on purpose. A sheet that
+    shows what the tool decided measures how persuadable the labeller is, not
+    whether the thresholds are right, and an ordered sheet lets the previous row
+    anchor the next one. Both turn an evening's work into a confirmation.
+    """
+    import random
+
+    rows = [r.filename for r in records if r.filename]
+    random.Random(seed).shuffle(rows)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["filename", "human_pile"])
+        for name in rows:
+            writer.writerow([name, ""])
+    return len(rows)
+
+
 def compare(records, labels: dict[str, dict]) -> BenchResult:
     """Correlate stored measurements against the human labels."""
     result = BenchResult()
@@ -159,12 +254,17 @@ def compare(records, labels: dict[str, dict]) -> BenchResult:
     result.missing = sorted(set(labels) - set(by_name))
 
     quality_pairs, uplift_pairs = [], []
+    piles: list[tuple[str, int]] = []
     for name, label in labels.items():
         record = by_name.get(name)
         if record is None:
             continue
         result.labelled += 1
         scores = record.scores or {}
+        if label.get("pile"):
+            piles.append((label["pile"], int(record.final_score or 0)))
+        if label.get("score") is None:
+            continue
         quality_pairs.append((float(scores.get("current_quality", 0)), label["score"]))
         if "edited" in label and label["edited"] is not None:
             measured_gain = float(scores.get("post_edit_potential", 0)) - float(
@@ -188,7 +288,63 @@ def compare(records, labels: dict[str, dict]) -> BenchResult:
         result.uplift = Correlation(
             note="no before/after labels: add a human_score_edited column"
         )
+    result.piles = agreement(piles)
     return result
+
+
+def pile_for(score: int, top: int, weak: int) -> str:
+    """Which of the three piles a score falls in, at the given thresholds."""
+    if score >= top:
+        return "top"
+    if score < weak:
+        return "weak"
+    return "good"
+
+
+def agreement(pairs: list[tuple[str, int]]) -> PileAgreement:
+    """How well the thresholds reproduce the human sorting, and what would do better.
+
+    The sweep is the point. Reporting "the thresholds agree 61% of the time" is
+    a complaint; reporting "and 82 / 51 would agree 74% of the time" is a
+    number somebody can act on. It is not applied automatically -- a threshold
+    fitted to one person's evening is that person's threshold, and the tool
+    saying so out loud is the difference between calibration and overfitting.
+    """
+    # Read from the categoriser rather than repeated here: a report of how well
+    # the thresholds agree has to use the thresholds that actually ran.
+    from curation import DEFAULT_THRESHOLDS
+
+    top_now, weak_now = DEFAULT_THRESHOLDS.top, DEFAULT_THRESHOLDS.weak
+    out = PileAgreement(current_top=top_now, current_weak=weak_now)
+    if not pairs:
+        return out
+
+    out.n = len(pairs)
+    out.confusion = {human: dict.fromkeys(HUMAN_PILES, 0) for human in HUMAN_PILES}
+    for human, score in pairs:
+        tool = pile_for(score, top_now, weak_now)
+        out.confusion[human][tool] += 1
+        if tool == human:
+            out.agreed += 1
+
+    called_top = sum(out.confusion[h]["top"] for h in HUMAN_PILES)
+    human_top = sum(out.confusion["top"].values())
+    hit = out.confusion["top"]["top"]
+    out.top_precision = hit / called_top if called_top else 0.0
+    out.top_recall = hit / human_top if human_top else 0.0
+
+    # Exhaustive rather than clever: 100 x 100 pairs over a few hundred frames
+    # is milliseconds, and a closed form would need assumptions the data does
+    # not support.
+    best = (out.agreement, top_now, weak_now)
+    for top in range(50, 100):
+        for weak in range(10, top):
+            hits = sum(1 for human, score in pairs if pile_for(score, top, weak) == human)
+            share = hits / out.n
+            if share > best[0]:
+                best = (share, top, weak)
+    out.best_agreement, out.best_top, out.best_weak = best
+    return out
 
 
 def format_report(result: BenchResult) -> str:
@@ -222,6 +378,57 @@ def format_report(result: BenchResult) -> str:
             lines.append(
                 f"    Below {USEFUL_CORRELATION}: this number does not rank photographs "
                 "the way a person does."
+            )
+
+    piles = result.piles
+    lines.append("")
+    lines.append("  the five piles, against a person's three")
+    if not piles.n:
+        lines.append(
+            "    not measured: no human_pile column. This is the one that matters --\n"
+            "    the thresholds are the product's central promise and nothing has\n"
+            "    checked them against anybody."
+        )
+    else:
+        lines.append(
+            f"    Agreement: {piles.agreement:.0%}  (n = {piles.n}, "
+            f"thresholds top {piles.current_top} / weak {piles.current_weak})"
+        )
+        lines.append(
+            f"    Top pile:  precision {piles.top_precision:.0%}, "
+            f"recall {piles.top_recall:.0%}"
+        )
+        lines.append("")
+        lines.append("           tool: top   good   weak")
+        for human in HUMAN_PILES:
+            row = piles.confusion.get(human, {})
+            counts = "".join(f"{row.get(t, 0):>7}" for t in HUMAN_PILES)
+            lines.append(f"    human {human:<6}{counts}")
+        lines.append("")
+        if not piles.meaningful:
+            lines.append(
+                f"    Too few to mean anything; {MIN_SAMPLES} is the minimum and "
+                "200-300 is where it starts being an answer."
+            )
+        elif piles.calibrated:
+            lines.append(
+                "    The thresholds reproduce this person's sorting well enough to "
+                "be called calibrated."
+            )
+        else:
+            lines.append(
+                f"    Below {USEFUL_AGREEMENT:.0%}: these thresholds do not sort "
+                "photographs the way this person does."
+            )
+        if (piles.best_top, piles.best_weak) != (piles.current_top, piles.current_weak):
+            lines.append(
+                f"    Best fit here: top {piles.best_top} / weak {piles.best_weak} "
+                f"would agree {piles.best_agreement:.0%}."
+            )
+            lines.append(
+                "    Not applied. A threshold fitted to one evening of labelling is\n"
+                "    that evening's threshold; try it with `reclassify --profile-file`\n"
+                "    and look at the photographs before believing it."
             )
 
     lines += [

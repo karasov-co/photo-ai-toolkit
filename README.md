@@ -48,6 +48,43 @@ gitignored and never committed.
 
 ---
 
+## Before you trust it
+
+Three things a stranger should know before running this on their own archive.
+
+**The five piles are not calibrated against anybody but the author.** The
+thresholds (top at 85, weak under 45) were tuned on one person's archive. That
+is the one genuinely weak claim in this repository, and it is measurable — an
+evening of sorting answers it:
+
+```bash
+photoai bench-quality --analysis run/.internal/reports/analysis.json \
+                      --template labels.csv        # blank sheet, shuffled
+# fill human_pile with top / good / weak, 200-300 rows
+photoai bench-quality --analysis run/.internal/reports/analysis.json \
+                      --labels labels.csv --json agreement.json
+```
+
+It prints the agreement, a confusion matrix, precision and recall on the top
+pile, and the thresholds that *would* have agreed best — which it does not apply
+on its own, because a threshold fitted to one evening is that evening's
+threshold. `reclassify --profile-file` re-sorts a finished run at different
+numbers without spending a token, so trying the suggestion is free.
+
+The sheet is shuffled and carries no score, on purpose: a sheet showing what the
+tool decided measures how persuadable you are, not whether the thresholds are
+right.
+
+**Only the OpenAI path has been run against a live endpoint.** grok is the
+default and is exercised in a live preflight; anthropic, gemini and
+openai-compatible are written from the documented request shape and say so at
+startup.
+
+**A score is one opinion.** Nothing is a verdict, nothing moves without
+`--apply`, and every original file is untouched throughout.
+
+---
+
 ## What you get
 
 `run/report/index.html` is a folder you can copy, zip or email. It has no
@@ -56,7 +93,7 @@ on a plane, behind a firewall, and in five years. `--standalone` produces a
 single `report_standalone.html` with every thumbnail inlined, for sending to one
 person.
 
-Five piles, and the count of each at the top of the page:
+Five piles, with the count of each at the top of the page:
 
 | Pile | What it means |
 |---|---|
@@ -78,6 +115,127 @@ That pair disagreeing is the point of showing both.
 
 ---
 
+## Everything it does
+
+Grouped by what you would be trying to do. Depth on any of it is in
+[docs/](#read-next).
+
+**Look at the files, without a key or a network**
+EXIF and RAW metadata; exposure, clipping, focus and motion measurement,
+measured on the *sensor* data for RAW rather than the rendered JPEG; corrupt and
+empty-frame detection; resolution gates; perceptual-hash duplicate clustering
+with a BK-tree; per-cluster best-frame choice with the margin that decided it;
+video sampling through FFmpeg.
+
+**Look at the pictures, with a key**
+Stage 2 ranks frames against each other in groups of twelve — genre, content,
+unrepeatability, documentary value, recoverability — and stitches the group
+ranks into one order with Bradley–Terry, so a frame keeps the population it was
+ranked against. Stage 3 is the artistic read: intent, resonance, whether an odd
+frame is a mistake or a decision, with face crops when the frame calls for them.
+
+**Decide, and say why**
+One 0–100 score per photograph, five piles, and a written reason for the pile in
+the reader's language (en/ru). Calibration profiles change the weighting without
+touching code. Confidence is reported, and a low-confidence frame goes to
+*needs decision* rather than being guessed at.
+
+**Suggest the edit**
+A per-frame recipe — exposure, white balance, highlight recovery, shadow lift,
+denoise, sharpening — with the measurement that earned each step. Optional
+darkroom pass renders candidates and validates them (skin-tone protection, halo
+and clipping checks) so a recipe that makes things worse is rejected rather than
+shipped. Export as XMP sidecars for Lightroom, darktable or RawTherapee, written
+beside the RAW and never over an existing one.
+
+**Sell it, if that is what you are doing**
+Stock metadata: title, description, ordered keywords, categories, concepts,
+location (only from something actually recorded — coordinates are not a place
+name), AI-provenance label. Marketplace fit per platform from a rules file, with
+technical blockers named. Submission CSV and XMP sidecars. Nothing is ever
+uploaded anywhere.
+
+**Learn your taste**
+`ask` puts the most informative questions first; `record` stores each answer; a
+personal preference model then abstains on unfamiliar cameras and genres rather
+than pretending. `bench-quality` correlates the score against a ranking you
+supply. `monitor` tracks false-trash rate and drift and can switch automation
+off.
+
+**Never lose anything**
+Deletion is a proposal: a list, a contact sheet of the frames on that list, and
+a script that moves them to the Trash. Quarantine is fenced to the source root,
+reversible with `restore`, and `purge` sits behind four gates. Runs are cached
+by content checksum and analyzer version, saved every three groups, and a failed
+run keeps everything it already paid for.
+
+---
+
+## Every command
+
+19 subcommands. `photoai <command> --help` prints the same thing in full.
+
+| Command | What it does |
+|---|---|
+| `analyze` | **The command.** Preflight, measure, content check, artistic read, report |
+| `measure` | Local measurement only, explicitly not an analysis |
+| `report` | Filter, sort and re-render a stored run — no re-analysis, no tokens |
+| `reclassify` | Redo routing at different thresholds — no re-analysis, no tokens |
+| `bench-quality` | Correlate the score against a human ranking you supply |
+| `darkroom` | Render the edit suggestions from a stored run |
+| `apply-recipe` | Write a recipe beside the RAW (dry run; refuses to clobber) |
+| `export` | Build a marketplace package: CSV, sidecars, instructions |
+| `quarantine` | Carry out a move plan (dry run unless `--apply`) |
+| `trash` | Carry out `delete_plan.json` (dry run unless `--apply`) |
+| `restore` | Undo a quarantine operation |
+| `purge` | Permanently delete, behind four gates |
+| `override` | Record a manual decision future runs must respect |
+| `ask` | The questions worth five minutes, most informative first |
+| `record` | Record one decision for the personal model |
+| `policy` | What would be automated, and what is holding each gate shut |
+| `monitor` | False-trash rate, drift, calibration; can switch automation off |
+| `profiles` | Inspect and dump calibration profiles |
+| `validate-profile` | Check a profile JSON before a run depends on it |
+
+**Global:** `--lang en|ru`, `-v/--verbose`.
+
+**`analyze` and `measure`** share:
+`--input*` `--output*` `--quarantine` `--profile` `--profile-file` `--expert`
+`--no-video` `--video-samples` `--force` `--limit` `--standalone`
+`--embed-width` `--embed-quality` `--jobs` `--copyright` `--darkroom`
+`--renderer` `--no-shadow-mode`.
+`analyze` adds: `--model` `--provider` `--base-url` `--no-stage3`
+`--reasoning low|medium|high` `--concurrency` `-y/--yes` `--insights-scope
+new|all`.
+
+**`report`:** `--analysis*` `--format` `--sort` `--media` `--route-class`
+`--route` `--genre` `--marketplace` `--min-score` `--min-potential`
+`--min-confidence` `--cluster` `--duplicates-only` `--limit`.
+
+**`reclassify`:** `--analysis*` `--profile` `--profile-file` `--limit`.
+**`bench-quality`:** `--analysis*` `--labels*` `--json`.
+**`darkroom`:** `--analysis*` `--output` `--limit`.
+**`apply-recipe`:** `--recipe*` `--raw*` `--apply` `--force`.
+**`export`:** `--analysis*` `--output` `--platform`.
+**`quarantine`:** `--analysis*` `--quarantine*` `--input` `--apply`.
+**`trash`:** `--plan` `--trash` `--apply`.
+**`restore`:** `--quarantine` `--operation` `--apply` `--monitor`.
+**`purge`:** `--quarantine` `--older-than` `--confirm` `--apply`.
+**`override`:** `--analysis*` `--set-class` `--set-genre` `--set-marketplace`
+`--exclude` `--note` `--clear` `--list`.
+**`ask`:** `--analysis*` `--limit`.
+**`record`:** `--store*` `--signal*` `--winner` `--loser` `--asset` `--answer`
+`--genre` `--camera` `--note`.
+**`policy`:** `--analysis*`.  **`monitor`:** `--state` `--enable` `--holdout`.
+**`profiles`:** `--name` `--dump`.
+
+`*` = required.
+
+**Environment:** `XAI_API_KEY` (then `OPENAI_API_KEY` as fallback),
+`PHOTO_AI_PROVIDER`, `PHOTO_AI_BASE_URL`, `OPENAI_MODEL`.
+
+---
+
 ## Nothing moves unless you say so
 
 The output is a farm of symlinks pointing back at wherever your files already
@@ -92,8 +250,8 @@ the only thing that carries out a plan.
 
 - **[How the score is built](docs/how-it-works.md)** — potential versus current
   quality, the five piles, the artistic read, what a card is telling you
-- **[Commands, output and configuration](docs/reference.md)** — every flag, the
-  output tree, calibration profiles, marketplaces, metadata
+- **[Commands, output and configuration](docs/reference.md)** — the output tree,
+  calibration profiles, marketplaces, metadata, every flag in prose
 - **[Internals, safety and limits](docs/internals.md)** — architecture, the
   model and why there is no fallback, quarantine, development, known limits
 
@@ -106,6 +264,13 @@ Python 3.12+. FFmpeg is optional and only needed for video.
 ```bash
 pip install -r requirements.txt
 brew install ffmpeg          # macOS; apt-get install ffmpeg on Debian/Ubuntu
+```
+
+Or install the `photoai` command into your environment:
+
+```bash
+pip install -e .
+photoai analyze --input ./photos --output ./run
 ```
 
 The key is looked for in this order: a variable already set in your shell, then
