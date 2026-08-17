@@ -51,7 +51,7 @@ jobs:
         run: choco install ffmpeg --no-progress -y
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
