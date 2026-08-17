@@ -225,6 +225,45 @@ def _number(value) -> float | None:
         return None
 
 
+# The photographer has already done the labelling; it is sitting in their
+# catalogue. A week of working in Lightroom leaves stars and picks in the
+# sidecars beside the originals, and reading them back turns every user into a
+# labeller who spent no time on it. It is also the only way the personal model
+# and the monitor ever see the thousands of decisions their gates ask for.
+CATALOG_PILE_BY_STARS = {5: "top", 4: "top", 3: "good", 2: "good", 1: "weak"}
+
+
+def read_catalog_labels(folder: Path) -> dict[str, dict]:
+    """Human piles from `xmp:Rating` in the sidecars beside a shoot.
+
+    Zero and unrated are skipped, not read as "weak": in every catalogue zero
+    means nobody looked, and counting that as a judgement would fill the set
+    with frames the photographer never opened.
+    """
+    import re
+
+    out: dict[str, dict] = {}
+    for path in sorted(Path(folder).rglob("*.xmp")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        found = re.search(r'xmp:Rating\s*=\s*"(\d+)"', text)
+        if not found:
+            found = re.search(r"<xmp:Rating>\s*(\d+)\s*</xmp:Rating>", text)
+        if not found:
+            continue
+        stars = int(found.group(1))
+        pile = CATALOG_PILE_BY_STARS.get(stars)
+        if not pile:
+            continue
+        # The sidecar is named after the photograph, whatever its extension.
+        for candidate in (path.stem + ext for ext in (".JPG", ".jpg", ".RW2", ".ARW", ".CR3", ".NEF", ".DNG")):
+            out[candidate] = {"pile": pile, "score": float(stars)}
+        out[path.stem] = {"pile": pile, "score": float(stars)}
+    return out
+
+
 def write_template(records, path: Path, *, seed: int = 0) -> int:
     """A CSV of filenames with an empty `human_pile` column, shuffled.
 

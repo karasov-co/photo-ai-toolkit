@@ -43,6 +43,10 @@ from exporters import adobe_xmp
 # Presets live in their own folder so "import everything in here" cannot pick up
 # the sidecars by accident, which is how a panel fills with `<x:xmpmet` entries.
 PRESETS_DIRNAME = "presets"
+# Star ratings and colour labels, one sidecar per photograph, for every
+# photograph in the run -- not only the ones that earned an edit recipe. This is
+# the culling decision in the form a catalogue sorts by.
+RATINGS_DIRNAME = "ratings"
 
 logger = logging.getLogger(__name__)
 
@@ -176,12 +180,41 @@ def export_all(records, measurements: dict, out_dir: Path, *, language: str = "e
         record.creative_directions = [d.to_dict() for d in directions_for(record, measurement)]
         written.append(record.filename)
 
+    rated = write_ratings(records, out_dir / RATINGS_DIRNAME)
+
     removed = _clear_stale(out_dir, keep={Path(name).stem for name in written})
-    if written:
+    if written or rated:
         write_instructions(out_dir, language=language)
     return {
-        "written": written, "skipped": skipped, "removed": removed, "dir": str(out_dir)
+        "written": written, "skipped": skipped, "removed": removed,
+        "rated": rated, "dir": str(out_dir),
     }
+
+
+def write_ratings(records, out_dir: Path) -> int:
+    """A star rating and a colour label per photograph, as XMP.
+
+    Every catalogue worth the name reads `xmp:Rating` and `xmp:Label` from a
+    sidecar. Until this existed, the only way to act on a run was to read an
+    HTML page beside the editor and click through a folder of symlinks, which is
+    not how anybody culls.
+
+    Written for every record, including the weak ones -- a two-star frame is a
+    decision as much as a five-star one, and the pile is only useful as a sort
+    if the whole shoot carries it.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for record in records:
+        if not record.category or record.status != "ok":
+            continue
+        stem = Path(record.filename).stem
+        (out_dir / f"{stem}.xmp").write_text(
+            adobe_xmp.to_rating_sidecar(record), encoding="utf-8"
+        )
+        count += 1
+    return count
 
 
 def _clear_stale(out_dir: Path, keep: set[str]) -> list[str]:
@@ -358,6 +391,42 @@ Adobe Camera Raw / Bridge
 -------------------------
 Copy the sidecar next to the original RAW and open the photograph. Camera Raw
 reads `<name>.xmp` automatically.
+
+Stars and colour labels
+-----------------------
+`ratings/<name>.xmp` carries the decision as a star rating and a colour label,
+one file per photograph in the shoot:
+
+  5 stars, yellow   top
+  4 stars, green    good, and it has a market
+  4 stars, blue     good, personal
+  3 stars, purple   needs your decision
+  2 stars, red      weak
+
+Then sort by rating in the tool you already cull in. Nothing is ever rated one
+star or zero: zero means "unrated" everywhere, and one star is what many
+photographers use for "reject", which is not a decision this tool is entitled to
+make for you.
+
+Read them in one of two ways.
+
+  Bridge or Photo Mechanic: point it at this folder. Nothing is copied and
+  nothing of yours is touched.
+
+  Lightroom Classic: the file has to sit beside the original as `<name>.xmp` --
+  which is the same file your own develop settings, crop and keywords live in.
+  Do not copy it over the top. `photoai apply-ratings` merges instead: it
+  changes only the rating and the label, keeps a `.before-photoai` copy, and
+  shows you the diff before it writes anything. Lightroom does not notice a
+  changed sidecar by itself, so afterwards select the photographs and use
+  Metadata > Read Metadata from File.
+
+Two things this cannot do. It does not work for JPEG in Lightroom Classic at
+all -- Lightroom keeps JPEG metadata in the catalogue and ignores a sidecar --
+so for a JPEG shoot use Bridge, or read the ratings out of `analysis.json`. And
+the colours are a guess at your convention: red already means "reject" or "to
+print" in plenty of catalogues. Set `PHOTO_AI_LABELS` to change them, for
+example `PHOTO_AI_LABELS=TOP=Orange,WEAK=` to leave weak frames unlabelled.
 
 About white balance
 -------------------

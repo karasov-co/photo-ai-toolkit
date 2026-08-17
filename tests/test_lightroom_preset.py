@@ -121,3 +121,140 @@ def test_export_writes_a_preset_beside_the_sidecar(tmp_path, monkeypatch):
 
     written = recipe_export.PRESETS_DIRNAME
     assert written == "presets", "presets live apart so a bulk import cannot grab sidecars"
+
+
+# --- the decision has to reach the catalogue ----------------------------------
+
+
+def rated(category, score=80):
+    return type("R", (), {"category": category, "final_score": score,
+                          "filename": "a.jpg", "status": "ok"})()
+
+
+def test_the_pile_becomes_stars_and_a_colour():
+    document = adobe_xmp.to_rating_sidecar(rated("TOP", 91))
+    assert 'xmp:Rating="5"' in document
+    assert 'xmp:Label="Yellow"' in document
+    ET.fromstring(document)
+
+
+def test_nothing_is_ever_rated_one_star_or_zero():
+    """Zero means unrated in every catalogue, and one star is what many
+    photographers use for reject -- a decision this tool has not earned."""
+    for category in adobe_xmp.STARS:
+        assert adobe_xmp.STARS[category] >= 2
+
+
+def test_every_pile_has_a_star_and_a_colour():
+    from curation import PhotoCategory
+
+    for category in PhotoCategory:
+        assert category.name in adobe_xmp.STARS, category.name
+        assert category.name in adobe_xmp.LABELS, category.name
+
+
+def test_an_unknown_category_does_not_invent_a_rating():
+    document = adobe_xmp.to_rating_sidecar(rated("SOMETHING_NEW"))
+    assert 'xmp:Rating="0"' in document
+
+
+def test_ratings_are_written_for_the_whole_shoot(tmp_path):
+    """A two-star frame is a decision too, and the pile is only useful as a sort
+    if every photograph carries one."""
+    import recipe_export
+
+    records = [rated("TOP"), rated("WEAK"), rated("GOOD_PERSONAL")]
+    for i, record in enumerate(records):
+        record.filename = f"p{i}.jpg"
+    written = recipe_export.write_ratings(records, tmp_path / "ratings")
+    assert written == 3
+    assert len(list((tmp_path / "ratings").glob("*.xmp"))) == 3
+
+
+def test_a_failed_photograph_gets_no_rating(tmp_path):
+    import recipe_export
+
+    broken = rated("WEAK")
+    broken.status = "error"
+    assert recipe_export.write_ratings([broken], tmp_path / "r") == 0
+
+
+# --- a rating must never eat the photographer's own sidecar -------------------
+
+
+def test_a_merge_keeps_everything_except_the_two_attributes(tmp_path):
+    """`<stem>.xmp` is where their develop settings and keywords already live.
+    plan_apply exists for exactly this collision on the develop side."""
+    theirs = (
+        '<x:xmpmeta><rdf:RDF><rdf:Description rdf:about=""'
+        ' xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"'
+        ' xmlns:xmp="http://ns.adobe.com/xap/1.0/"'
+        ' crs:Exposure2012="+1.50" crs:HasCrop="True"'
+        ' xmp:Rating="5" xmp:Label="Green"/></rdf:RDF></x:xmpmeta>'
+    )
+    merged = adobe_xmp.merge_rating(theirs, rated("WEAK"))
+    assert 'crs:Exposure2012="+1.50"' in merged
+    assert 'crs:HasCrop="True"' in merged
+    assert 'xmp:Rating="2"' in merged
+
+
+def test_a_sidecar_without_a_rating_gains_one_and_its_namespace():
+    theirs = (
+        '<x:xmpmeta><rdf:RDF><rdf:Description rdf:about=""'
+        ' xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"'
+        ' crs:Exposure2012="+1.50"/></rdf:RDF></x:xmpmeta>'
+    )
+    merged = adobe_xmp.merge_rating(theirs, rated("TOP"))
+    assert "xmlns:xmp=" in merged
+    assert 'xmp:Rating="5"' in merged
+    ET.fromstring(merged.replace("x:xmpmeta", "xmpmeta").replace("rdf:", "").replace("x:", ""))
+
+
+def test_planning_a_rating_never_writes(tmp_path):
+    target = tmp_path / "P1.xmp"
+    target.write_text('<x><rdf:Description crs:Exposure2012="+1.00"/></x>')
+    before = target.read_text()
+    plan = adobe_xmp.plan_rating(rated("TOP"), target)
+    assert plan.exists
+    assert target.read_text() == before
+    assert plan.diff
+
+
+def test_writing_a_rating_keeps_a_copy_of_what_was_there(tmp_path):
+    target = tmp_path / "P1.xmp"
+    target.write_text('<x><rdf:Description crs:Exposure2012="+1.00"/></x>')
+    adobe_xmp.plan_rating(rated("TOP"), target).write()
+    spare = target.with_suffix(".xmp.before-photoai")
+    assert spare.is_file()
+    assert "crs:Exposure2012" in spare.read_text()
+
+
+def test_the_colours_are_not_hardcoded(monkeypatch):
+    """Red already means reject, or to-print, or client-selected in plenty of
+    working catalogues. Overwriting that meaning is worse than not labelling."""
+    monkeypatch.setenv("PHOTO_AI_LABELS", "TOP=Orange,WEAK=")
+    assert adobe_xmp.LABELS.get("TOP") == "Orange"
+    assert adobe_xmp.LABELS.get("WEAK") == ""
+    assert 'xmp:Label="Orange"' in adobe_xmp.to_rating_sidecar(rated("TOP"))
+
+
+# --- the photographer has already done the labelling --------------------------
+
+
+def test_stars_in_a_catalogue_become_human_piles(tmp_path):
+    import bench_quality
+
+    (tmp_path / "a.xmp").write_text('<x><rdf:Description xmp:Rating="5"/></x>')
+    (tmp_path / "b.xmp").write_text('<x><rdf:Description xmp:Rating="2"/></x>')
+    labels = bench_quality.read_catalog_labels(tmp_path)
+    assert labels["a"]["pile"] == "top"
+    assert labels["b"]["pile"] == "good"
+
+
+def test_an_unrated_photograph_is_not_read_as_a_rejection(tmp_path):
+    """Zero means nobody looked, in every catalogue there is."""
+    import bench_quality
+
+    (tmp_path / "a.xmp").write_text('<x><rdf:Description xmp:Rating="0"/></x>')
+    (tmp_path / "b.xmp").write_text("<x><rdf:Description/></x>")
+    assert bench_quality.read_catalog_labels(tmp_path) == {}

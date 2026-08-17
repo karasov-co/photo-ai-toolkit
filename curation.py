@@ -7,12 +7,13 @@ something. None of those is the question a photographer actually asks, which is
 
 The design has three load-bearing separations.
 
-**Quality is not saleability.** A release, a crowd of strangers, a private
-context or a subject nobody wants to license are facts about *distribution*.
-They decide GOOD_STOCK versus GOOD_PERSONAL and they never touch the score. A
-photograph of your family that no agency would ever accept can outscore
-everything else in the run, and it must be able to. This is why
-`legal_readiness` and `stock_potential` appear nowhere in the blend.
+**Quality is not saleability.** A crowd of strangers, a private context or a
+subject nobody wants to license are facts about *distribution*. They decide
+GOOD_STOCK versus GOOD_PERSONAL and they never touch the score. A photograph of
+your family that no agency would ever accept can outscore everything else in the
+run, and it must be able to. This is why `stock_potential` appears nowhere in
+the blend, and why the release logic that used to sit beside it is gone
+entirely.
 
 **Technical excellence cannot rescue a failed photograph.** Sharpness, exposure
 and resolution are entry conditions, not merits. So defects that mean the

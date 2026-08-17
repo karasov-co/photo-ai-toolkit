@@ -12,7 +12,7 @@ computed from its own evidence and stored separately, and only the last one --
     B recoverability         how safely normal editing can move it
     C post_edit_potential    what it becomes after a realistic edit
     D aesthetic_potential    whether the result is worth looking at
-    E stock_potential        whether it is sellable, findable and legal
+    E stock_potential        whether it is sellable and findable
     F portfolio_potential    whether it represents the photographer's best
     H uniqueness             against the rest of this collection
     I confidence             how much of the above is actually evidenced
@@ -25,10 +25,12 @@ search will find genuine uplift on an out-of-focus frame, because raising its
 exposure genuinely does improve it, and without a hard ceiling that uplift
 promotes a photograph whose subject will never be sharp.
 
-**Faces or logos physically cannot reach commercial stock.** Not a weighting,
-not a recommendation: a branch that runs before the thresholds do. Both need a
-release, and submitting them without one earns rejections in batches. The model
-is asked for these two flags and is *not* trusted to act on them.
+**Nothing is blocked for a legal reason.** A branch used to run here before any
+threshold: a face or a logo sent a photograph to a separate editorial pile, off
+a vision model's answer to a question about paperwork it cannot answer. The
+branch, the pile, the `legal_readiness` dimension and the vocabulary are all
+gone. What separates *stock* from *personal* is whether the frame has a market,
+and that never lowers a score.
 """
 
 from __future__ import annotations

@@ -295,15 +295,28 @@ def cmd_bench_quality(args: argparse.Namespace) -> int:
         )
         return 0
 
-    if not args.labels:
+    if not args.labels and not args.from_catalog:
         print(
-            "Nothing to measure against. Pass --labels with a filled sheet, or "
+            "Nothing to measure against. Pass --from-catalog to read the stars you "
+            "already gave these photographs, --labels with a filled sheet, or "
             "--template to write a blank one.",
             file=sys.stderr,
         )
         return 1
 
-    labels = bench_quality.read_labels(Path(args.labels))
+    if args.from_catalog:
+        labels = bench_quality.read_catalog_labels(Path(args.from_catalog))
+        if not labels:
+            print(
+                f"No star ratings found in {args.from_catalog}. Lightroom writes them "
+                "into <name>.xmp beside the original; in Lightroom Classic use "
+                "Metadata > Save Metadata to Files first.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"Read {len(labels)} rated photograph(s) from the catalogue.\n")
+    else:
+        labels = bench_quality.read_labels(Path(args.labels))
     if not labels:
         print(
             f"No labels found in {args.labels}. Expected CSV with a filename column "
@@ -1063,7 +1076,6 @@ def cmd_export(args: argparse.Namespace) -> int:
         return 0
 
     rows = []
-    checklist = []
     for record in selected:
         meta = stock_metadata.StockMetadata(**{
             k: v for k, v in (record.stock_metadata or {}).items()
@@ -1073,9 +1085,6 @@ def cmd_export(args: argparse.Namespace) -> int:
         stock_metadata.write_xmp_sidecar(meta, out_dir / record.filename)
 
     csv_path = stock_metadata.write_submission_csv(rows, out_dir / "submission.csv")
-    (out_dir / "release_checklist.txt").write_text(
-        "\n".join(checklist) or "No releases required for this batch.\n", encoding="utf-8"
-    )
     (out_dir / "README.txt").write_text(
         f"""Marketplace package: {args.platform}
 {len(selected)} asset(s).
@@ -1084,7 +1093,10 @@ This is an EXPORT PACKAGE, not an upload. Nothing has been submitted anywhere.
 
   submission.csv         metadata for each file, in upload order
   <name>.xmp             IPTC/XMP sidecar per file
-  release_checklist.txt  what still needs paperwork
+
+Releases are yours to judge. Nothing here guesses whether a photograph needs
+one: that is a legal question, and the thing that used to answer it was a vision
+model looking at a 512px preview.
 
 To submit: upload the original files through the platform's own contributor
 portal and attach submission.csv where the platform supports a metadata import.
@@ -1096,8 +1108,57 @@ data/marketplace_rules.json.
     )
     print(f"Package for {args.platform}: {len(selected)} asset(s) -> {out_dir}")
     print(f"  {csv_path}")
-    if checklist:
-        print(f"  {len(checklist)} item(s) need releases; see release_checklist.txt")
+    return 0
+
+
+def cmd_apply_ratings(args: argparse.Namespace) -> int:
+    """Merge the stars and labels into the sidecars beside the originals.
+
+    A dry run unless `--apply`, like everything else that touches a file. The
+    merge matters: `<name>.xmp` beside a RAW is where the photographer's own
+    develop settings, crop and keywords live, and writing a fresh rating file
+    over the top would destroy all of it.
+    """
+    from exporters import adobe_xmp
+
+    records = _load_records(Path(args.analysis).resolve())
+    plans = []
+    for record in records:
+        if not record.category or record.status != "ok":
+            continue
+        source = Path(record.source_path)
+        if not source.parent.is_dir():
+            continue
+        plans.append((record, adobe_xmp.plan_rating(record, source.with_suffix(".xmp"))))
+
+    if not plans:
+        print("Nothing to rate: no analysed photographs were found where they were.")
+        return 0
+
+    existing = [p for _, p in plans if p.exists]
+    print(f"{len(plans)} photograph(s), {len(existing)} with a sidecar already there.\n")
+    for record, plan in plans[:8]:
+        state = f"merge, keeping {plan.preserved} setting(s)" if plan.exists else "new file"
+        print(f"  {record.filename:<28} {state}")
+        for line in plan.diff[:3]:
+            print(f"      {line}")
+    if len(plans) > 8:
+        print(f"  ... and {len(plans) - 8} more")
+
+    if not args.apply:
+        print(
+            "\nNothing written. Re-run with --apply to carry this out; each existing "
+            "sidecar\nis copied to <name>.xmp.before-photoai first. Afterwards, in "
+            "Lightroom Classic:\nselect the photographs and use Metadata > Read "
+            "Metadata from File -- it does not\nnotice a changed sidecar on its own. "
+            "For JPEG this route does not work at all;\nLightroom keeps JPEG metadata "
+            "in the catalogue and ignores the sidecar."
+        )
+        return 0
+
+    for _, plan in plans:
+        plan.write()
+    print(f"\nWritten to {len(plans)} sidecar(s). Metadata > Read Metadata from File to load them.")
     return 0
 
 
@@ -1336,6 +1397,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--analysis", required=True, help="path to analysis.json")
     bench.add_argument(
+        "--from-catalog",
+        help=(
+            "read the star ratings you already gave these photographs, from the "
+            "sidecars beside them. Costs you nothing and needs no sheet"
+        ),
+    )
+    bench.add_argument(
         "--template",
         help=(
             "write a blank labelling sheet here instead of measuring: one "
@@ -1351,6 +1419,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--json", help="also write the result as JSON")
     bench.set_defaults(func=cmd_bench_quality)
+
+    ratings = sub.add_parser(
+        "apply-ratings",
+        help="merge the star ratings into the sidecars beside your originals",
+    )
+    ratings.add_argument("--analysis", required=True)
+    ratings.add_argument("--apply", action="store_true", help="actually write")
+    ratings.set_defaults(func=cmd_apply_ratings)
 
     report = sub.add_parser("report", help="filter, sort and re-render a stored run")
     report.add_argument("--analysis", required=True)

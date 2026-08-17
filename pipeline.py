@@ -428,6 +428,12 @@ class Measurement:
     crop_keep: float = 1.0
     phash: str = ""
     blur_ratio: float = 0.0
+    # The 512px measurements above cannot see a focus miss. These come from a
+    # second look at the sharpest region at native resolution, which is where a
+    # frame focused on an ear instead of an eye stops looking sharp.
+    focus_confirmed: bool | None = None
+    focus_ratio: float = 0.0
+    focus_note: str = ""
     clipped_highlights: float = 0.0
     clipped_shadows: float = 0.0
     # Where the clipping figures above came from. A rendered preview has already
@@ -484,6 +490,17 @@ def measure_photo(asset: media.Asset, previews_dir: Path) -> Measurement:
     report = technical_filter.analyze(image)
     out.phash = report.phash
     out.blur_ratio = round(report.blur_ratio, 3)
+
+    # One crop at native resolution, on the region the preview thought was
+    # sharpest. Culling is mostly "did the focus land", and a preview cannot
+    # answer that -- it is the question this pass existed not to ask.
+    focus = technical_filter.confirm_focus(
+        asset.path, report, iso=_iso_of(asset.path)
+    )
+    if focus.checked:
+        out.focus_confirmed = focus.confirmed
+        out.focus_ratio = round(focus.ratio, 2)
+    out.focus_note = focus.note
     out.clipped_highlights = round(report.clipped_highlights, 4)
     out.clipped_shadows = round(report.clipped_shadows, 4)
 
@@ -883,6 +900,18 @@ def _store_group(placed, by_name, cached_raw, cache, model, reasoning) -> None:
         cached_raw.setdefault(name, entry)
         if cache is not None:
             cache.put_semantic(asset.checksum, model, entry, reasoning)
+
+
+def _iso_of(path) -> int | None:
+    """Film speed, for the focus floor. Noise raises blur ratio, so a soft
+    frame at ISO 6400 clears a threshold a soft frame at ISO 200 would fail."""
+    try:
+        import exif_reader
+
+        value = (exif_reader.extract_exif(path, "PHOTO") or {}).get("iso")
+        return int(value) if value else None
+    except Exception:  # pragma: no cover - unreadable EXIF is not a crash
+        return None
 
 
 def _measure_one(args):

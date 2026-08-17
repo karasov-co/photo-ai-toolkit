@@ -317,3 +317,63 @@ def test_the_html_shows_what_the_darkroom_refused(tmp_path):
     assert "refused: expressive" in body
     assert "keep: the low-key structure" in body
     assert "auto_keep_and_edit" in body
+
+
+# --- focus, at the resolution where a focus miss is visible --------------------
+
+
+def test_a_defocused_frame_fails_the_full_resolution_check(tmp_path):
+    """The 512px pass cannot see this. Culling is mostly this question."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+
+    import technical_filter
+
+    rng = np.random.default_rng(4)
+    detail = rng.integers(0, 255, (1400, 1400, 3), dtype=np.uint8)
+    sharp_path = tmp_path / "sharp.jpg"
+    Image.fromarray(detail).save(sharp_path, quality=95)
+
+    soft_path = tmp_path / "soft.jpg"
+    Image.fromarray(detail).filter(ImageFilter.GaussianBlur(4.0)).save(soft_path, quality=95)
+
+    for path, expected in ((sharp_path, True), (soft_path, False)):
+        with Image.open(path) as image:
+            report = technical_filter.analyze(image.convert("RGB"))
+        check = technical_filter.confirm_focus(path, report)
+        assert check.checked
+        assert check.confirmed is expected, f"{path.name}: ratio {check.ratio}"
+
+
+def test_the_focus_check_says_where_it_looked(tmp_path):
+    """So a person can zoom to the same place and disagree."""
+    import numpy as np
+    from PIL import Image
+
+    import technical_filter
+
+    rng = np.random.default_rng(9)
+    Image.fromarray(rng.integers(0, 255, (1200, 1600, 3), dtype=np.uint8)).save(
+        tmp_path / "f.jpg", quality=95
+    )
+    with Image.open(tmp_path / "f.jpg") as image:
+        report = technical_filter.analyze(image.convert("RGB"))
+    assert report.tile_location is not None
+
+    check = technical_filter.confirm_focus(tmp_path / "f.jpg", report)
+    left, top, right, bottom = check.region
+    assert right > left and bottom > top
+    assert right - left <= technical_filter.FOCUS_CROP_PX
+
+
+def test_an_unreadable_frame_is_reported_not_crashed(tmp_path):
+    import technical_filter
+
+    report = technical_filter.TechnicalReport(
+        sharpness_global=1.0, sharpness_tile=10.0, blur_ratio=5.0,
+        clipped_shadows=0.0, clipped_highlights=0.0, phash="x",
+        tile_location=(0, 0),
+    )
+    check = technical_filter.confirm_focus(tmp_path / "nope.jpg", report)
+    assert not check.checked
+    assert check.note

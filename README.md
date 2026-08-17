@@ -48,82 +48,6 @@ gitignored and never committed.
 
 ---
 
-## Before you trust it
-
-What a stranger should know before running this on their own archive. None of it
-is buried in the docs.
-
-**The five piles are not calibrated against anybody but the author.** The
-thresholds (top at 85, weak under 45) were tuned on one person's archive. That
-is the one genuinely weak claim in this repository, and it is measurable — an
-evening of sorting answers it:
-
-```bash
-photoai bench-quality --analysis run/.internal/reports/analysis.json \
-                      --template labels.csv        # blank sheet, shuffled
-# fill human_pile with top / good / weak, 200-300 rows
-photoai bench-quality --analysis run/.internal/reports/analysis.json \
-                      --labels labels.csv --json agreement.json
-```
-
-It prints the agreement, a confusion matrix, precision and recall on the top
-pile, and the thresholds that *would* have agreed best — which it does not apply
-on its own, because a threshold fitted to one evening is that evening's
-threshold. `reclassify --profile-file` re-sorts a finished run at different
-numbers without spending a token, so trying the suggestion is free.
-
-The sheet is shuffled and carries no score, on purpose: a sheet showing what the
-tool decided measures how persuadable you are, not whether the thresholds are
-right.
-
-**Two of five provider adapters have met a live endpoint.** grok (the default,
-281 photographs through it) and openai. anthropic, gemini and openai-compatible
-are written from the documented request shape, have never been run, and say so
-at startup.
-
-**The gain figure compares frames; it does not measure photographs.** The metric
-it comes from is both what the edit search optimises and the ruler that reports
-the result, so "+12" means this frame has more room than that one, not that
-editing makes a picture 12 points better. The report says so on every page, and
-`bench-quality` against your own ranking is the only thing that changes it.
-
-**Sharpness is measured on a 512px preview, on the sharpest tile.** So a frame
-where the *wrong* object is sharp passes the gate, and a focus miss that only
-shows at 100% is not caught at all. This is a deliberate trade — full-resolution
-focus checking on every frame is a different tool — but it is a limit of the
-product, not a detail of the implementation.
-
-**Near-duplicates are grouped by perceptual hash, not by content.** Two
-different subjects with the same palette and framing can be merged, and the
-weaker one filed as a repeat. There is no embedding model in here.
-
-**No export path has been confirmed working by its author.** The Lightroom
-sidecar was the one that looked exercised and was not: it is develop settings
-with no preset identity, so imported as a preset it appears as `<x:xmpmet` with
-an Amount slider that does nothing, and beside a JPEG Lightroom ignores it
-entirely. That is fixed -- there is now a real preset in `edit_recipes/presets/`
-that works on any format -- but fixed from Adobe's documented preset structure,
-not from watching Lightroom load one. The darktable and RawTherapee renderers
-have never been run at all; no binaries were available, and they report
-themselves `[unverified]`.
-
-**The recipes correct, they do not style.** Exposure, white balance, highlight
-and shadow recovery, some contrast and clarity, with the measurement that earned
-each step. No HSL, no tone curve, no split toning. Next to a photographer's
-preset the result will look like almost nothing happened, and that is the
-design: a style applied to an unrelated photograph is a lie about the picture.
-If you want a look, this is what goes under it.
-
-**Nothing auto-deletes, and it is not one flag away.** Ten gates have to open
-together — 1,000 recorded decisions, 3,000 holdout checks, a certified monitor,
-and six more. `--no-shadow-mode` opens exactly one of them. `photoai policy`
-prints the other nine and what each is waiting for.
-
-**A score is one opinion.** Nothing is a verdict, nothing moves without
-`--apply`, and every original file is untouched throughout.
-
----
-
 ## What you get
 
 `run/report/index.html` is a folder you can copy, zip or email. It has no
@@ -131,6 +55,19 @@ external requests — no CDN, no web fonts, no JavaScript libraries — so it op
 on a plane, behind a firewall, and in five years. `--standalone` produces a
 single `report_standalone.html` with every thumbnail inlined, for sending to one
 person.
+
+The decision also arrives where you actually cull. `edit_recipes/ratings/` holds
+one XMP per photograph with a star rating and a colour label — five stars for
+top, two for weak — that Bridge and Photo Mechanic read straight from the
+folder. For Lightroom Classic, `photoai apply-ratings` merges them into the
+sidecars beside your originals: it changes the rating and the label and nothing
+else, keeps a `.before-photoai` copy, and shows the diff before writing. Then
+Metadata > Read Metadata from File. Colours are yours to set with
+`PHOTO_AI_LABELS` — red already means something in most catalogues.
+
+And the loop closes. After a week of working in Lightroom, your own stars are in
+those same sidecars, so `bench-quality --from-catalog` measures the tool against
+your real choices without you labelling anything.
 
 Five piles, with the count of each at the top of the page:
 
@@ -223,6 +160,7 @@ run keeps everything it already paid for.
 | `bench-quality` | Correlate the score against a human ranking you supply |
 | `darkroom` | Render the edit suggestions from a stored run |
 | `apply-recipe` | Write a recipe beside the RAW (dry run; refuses to clobber) |
+| `apply-ratings` | Merge the stars and labels into your own sidecars (dry run) |
 | `export` | Build a marketplace package: CSV, sidecars, instructions |
 | `quarantine` | Carry out a move plan (dry run unless `--apply`) |
 | `trash` | Carry out `delete_plan.json` (dry run unless `--apply`) |
@@ -252,9 +190,16 @@ new|all`.
 `--min-confidence` `--cluster` `--duplicates-only` `--limit`.
 
 **`reclassify`:** `--analysis*` `--profile` `--profile-file` `--limit`.
-**`bench-quality`:** `--analysis*` `--labels*` `--json`.
+**`bench-quality`:** `--analysis*` `--from-catalog` `--template` `--labels`
+`--json`. `--from-catalog` reads the stars you already gave these photographs
+out of the sidecars beside them, so the check costs you no time at all.
+`--template`
+writes a blank labelling sheet; fill its `human_pile` column and pass it back as
+`--labels` to see how far the thresholds are from your own sorting. See
+[what it does not do](docs/limits.md).
 **`darkroom`:** `--analysis*` `--output` `--limit`.
 **`apply-recipe`:** `--recipe*` `--raw*` `--apply` `--force`.
+**`apply-ratings`:** `--analysis*` `--apply`.
 **`export`:** `--analysis*` `--output` `--platform`.
 **`quarantine`:** `--analysis*` `--quarantine*` `--input` `--apply`.
 **`trash`:** `--plan` `--trash` `--apply`.
@@ -287,6 +232,8 @@ the only thing that carries out a plan.
 
 ## Read next
 
+- **[What it does not do](docs/limits.md)** — measured limits and unverified
+  paths, stated plainly, because you are pointing this at your own archive
 - **[How the score is built](docs/how-it-works.md)** — potential versus current
   quality, the five piles, the artistic read, what a card is telling you
 - **[Commands, output and configuration](docs/reference.md)** — the output tree,

@@ -13,12 +13,22 @@ concurrency:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # Most photographers are on Windows or a Mac, and the two native
+        # dependencies -- LibRaw through rawpy, and FFmpeg -- install
+        # differently on each. Testing only on Ubuntu means the first Windows
+        # user finds the rawpy build failure, not the CI.
+        os: [ubuntu-latest, windows-latest, macos-14]
         python-version: ["3.12", "3.13", "3.14"]
+        exclude:
+          # The version sweep is what Linux is for; the other two prove the
+          # platform, not every interpreter on it.
+          - {os: windows-latest, python-version: "3.13"}
+          - {os: macos-14, python-version: "3.13"}
 
     steps:
       - uses: actions/checkout@v5
@@ -26,10 +36,19 @@ jobs:
       # Video support is optional at runtime, but the suite has integration
       # tests that decode a generated clip. Without FFmpeg they skip silently,
       # which is exactly how a broken video path reaches main unnoticed.
-      - name: Install FFmpeg
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --no-progress -y
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
@@ -44,6 +63,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Lint
+        if: runner.os == 'Linux'
         run: ruff check --output-format=github .
 
       - name: Test

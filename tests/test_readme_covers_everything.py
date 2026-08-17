@@ -92,3 +92,61 @@ def test_the_price_in_the_readme_matches_the_pricing_file():
     # number and the unit, which is a formatting detail and not a claim.
     text = re.sub(r"\s+", " ", README.read_text(encoding="utf-8"))
     assert f"${entry['usd_per_100_photos']:.2f} per 100 photographs" in text
+
+
+# --- prose against code, everywhere it can be checked -------------------------
+#
+# The commit that added the tests above was about a docstring that had gone
+# stale. Three days later scoring.py's own docstring still described the
+# editorial branch, the release logic and a `legal_readiness` dimension, all of
+# which had been deleted. One module having a drift test is not a policy.
+
+REMOVED_VOCABULARY = (
+    "legal_readiness",
+    "model release",
+    "editorial-only",
+    "editorial only",
+    "cannot reach commercial stock",
+)
+
+
+def _module_docstrings():
+    import importlib
+    import pkgutil
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    for path in sorted(root.glob("*.py")):
+        if path.stem in ("conftest", "setup"):
+            continue
+        try:
+            module = importlib.import_module(path.stem)
+        except Exception:  # pragma: no cover - a module that needs an argument
+            continue
+        if module.__doc__:
+            yield path.name, module.__doc__
+    del pkgutil
+
+
+def test_no_module_docstring_still_describes_the_release_logic():
+    offenders = []
+    for name, doc in _module_docstrings():
+        lowered = doc.lower()
+        for phrase in REMOVED_VOCABULARY:
+            # An explicit "this is gone" sentence is the point of keeping the
+            # history in the prose; a description in the present tense is not.
+            if phrase in lowered and not any(
+                marker in lowered for marker in ("used to", "are all\ngone", "is gone", "no longer")
+            ):
+                offenders.append(f"{name}: {phrase}")
+    assert not offenders, f"docstrings describe deleted behaviour: {offenders}"
+
+
+def test_the_scoring_docstring_lists_the_dimensions_that_exist():
+    import scoring
+
+    doc = scoring.__doc__
+    fields = set(scoring.AssetScores().to_dict())
+    listed = {line.split()[1] for line in doc.splitlines()
+              if line.startswith("    ") and len(line.split()) > 2 and len(line.split()[0]) == 1}
+    assert listed == fields, f"docstring lists {listed - fields}, missing {fields - listed}"
+    assert f"{len(fields)} numbers per asset" in doc.replace("Ten", "10").replace("Nine", "9")
