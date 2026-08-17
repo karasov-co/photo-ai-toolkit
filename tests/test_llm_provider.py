@@ -55,11 +55,12 @@ def test_every_provider_implements_the_one_method():
         assert issubclass(factory, llm_provider.Provider), name
 
 
-def test_only_the_openai_provider_claims_to_have_been_run():
+def test_the_untested_adapters_are_not_in_the_shipped_set():
     """Shipping three untested paths as equivalent would be the dishonest part."""
     assert llm_provider.OpenAIProvider.verified is True
     for name in ("anthropic", "gemini", "openai-compatible"):
-        assert llm_provider.PROVIDERS[name].verified is False, name
+        assert llm_provider.CONTRIB_PROVIDERS[name].verified is False, name
+        assert name not in llm_provider.PROVIDERS
 
 
 def test_an_unknown_provider_fails_rather_than_defaulting():
@@ -262,12 +263,30 @@ def test_grok_is_registered_and_has_met_the_endpoint():
     assert llm_provider.GrokProvider.verified is True
 
 
-def test_the_adapters_nobody_has_run_still_say_so():
-    """Three of five. A default that has been run and three that have not is a
-    different situation from four unverified adapters, and the startup note has
-    to keep telling the difference."""
+def test_the_adapters_nobody_has_run_are_not_shipped():
+    """They existed with a note attached, which asked every user to evaluate the
+    note. Behind a switch, only the people who want to try one are asked."""
     for name in ("anthropic", "gemini", "openai-compatible"):
-        assert llm_provider.PROVIDERS[name].verified is False
+        assert name not in llm_provider.PROVIDERS
+        assert llm_provider.CONTRIB_PROVIDERS[name].verified is False
+
+
+def test_the_contrib_switch_puts_them_back(monkeypatch):
+    import importlib
+
+    monkeypatch.setenv("PHOTO_AI_CONTRIB", "1")
+    reloaded = importlib.reload(llm_provider)
+    try:
+        assert "anthropic" in reloaded.PROVIDERS
+    finally:
+        monkeypatch.delenv("PHOTO_AI_CONTRIB")
+        importlib.reload(llm_provider)
+
+
+def test_everything_shipped_has_met_an_endpoint():
+    """The whole point of the split: no adapter in the default set is a guess."""
+    for name, factory in llm_provider.PROVIDERS.items():
+        assert factory.verified is True, name
 
 
 def test_grok_points_at_xai_by_default():
@@ -504,18 +523,15 @@ COUNT_WORDS = {
 
 
 def test_the_docstring_counts_the_providers_that_exist():
-    total = COUNT_WORDS[len(llm_provider.PROVIDERS)]
+    shipped = len(llm_provider.PROVIDERS)
+    total = COUNT_WORDS[shipped + len(llm_provider.CONTRIB_PROVIDERS)]
     doc = llm_provider.__doc__
-    assert f"{total} ways to serve it" in doc, (
-        f"{len(llm_provider.PROVIDERS)} providers are registered; the docstring "
-        "says something else"
-    )
+    assert f"{total} ways to serve it" in doc
+    assert f"{COUNT_WORDS[shipped].capitalize()} of the five" in doc
 
 
 def test_the_docstring_names_every_provider_that_has_met_an_endpoint():
-    verified = sorted(
-        name for name, factory in llm_provider.PROVIDERS.items() if factory.verified
-    )
+    verified = sorted(llm_provider.PROVIDERS)
     doc = llm_provider.__doc__
     for name in verified:
         assert f"`{name}`" in doc, f"{name} is verified and the docstring does not say so"
@@ -529,8 +545,7 @@ def test_the_docstring_does_not_call_a_verified_provider_untested():
         if not factory.verified:
             continue
         assert f"only the {name} provider is exercised" not in doc
-    unverified = [n for n, f in llm_provider.PROVIDERS.items() if not f.verified]
-    for name in unverified:
+    for name in llm_provider.CONTRIB_PROVIDERS:
         assert f"`{name}`" in llm_provider.__doc__, (
             f"{name} has never been run and the docstring does not list it"
         )

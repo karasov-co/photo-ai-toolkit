@@ -1030,8 +1030,8 @@ def test_with_no_client_the_configuration_decides(monkeypatch):
 
     monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
     assert isinstance(pipeline._provider("grok-4.6"), llm_provider.GrokProvider)
-    monkeypatch.setenv("PHOTO_AI_PROVIDER", "anthropic")
-    assert isinstance(pipeline._provider("claude"), llm_provider.AnthropicProvider)
+    monkeypatch.setenv("PHOTO_AI_PROVIDER", "openai")
+    assert isinstance(pipeline._provider("gpt"), llm_provider.OpenAIProvider)
 
 
 def test_stage2_and_stage3_agree_with_the_preflight_on_the_endpoint(monkeypatch):

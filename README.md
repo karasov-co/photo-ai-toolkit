@@ -233,8 +233,9 @@ writes a blank labelling sheet; fill its `human_pile` column and pass it back as
 `*` = required.
 
 **Environment:** `XAI_API_KEY` (then `OPENAI_API_KEY` as fallback),
-`PHOTO_AI_PROVIDER`, `PHOTO_AI_BASE_URL`, `OPENAI_MODEL`, `PHOTO_AI_LABELS`
-(colour labels per pile), `PHOTO_AI_STARS` (how your stars map to piles).
+`PHOTO_AI_PROVIDER` (`grok` or `openai`), `PHOTO_AI_BASE_URL`, `OPENAI_MODEL`,
+`PHOTO_AI_LABELS` (colour labels per pile), `PHOTO_AI_STARS` (how your stars map
+to piles).
 
 ---
 

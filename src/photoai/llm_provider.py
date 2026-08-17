@@ -15,13 +15,16 @@ a run that costs what you did not expect and reasons differently than you asked.
 Dropping it without asking was its own version of that mistake, and cost 627,000
 unbudgeted reasoning tokens before anybody counted them.
 
-**Two of the five have met a live endpoint: `openai` and `grok`.** grok is the
-default and has 281 photographs through it across both passes; openai is what
-the earlier live runs used and what the tests mock. `anthropic`, `gemini` and
-`openai-compatible` are written from each vendor's documented request shape and
-have never been run against the real thing. They say so in `verified`, and the
-CLI says so when you pick one, which is worth more than quietly shipping
-untested paths as though they were equivalent.
+**Two of the five are shipped: `openai` and `grok`.** Those are the two that
+have met a live endpoint -- grok is the default, with 281 photographs through it
+across both passes, and openai is what the earlier live runs used and what the
+tests mock.
+
+`anthropic`, `gemini` and `openai-compatible` are written from each vendor's
+documented request shape and have never been run against the real thing. They
+are not in `PROVIDERS`; `PHOTO_AI_CONTRIB=1` adds them. Shipping them with a
+warning attached asked every user to evaluate the warning. Shipping them behind
+a switch asks only the people who want to try one.
 
 `verified` means exactly "this adapter has met the endpoint". It is not a claim
 that it is correct.
@@ -31,6 +34,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -459,13 +463,25 @@ def _xai_key() -> str:
     )
 
 
+# Two adapters have met a live endpoint and those are the two this ships.
 PROVIDERS = {
     "openai": OpenAIProvider,
     "grok": GrokProvider,
+}
+
+# The other three are written from each vendor's documented request shape and
+# have never been run against the real thing. Shipping them behind a note asked
+# every user to evaluate that note; shipping them behind a switch asks only the
+# people who want to try. `PHOTO_AI_CONTRIB=1` puts them back, and they say what
+# they are when selected.
+CONTRIB_PROVIDERS = {
     "anthropic": AnthropicProvider,
     "gemini": GeminiProvider,
     "openai-compatible": OpenAICompatibleProvider,
 }
+
+if os.environ.get("PHOTO_AI_CONTRIB", "").strip() in ("1", "true", "yes"):
+    PROVIDERS.update(CONTRIB_PROVIDERS)
 
 
 def build(name: str, model: str, *, base_url: str = "", client=None) -> Provider:
