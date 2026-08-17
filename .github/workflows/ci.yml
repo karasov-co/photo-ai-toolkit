@@ -31,7 +31,7 @@ jobs:
           - {os: macos-14, python-version: "3.13"}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Video support is optional at runtime, but the suite has integration
       # tests that decode a generated clip. Without FFmpeg they skip silently,
