@@ -230,20 +230,46 @@ def _number(value) -> float | None:
 # sidecars beside the originals, and reading them back turns every user into a
 # labeller who spent no time on it. It is also the only way the personal model
 # and the monitor ever see the thousands of decisions their gates ask for.
-CATALOG_PILE_BY_STARS = {5: "top", 4: "top", 3: "good", 2: "good", 1: "weak"}
+# Where a photographer's stars sit is a personal convention. For many people one
+# star is "bin it" and two is already "kept", which is exactly where the
+# good/weak line falls -- so getting this wrong shifts the whole measurement.
+# Override with PHOTO_AI_STARS, as `5=top,4=top,3=good,2=weak,1=weak`.
+DEFAULT_PILE_BY_STARS = {5: "top", 4: "top", 3: "good", 2: "good", 1: "weak"}
 
 
-def read_catalog_labels(folder: Path) -> dict[str, dict]:
+def pile_by_stars() -> dict[int, str]:
+    import os
+
+    mapping = dict(DEFAULT_PILE_BY_STARS)
+    for pair in os.environ.get("PHOTO_AI_STARS", "").split(","):
+        stars, _, pile = pair.partition("=")
+        stars, pile = stars.strip(), pile.strip().lower()
+        if stars.isdigit() and pile in HUMAN_PILES:
+            mapping[int(stars)] = pile
+    return mapping
+
+
+def read_catalog_labels(folder: Path, *, written_before: float | None = None) -> dict[str, dict]:
     """Human piles from `xmp:Rating` in the sidecars beside a shoot.
 
     Zero and unrated are skipped, not read as "weak": in every catalogue zero
     means nobody looked, and counting that as a judgement would fill the set
     with frames the photographer never opened.
+
+    `written_before` is the guard against the loop closing on itself. A
+    photographer edits the frames the tool put in the top pile, and edited
+    frames get five stars, and the tool then reports that it agreed with them --
+    a measurement of its own influence. Sidecars touched after the run they are
+    being compared against are dropped, and the caller says how many.
     """
     import re
 
     out: dict[str, dict] = {}
+    mapping = pile_by_stars()
     for path in sorted(Path(folder).rglob("*.xmp")):
+        if written_before is not None and path.stat().st_mtime > written_before:
+            _CONTAMINATED.append(path.name)
+            continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -254,7 +280,7 @@ def read_catalog_labels(folder: Path) -> dict[str, dict]:
         if not found:
             continue
         stars = int(found.group(1))
-        pile = CATALOG_PILE_BY_STARS.get(stars)
+        pile = mapping.get(stars)
         if not pile:
             continue
         # The sidecar is named after the photograph, whatever its extension.
@@ -262,6 +288,16 @@ def read_catalog_labels(folder: Path) -> dict[str, dict]:
             out[candidate] = {"pile": pile, "score": float(stars)}
         out[path.stem] = {"pile": pile, "score": float(stars)}
     return out
+
+
+# Filled by `read_catalog_labels` so the caller can report it. A list rather
+# than a count: naming the files is what lets somebody check the guard is not
+# throwing away the whole set for a clock-skew reason.
+_CONTAMINATED: list[str] = []
+
+
+def contaminated() -> list[str]:
+    return list(_CONTAMINATED)
 
 
 def write_template(records, path: Path, *, seed: int = 0) -> int:

@@ -367,3 +367,21 @@ def test_the_header_names_both_bucket_thresholds():
     assert f"Top starts at {simple_report.TOP_THRESHOLD}" in line
     assert f"under {simple_report.WEAK_THRESHOLD} is weak" in line
     assert "stock" in line and "personal" in line
+
+
+def test_the_standalone_file_survives_publishing(tmp_path):
+    """`--standalone` wrote it into staging and publish left it there: the flag
+    reported success and printed a path that held nothing."""
+    import workspace
+
+    space = workspace.Workspace(tmp_path / "run").create()
+    staged = space.internal / "staging-test"
+    (staged / workspace.REPORT_DIRNAME).mkdir(parents=True)
+    (staged / workspace.REPORT_DIRNAME / "index.html").write_text("<html></html>")
+    (staged / workspace.INSIGHTS_NAME).write_text("<html></html>")
+    (staged / workspace.STANDALONE_NAME).write_text("<html>one file</html>")
+    (staged / next(iter(workspace.CATEGORY_DIRS.values()))).mkdir(parents=True)
+
+    workspace.publish(space, staged)
+    assert space.standalone.is_file(), "the one shareable file was left in staging"
+    assert space.standalone.read_text() == "<html>one file</html>"

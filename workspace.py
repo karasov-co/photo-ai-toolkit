@@ -288,9 +288,15 @@ def publish(space: Workspace, staged: Path) -> list[str]:
     if missing:
         raise PublishError(f"the run did not produce: {', '.join(missing)}")
 
+    # STANDALONE_NAME was missing from this list, so `--standalone` wrote the
+    # file into staging and publish left it there: the flag reported success and
+    # produced nothing at the path it named.
     entries = [
         name
-        for name in (REPORT_DIRNAME, INSIGHTS_NAME, RECIPES, *CATEGORY_DIRS.values())
+        for name in (
+            REPORT_DIRNAME, STANDALONE_NAME, INSIGHTS_NAME, RECIPES,
+            *CATEGORY_DIRS.values(),
+        )
         if (staged / name).exists()
     ]
     backups: list[tuple[Path, Path]] = []

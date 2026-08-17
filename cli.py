@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -305,7 +306,21 @@ def cmd_bench_quality(args: argparse.Namespace) -> int:
         return 1
 
     if args.from_catalog:
-        labels = bench_quality.read_catalog_labels(Path(args.from_catalog))
+        # Only ratings that predate the run being judged. A frame the tool put
+        # in the top pile gets edited, and an edited frame gets five stars, and
+        # then the tool reports it agreed with itself.
+        analysis = Path(args.analysis).resolve()
+        cutoff = analysis.stat().st_mtime if analysis.exists() else None
+        labels = bench_quality.read_catalog_labels(
+            Path(args.from_catalog), written_before=None if args.trust_later else cutoff
+        )
+        later = bench_quality.contaminated()
+        if later:
+            print(
+                f"Skipped {len(later)} sidecar(s) written after this run: those stars "
+                "may be a reaction to\nits own output rather than an independent "
+                "opinion. --trust-later includes them.\n"
+            )
         if not labels:
             print(
                 f"No star ratings found in {args.from_catalog}. Lightroom writes them "
@@ -1162,6 +1177,81 @@ def cmd_apply_ratings(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_demo(args: argparse.Namespace) -> int:
+    """Twelve committed frames, recorded model answers, a real report.
+
+    The point is a stranger seeing the output before deciding whether to point
+    this at their own archive or pay anything. So: no key, no network, nobody's
+    photographs, about a minute. The answers under `demo/answers.json` are a
+    real Stage 2 and Stage 3 reply, recorded once and replayed -- which also
+    makes this the only end-to-end path a person can run offline.
+    """
+    import json as _json
+    import shutil
+
+    root = Path(__file__).resolve().parent / "demo"
+    photos = root / "photos"
+    if not photos.is_dir():
+        print(f"The demo frames are missing from {photos}.", file=sys.stderr)
+        return 1
+
+    out = Path(args.output).resolve() if args.output else Path.cwd() / "demo-run"
+    if out.exists() and args.fresh:
+        shutil.rmtree(out)
+
+    answers = root / "answers.json"
+    if answers.is_file():
+        # Replayed, not requested. `PHOTO_AI_REPLAY` is read by the provider
+        # factory and short-circuits the network entirely.
+        os.environ["PHOTO_AI_REPLAY"] = str(answers)
+
+    print(
+        f"Twelve photographs from {photos}, nobody's but the repository's.\n"
+        "No API key is used and no request leaves this machine.\n"
+    )
+    code = _analyze(
+        argparse.Namespace(
+            **{
+                **vars(args),
+                "input": str(photos),
+                "output": str(out),
+                "quarantine": None, "profile": None, "profile_file": None,
+                "expert": False, "no_video": True, "video_samples": 9,
+                "force": True, "limit": None, "standalone": True,
+                "embed_width": None, "embed_quality": None,
+                "reasoning": "low", "concurrency": 1, "jobs": 1,
+                "copyright": "", "darkroom": False, "renderer": None,
+                "no_shadow_mode": False,
+            }
+        ),
+        semantic=False,
+    )
+    if code == 0:
+        print(f"\n  Open {out / 'report' / 'index.html'}")
+        print(f"  One shareable file:  {out / 'report_standalone.html'}")
+        _json  # noqa: B018 - imported for the replay path above
+    return code
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Everything checkable before a cent is spent. Never calls a paid endpoint."""
+    import doctor
+
+    report = doctor.run(
+        input_dir=Path(args.input) if args.input else None,
+        output_dir=Path(args.output) if args.output else None,
+    )
+    print(doctor.format_report(report))
+    if args.json:
+        import json as _json
+
+        Path(args.json).write_text(
+            _json.dumps(report.to_dict(), indent=2), encoding="utf-8"
+        )
+        print(f"Written to {args.json} -- attach this to a bug report.")
+    return 0 if report.ok else 1
+
+
 # --- override ---------------------------------------------------------------
 
 
@@ -1397,6 +1487,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--analysis", required=True, help="path to analysis.json")
     bench.add_argument(
+        "--trust-later", action="store_true",
+        help=(
+            "include star ratings written after the run. Off by default: a frame "
+            "the tool ranked highly gets edited, and an edited frame gets stars"
+        ),
+    )
+    bench.add_argument(
         "--from-catalog",
         help=(
             "read the star ratings you already gave these photographs, from the "
@@ -1427,6 +1524,22 @@ def build_parser() -> argparse.ArgumentParser:
     ratings.add_argument("--analysis", required=True)
     ratings.add_argument("--apply", action="store_true", help="actually write")
     ratings.set_defaults(func=cmd_apply_ratings)
+
+    demo = sub.add_parser(
+        "demo",
+        help="run on twelve committed photographs, offline, and open the report",
+    )
+    demo.add_argument("--output", help="where to write (default ./demo-run)")
+    demo.add_argument("--fresh", action="store_true", help="delete a previous demo run first")
+    demo.set_defaults(func=cmd_demo)
+
+    doc = sub.add_parser(
+        "doctor", help="check the key, the binaries, permissions and space before a run"
+    )
+    doc.add_argument("--input", help="the folder you plan to analyse")
+    doc.add_argument("--output", help="where you plan to write")
+    doc.add_argument("--json", help="write the result as JSON, for a bug report")
+    doc.set_defaults(func=cmd_doctor)
 
     report = sub.add_parser("report", help="filter, sort and re-render a stored run")
     report.add_argument("--analysis", required=True)

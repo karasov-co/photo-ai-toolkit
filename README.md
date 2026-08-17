@@ -16,10 +16,20 @@ It never moves, changes or deletes an original file.
 
 ---
 
-## Start without paying anything
+## See it in a minute, on nobody's photographs
 
 ```bash
 pip install -r requirements.txt
+python3 cli.py demo
+```
+
+Twelve photographs committed to this repository, no API key, no request leaving
+your machine, a real report at the end. That is the whole tool running.
+
+## Then on your own
+
+```bash
+python3 cli.py doctor --input ./photos --output ./run   # free, checks everything
 python3 cli.py analyze --input ./photos --output ./run
 open ./run/report/index.html
 ```
@@ -157,7 +167,9 @@ run keeps everything it already paid for.
 | `measure` | Local measurement only, explicitly not an analysis |
 | `report` | Filter, sort and re-render a stored run — no re-analysis, no tokens |
 | `reclassify` | Redo routing at different thresholds — no re-analysis, no tokens |
-| `bench-quality` | Correlate the score against a human ranking you supply |
+| `demo` | Twelve committed photographs, offline, a real report in a minute |
+| `doctor` | Key, binaries, permissions and space — before a cent is spent |
+| `bench-quality` | Check the piles against your own sorting, or your catalogue |
 | `darkroom` | Render the edit suggestions from a stored run |
 | `apply-recipe` | Write a recipe beside the RAW (dry run; refuses to clobber) |
 | `apply-ratings` | Merge the stars and labels into your own sidecars (dry run) |
@@ -190,7 +202,9 @@ new|all`.
 `--min-confidence` `--cluster` `--duplicates-only` `--limit`.
 
 **`reclassify`:** `--analysis*` `--profile` `--profile-file` `--limit`.
-**`bench-quality`:** `--analysis*` `--from-catalog` `--template` `--labels`
+**`demo`:** `--output` `--fresh`.
+**`doctor`:** `--input` `--output` `--json`.
+**`bench-quality`:** `--analysis*` `--from-catalog` `--trust-later` `--template` `--labels`
 `--json`. `--from-catalog` reads the stars you already gave these photographs
 out of the sidecars beside them, so the check costs you no time at all.
 `--template`
@@ -216,7 +230,8 @@ writes a blank labelling sheet; fill its `human_pile` column and pass it back as
 `*` = required.
 
 **Environment:** `XAI_API_KEY` (then `OPENAI_API_KEY` as fallback),
-`PHOTO_AI_PROVIDER`, `PHOTO_AI_BASE_URL`, `OPENAI_MODEL`.
+`PHOTO_AI_PROVIDER`, `PHOTO_AI_BASE_URL`, `OPENAI_MODEL`, `PHOTO_AI_LABELS`
+(colour labels per pile), `PHOTO_AI_STARS` (how your stars map to piles).
 
 ---
 
