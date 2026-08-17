@@ -279,6 +279,12 @@ class RunResult:
     # the run -- edit recipes, insights -- can use what was measured without
     # decoding a second time.
     measurements: dict = field(default_factory=dict)
+    # Which of the two similarity measurements the diversity pass actually used,
+    # and why, when it was not the better one. "perceptual_hash" is the honest
+    # default and the fallback both; a run must never leave which one it was to
+    # be inferred from whether onnxruntime happens to be installed.
+    similarity_mode: str = "perceptual_hash"
+    similarity_detail: str = ""
 
     @property
     def analysis_mode(self) -> str:
@@ -381,6 +387,37 @@ class AnalysisCache:
         self, checksum: str, model: str, payload: dict, reasoning: str | None = "low"
     ) -> None:
         self._data[self.semantic_key(checksum, model, reasoning)] = payload
+
+    # --- semantic vectors, keyed by checksum AND model id -------------------
+    #
+    # The model id has to be in the key for the same reason the analyzer version
+    # is in the one above: a vector from one encoder is not comparable with a
+    # vector from another, and serving a stored ViT-B/32 vector to a run using a
+    # different tower would produce cosines that mean nothing. Not keyed on the
+    # analyzer version, though -- a scoring change does not alter what a
+    # photograph looks like, and re-encoding an archive is a minute of CPU.
+
+    @staticmethod
+    def embedding_key(checksum: str, model_id: str) -> str:
+        return f"embedding:{checksum}:{model_id}"
+
+    def get_embedding(self, checksum: str, model_id: str) -> tuple[float, ...] | None:
+        stored = self._data.get(self.embedding_key(checksum, model_id))
+        if not stored:
+            return None
+        vector = stored.get("vector")
+        return tuple(float(v) for v in vector) if vector else None
+
+    def put_embedding(self, checksum: str, model_id: str, vector) -> None:
+        if not vector:
+            return
+        # Six decimals on a unit vector is under a part in 10^5 of angle, which
+        # is far below anything the similarity threshold can see, and it roughly
+        # halves the size of the cache file.
+        self._data[self.embedding_key(checksum, model_id)] = {
+            "vector": [round(float(v), 6) for v in vector],
+            "dimensions": len(vector),
+        }
 
     def get(self, checksum: str) -> dict | None:
         return self._data.get(self.key(checksum))
@@ -1387,20 +1424,32 @@ def run(
     cache.save()
 
     clusters = _cluster(assets, measurements)
+    # Before the semantic pass, so that a run without credentials still gets the
+    # better diversity measurement: this one is local and costs no money.
+    vectors, result.similarity_mode, result.similarity_detail = _embed(
+        assets, measurements, cache
+    )
+    logger.info(
+        "Diversity similarity: %s%s",
+        result.similarity_mode,
+        f" ({result.similarity_detail})" if result.similarity_detail else "",
+    )
     semantics = _semantics(assets, measurements, options, client, result, model)
 
     # Stage 3 needs a provisional route to decide who is worth reading, so the
     # scoring pass runs twice: once to get candidates, then again with the
     # artistic evidence that can promote or block them.
     provisional = _score_all(
-        assets, measurements, clusters, semantics, calibration, options, model
+        assets, measurements, clusters, semantics, calibration, options, model,
+        vectors=vectors,
     )
     stage3_results = _stage3(
         assets, measurements, provisional, semantics, options, client, result, model
     )
 
     result.records = _score_all(
-        assets, measurements, clusters, semantics, calibration, options, model, stage3_results
+        assets, measurements, clusters, semantics, calibration, options, model, stage3_results,
+        vectors=vectors,
     )
     result.measurements = measurements
     _apply_policy(result.records, options)
@@ -1769,9 +1818,71 @@ def _cluster(assets, measurements) -> dict[str, tuple[str, int, bool, float, flo
     return out
 
 
+def _embed(assets, measurements, cache) -> tuple[dict[str, tuple[float, ...]], str, str]:
+    """asset key -> unit vector, plus the mode that was used and why.
+
+    Returns `({}, "perceptual_hash", reason)` whenever the encoder is not there,
+    which is the normal case: `onnxruntime` is an optional extra and the weights
+    are only fetched when somebody asks. Nothing here downloads unless
+    `PHOTO_AI_EMBEDDINGS=1` says it may -- see `photoai.embeddings.prepare`.
+
+    The cache lookup happens before the model is loaded, deliberately. A re-run
+    over an unchanged archive answers every frame from store and never opens the
+    335 MB file at all, which is what makes turning this on cheap after the
+    first time.
+
+    One file at a time rather than in batches. Batching would be perhaps twice
+    as fast, and it would mean one unreadable preview taking seven good frames
+    down with it; a per-file loop isolates the failure to the frame that caused
+    it, and that frame simply falls back to the hash.
+    """
+    from photoai import embeddings
+
+    state = embeddings.prepare()
+    if not state.ok:
+        return {}, "perceptual_hash", state.reason
+
+    vectors: dict[str, tuple[float, ...]] = {}
+    pending: list[tuple[media.Asset, str]] = []
+    for asset in assets:
+        if asset.kind is not media.MediaKind.PHOTO:
+            continue
+        stored = cache.get_embedding(asset.checksum, state.model_id)
+        if stored:
+            vectors[asset.key] = stored
+            continue
+        preview = measurements.get(asset.key, Measurement()).preview_path
+        if preview:
+            pending.append((asset, preview))
+
+    if pending:
+        try:
+            embeddings.encoder()
+        except embeddings.EmbeddingsUnavailable as e:
+            logger.warning("Falling back to perceptual hashes: %s", e)
+            return {}, "perceptual_hash", str(e)
+        for asset, preview in pending:
+            vector = embeddings.embed_file(preview)
+            if vector:
+                vectors[asset.key] = vector
+                cache.put_embedding(asset.checksum, state.model_id, vector)
+        cache.save()
+
+    photos = sum(1 for a in assets if a.kind is media.MediaKind.PHOTO)
+    missing = photos - len(vectors)
+    detail = ""
+    if missing > 0:
+        # Partial coverage is not a failure, but it is not full coverage either,
+        # and those frames are compared by hash while the rest are compared by
+        # meaning. Said out loud rather than averaged away.
+        detail = f"{missing} of {photos} photographs have no vector and fall back to the hash"
+    return vectors, "embedding", detail
+
+
 def _score_all(
     assets, measurements, clusters, semantics, calibration, options,
     semantic_model: str = "", stage3_results: dict | None = None,
+    vectors: dict | None = None,
 ) -> list[AssetRecord]:
     """Score, then run the collection-level flagship pass, then classify."""
     prepared: list[tuple[media.Asset, Measurement, ScoreInput, object]] = []
@@ -1823,7 +1934,7 @@ def _score_all(
         )
         prepared.append((asset, measurement, inp, scoring.score(inp, profile)))
 
-    flagship = _select_flagship(prepared, measurements, clusters, calibration)
+    flagship = _select_flagship(prepared, measurements, clusters, calibration, vectors or {})
 
     records: list[AssetRecord] = []
     for asset, measurement, inp, scores in prepared:
@@ -1839,12 +1950,17 @@ def _score_all(
     return records
 
 
-def _select_flagship(prepared, measurements, clusters, calibration) -> set[str]:
+def _select_flagship(prepared, measurements, clusters, calibration, vectors=None) -> set[str]:
     """The absolute floor first, then a diversity-aware competition.
 
     Both halves are required. The floor alone promotes nothing from a modest
     shoot; the competition alone promotes twenty frames of the same sunset.
+
+    `vectors` is empty on a run with no encoder, in which case every candidate
+    reaches `select_diverse` without one and the redundancy term is measured on
+    perceptual hashes, exactly as before.
     """
+    vectors = vectors or {}
     profile = calibration.photo
     candidates = []
     for asset, measurement, inp, scores in prepared:
@@ -1864,6 +1980,7 @@ def _select_flagship(prepared, measurements, clusters, calibration) -> set[str]:
                     date_shot=measurement.exif.get("date_shot"),
                     quality=measurement.quality,
                     genre=inp.semantic.genre,
+                    embedding=vectors.get(asset.key),
                 ),
             )
         )

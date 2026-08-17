@@ -364,3 +364,41 @@ def test_no_unvalidated_focus_verdict_survives():
 
     for gone in ("confirm_focus", "FocusCheck", "focus_floor", "FOCUS_CONFIRM_RATIO"):
         assert not hasattr(technical_filter, gone), gone
+
+
+# --- a RAW LibRaw cannot open ---------------------------------------------------
+#
+# The commonest first failure for somebody with an unfamiliar body: a format
+# this build of LibRaw was not compiled for, or a file that is simply not what
+# its extension says. Reproduced against a real `LibRawFileUnsupportedError`.
+
+
+def test_an_unreadable_raw_is_a_failed_frame_not_a_failed_run(tmp_path):
+    from photoai import media, pipeline
+
+    for name in ("broken.CR2", "broken.RAF", "broken.NEF"):
+        (tmp_path / name).write_bytes(b"<!DOCTYPE html>\n" + b"x" * 4096)
+
+    previews = tmp_path / "previews"
+    for path in sorted(tmp_path.glob("broken.*")):
+        asset = media.Asset(
+            path=path, kind=media.MediaKind.PHOTO,
+            checksum=path.name, size_bytes=path.stat().st_size,
+        )
+        measurement = pipeline.measure_photo(asset, previews)
+        assert measurement.error, f"{path.name} decoded when it should not have"
+        assert "raw" in measurement.error.lower() or "format" in measurement.error.lower()
+
+
+def test_a_whole_folder_of_unreadable_raw_still_produces_a_report(tmp_path):
+    """One bad body must not cost somebody the run they already paid for."""
+    from photoai import cli
+
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    for name in ("a.CR3", "b.ARW", "c.ORF"):
+        (archive / name).write_bytes(b"not a raw file" * 512)
+
+    out = tmp_path / "run"
+    assert cli.main(["measure", "--input", str(archive), "--output", str(out)]) == 0
+    assert (out / "report" / "index.html").is_file()
