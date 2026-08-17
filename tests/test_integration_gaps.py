@@ -316,11 +316,13 @@ def test_the_html_shows_what_the_darkroom_refused(tmp_path):
     assert "auto_keep_and_edit" in body
 
 
-# --- focus, at the resolution where a focus miss is visible --------------------
+# --- the local pass rejects broken frames, not unfashionable ones --------------
 
 
-def test_a_defocused_frame_fails_the_full_resolution_check(tmp_path):
-    """The 512px pass cannot see this. Culling is mostly this question."""
+def test_a_frame_that_resolves_nothing_is_rejected(tmp_path):
+    """The only sharpness judgement the local pass makes, and the only one it
+    can: is there anything here at all. Not "is the right thing sharp" -- that
+    needs to know what the picture is about, and this pass does not."""
     import numpy as np
     from PIL import Image, ImageFilter
 
@@ -328,49 +330,37 @@ def test_a_defocused_frame_fails_the_full_resolution_check(tmp_path):
 
     rng = np.random.default_rng(4)
     detail = rng.integers(0, 255, (1400, 1400, 3), dtype=np.uint8)
-    sharp_path = tmp_path / "sharp.jpg"
-    Image.fromarray(detail).save(sharp_path, quality=95)
 
-    soft_path = tmp_path / "soft.jpg"
-    Image.fromarray(detail).filter(ImageFilter.GaussianBlur(4.0)).save(soft_path, quality=95)
+    with Image.fromarray(detail) as sharp:
+        assert technical_filter.analyze(sharp).blur_ratio >= technical_filter.MIN_BLUR_RATIO
 
-    for path, expected in ((sharp_path, True), (soft_path, False)):
-        with Image.open(path) as image:
-            report = technical_filter.analyze(image.convert("RGB"))
-        check = technical_filter.confirm_focus(path, report)
-        assert check.checked
-        assert check.confirmed is expected, f"{path.name}: ratio {check.ratio}"
+    smear = Image.fromarray(detail).filter(ImageFilter.GaussianBlur(12.0))
+    assert technical_filter.analyze(smear).blur_ratio < technical_filter.MIN_BLUR_RATIO
 
 
-def test_the_focus_check_says_where_it_looked(tmp_path):
-    """So a person can zoom to the same place and disagree."""
+def test_a_shallow_depth_of_field_frame_is_not_rejected(tmp_path):
+    """Foreground smeared and one sharp plane is a photograph, not a fault. The
+    tile measure exists so this survives the gate."""
     import numpy as np
-    from PIL import Image
+    from PIL import Image, ImageFilter
 
     from photoai import technical_filter
 
-    rng = np.random.default_rng(9)
-    Image.fromarray(rng.integers(0, 255, (1200, 1600, 3), dtype=np.uint8)).save(
-        tmp_path / "f.jpg", quality=95
-    )
-    with Image.open(tmp_path / "f.jpg") as image:
-        report = technical_filter.analyze(image.convert("RGB"))
-    assert report.tile_location is not None
+    rng = np.random.default_rng(11)
+    frame = Image.fromarray(rng.integers(0, 255, (1200, 1600, 3), dtype=np.uint8))
+    soft = frame.filter(ImageFilter.GaussianBlur(9.0))
+    # One sharp band in an otherwise smeared frame.
+    soft.paste(frame.crop((600, 400, 1000, 800)), (600, 400))
 
-    check = technical_filter.confirm_focus(tmp_path / "f.jpg", report)
-    left, top, right, bottom = check.region
-    assert right > left and bottom > top
-    assert right - left <= technical_filter.FOCUS_CROP_PX
+    report = technical_filter.analyze(soft)
+    assert report.sharpness_tile > report.sharpness_global
+    assert not report.rejected_for
 
 
-def test_an_unreadable_frame_is_reported_not_crashed(tmp_path):
+def test_no_unvalidated_focus_verdict_survives():
+    """A full-resolution focus check lived here with a threshold calibrated on
+    an archive that had already been culled -- a set with no bad focus in it."""
     from photoai import technical_filter
 
-    report = technical_filter.TechnicalReport(
-        sharpness_global=1.0, sharpness_tile=10.0, blur_ratio=5.0,
-        clipped_shadows=0.0, clipped_highlights=0.0, phash="x",
-        tile_location=(0, 0),
-    )
-    check = technical_filter.confirm_focus(tmp_path / "nope.jpg", report)
-    assert not check.checked
-    assert check.note
+    for gone in ("confirm_focus", "FocusCheck", "focus_floor", "FOCUS_CONFIRM_RATIO"):
+        assert not hasattr(technical_filter, gone), gone

@@ -197,146 +197,36 @@ def _sharpest_tile(gray: np.ndarray, grid: int = TILE_GRID) -> tuple[float, tupl
     return best, where
 
 
-# --- looking at 100%, which is where a focus miss lives ------------------------
+# --- looking at 100%, which is where a focus miss would live -------------------
 #
-# Everything above runs on a 512px preview. That is fast and it is enough for
-# exposure, clipping and a frame that is obviously soft. It is not enough for
-# focus: a portrait focused on an ear instead of an eye, or a frame back-focused
-# by ten centimetres, is smooth at 512px and wrong at 100%. Professional culling
-# is mostly this question, and answering it on a preview is answering a
-# different one.
+# There was a second pass here that re-measured the sharpest region at native
+# resolution and called a frame unconfirmed when it came back soft. It is gone,
+# for two reasons.
 #
-# So the sharpest tile is measured a second time, at native resolution, on that
-# tile alone. One crop per frame rather than a full decode: the cost is a
-# fraction of the decode that already happened, and the number it returns is
-# about the pixels a person would zoom into.
-
-# The measure is the same blur ratio used above, computed on the native crop:
-# how much detail the region loses when blurred again. It is scale-free, which
-# matters -- comparing Laplacian variance between a 512px preview and a 768px
-# native crop compares two different pixel scales and calls every large frame
-# soft, which is what the first version of this did.
+# The threshold was never validated against real failures. It was calibrated on
+# 200 frames from an archive that had already been culled -- a set with almost
+# no bad focus in it -- so the only point below the line was one synthetically
+# blurred frame. Everything between 8.5 and 11.9 was guesswork wearing a number.
 #
-# It is NOT noise-free, and that decides the threshold. Noise is high-frequency
-# energy, so grain raises the ratio: a defocused frame at ISO 6400 can clear a
-# floor that a defocused frame at ISO 200 would fail. Measured over 200 frames
-# from one archive, all of them in focus:
+# The second reason matters more, and it is about what this tool is for. A
+# photograph is not better for being sharp where a textbook wants it. Foreground
+# smeared and something extraordinary behind it is a photograph; a technically
+# immaculate frame of nothing is not. Deciding "the wrong thing is sharp" needs
+# to know what the picture is about, and the only part of this pipeline that
+# knows that is the content pass. So that judgement belongs there, and the local
+# pass keeps the job it can actually do: catching frames that are broken.
 #
-#     ISO <= 200    n=146   min 11.90   p10 14.84   median  56.26   max 127.25
-#     ISO <= 800    n= 15   min 14.56   p10 18.50   median  44.13   max  79.31
-#     ISO > 3200    n= 39   min 12.90   p10 20.61   median  42.17   max  78.99
-#
-# Two things follow. The passing population bottoms out near 12, so any floor
-# under ~10 never rejects a frame this archive would have kept. And the p10
-# rises with ISO rather than falling, which is the grain -- so the floor has to
-# rise with it, or a soft high-ISO frame passes on noise alone.
-#
-# Honest limit: these are 200 in-focus frames from one camera. There are no
-# defocused high-ISO samples in the set, so the slope below is chosen to track
-# the measured p10 rather than fitted to a separation nobody has measured.
-FOCUS_BASE_RATIO = 4.0
-FOCUS_RATIO_PER_ISO_STOP = 0.9
-FOCUS_ISO_BASELINE = 200
+# What survives is `blur_ratio` against MIN_BLUR_RATIO, which does not ask
+# whether a photograph is good. It asks whether anything in the frame resolves
+# at all -- and at 1.08 against a threshold of 2.0, a frame that is entirely out
+# of focus has nothing for the paid pass to look at and should not be sent to
+# it. That is the whole ambition: do not charge somebody to have a model
+# describe a smear.
 
 
-def focus_floor(iso: int | None) -> float:
-    """The blur ratio a sharp region has to clear, given the film speed."""
-    if not iso or iso <= FOCUS_ISO_BASELINE:
-        return FOCUS_BASE_RATIO
-    import math
-
-    stops = math.log2(iso / FOCUS_ISO_BASELINE)
-    return round(FOCUS_BASE_RATIO + FOCUS_RATIO_PER_ISO_STOP * stops, 2)
-
-
-# Kept for the callers that have no ISO to hand. Same value as the base.
-FOCUS_CONFIRM_RATIO = FOCUS_BASE_RATIO
-
-# The crop taken at native resolution, in pixels. Large enough to hold an eye
-# and its lashes at 24MP, small enough that reading it costs nothing.
-FOCUS_CROP_PX = 768
-
-
-@dataclass
-class FocusCheck:
-    """What the sharpest region looks like at 100%, rather than at 512px."""
-
-    checked: bool = False
-    preview_sharpness: float = 0.0
-    full_sharpness: float = 0.0
-    ratio: float = 0.0
-    region: tuple[int, int, int, int] = (0, 0, 0, 0)
-    note: str = ""
-    # The floor this frame had to clear, which rises with ISO. Stored so a
-    # person reading the JSON can see what the verdict was measured against.
-    floor: float = FOCUS_BASE_RATIO
-
-    @property
-    def confirmed(self) -> bool:
-        """Whether the sharpest region really is sharp at 100%."""
-        return self.checked and self.ratio >= self.floor
-
-    def to_dict(self) -> dict:
-        return {
-            "checked": self.checked,
-            "preview_sharpness": round(self.preview_sharpness, 2),
-            "full_sharpness": round(self.full_sharpness, 2),
-            "ratio": round(self.ratio, 4),
-            "confirmed": self.confirmed,
-            "floor": self.floor,
-            "region": list(self.region),
-            "note": self.note,
-        }
-
-
-def confirm_focus(
-    path: Path, report: TechnicalReport, *, grid: int = TILE_GRID, iso: int | None = None
-) -> FocusCheck:
-    """Re-measure the sharpest region at native resolution.
-
-    Returns a `FocusCheck` rather than a verdict. A soft result is a fact about
-    the frame, and what to do about it belongs to the caller -- this module has
-    thrown away good photographs before by deciding on its own.
-    """
-    check = FocusCheck(preview_sharpness=report.sharpness_tile, floor=focus_floor(iso))
-    if not report.tile_location or report.sharpness_tile <= 0:
-        check.note = "no sharp region was found on the preview to re-check"
-        return check
-
-    try:
-        with Image.open(path) as opened:
-            opened.draft("L", opened.size)  # no-op for most, a hint for JPEG
-            width, height = opened.size
-            row, col = report.tile_location
-            centre_x = int((col + 0.5) * width / grid)
-            centre_y = int((row + 0.5) * height / grid)
-            half = FOCUS_CROP_PX // 2
-            box = (
-                max(0, min(width - FOCUS_CROP_PX, centre_x - half)),
-                max(0, min(height - FOCUS_CROP_PX, centre_y - half)),
-                0, 0,
-            )
-            box = (box[0], box[1], min(width, box[0] + FOCUS_CROP_PX),
-                   min(height, box[1] + FOCUS_CROP_PX))
-            if box[2] - box[0] < 32 or box[3] - box[1] < 32:
-                check.note = "the frame is too small for a full-resolution crop to mean anything"
-                return check
-            crop = opened.convert("L").crop(box)
-    except Exception as e:
-        check.note = f"could not re-read the frame at full size: {e}"
-        return check
-
-    check.checked = True
-    check.region = box
-    gray = np.asarray(crop, dtype=np.float64)
-    check.full_sharpness = _laplacian_variance(gray)
-    check.ratio = _blur_ratio(crop, gray)
-    if not check.confirmed:
-        check.note = (
-            "the sharpest region is softer at 100% than the preview suggested: "
-            "the focus may have landed somewhere else"
-        )
-    return check
+def _blur_ratio_of(image: Image.Image, gray: np.ndarray) -> float:
+    """Exposed for callers that already hold a decoded frame."""
+    return _blur_ratio(image, gray)
 
 
 # --- burst collapsing -------------------------------------------------------
