@@ -27,34 +27,41 @@ resolution, a big exposure push loses latitude, and a JPEG gets far less credit
 than a RAW because the data the recovery would use has already been thrown away
 by the encoder.
 
-On a real 45-frame RAW sample, editing gained a median of **12 points** and up
-to **53**. Those are the frames a "current quality" score files in the bin.
+### Where the gain figure comes from, and what it is for
 
-### What that number is not
+`uplift` is a comparison between frames in one run, not a measurement of a
+photograph. The preview search hill-climbs on `frame_quality` and the same
+number reports the result, so the figure says "this frame has more room than
+that one" and cannot say "editing makes a picture 12 points better". It is
+useful for exactly one thing -- ordering an evening's work -- and the report
+labels it that way.
 
-`frame_quality` is used twice, and you should know it before trusting the gain.
-It is the objective the preview search hill-climbs on, *and* it is the ruler
-that reports the result. So `uplift` measures how far the search moved a number
-it was optimising — which is a weaker claim than "the photograph got better",
-however plausible the first makes the second sound. A metric scoring its own
-output will always report progress.
-
-That circularity cannot be settled from the inside. It needs photographs a
-person has ranked:
+To check the ordering against your own, the tool reads the stars you already
+gave these photographs:
 
 ```bash
 python3 cli.py bench-quality --analysis ./run/.internal/reports/analysis.json \
-                             --labels ./labels.csv
+                             --from-catalog ./photos
 ```
 
-with `filename,human_score` (or `human_rank`, or a `human_score_edited` column
-for the gain half). It reports Spearman correlation against your ranking.
+It reports agreement, a confusion matrix, precision on the top pile, and the
+thresholds that would have matched your sorting more closely. Ratings written
+after the run are skipped, so it cannot measure its own influence.
 
-Until that has been run, every record carries `uplift_validated: false` and the
-report says the gain is an estimate from an unchecked metric. **It is false
-today.** No labelled set ships with this project, and the correlation has not
-been measured — so treat the gain as a plausible ordering signal and not as a
-measurement.
+A blank sheet is the other route:
+
+```bash
+python3 cli.py bench-quality --analysis ./run/.internal/reports/analysis.json \
+                             --template ./labels.csv
+```
+
+with `filename,human_pile` — top, good or weak, your sorting. The sheet is
+shuffled and carries no score, so it measures the thresholds rather than how
+persuadable you are.
+
+`uplift_validated` in the stored run says whether either check has been run
+against this archive, and the report reads it: the gain is presented as an
+ordering signal until a ranking of yours says otherwise.
 
 ---
 
@@ -68,20 +75,16 @@ These are stored as different numbers and must never be collapsed:
 | `recoverability` | How safely normal editing can move it |
 | `post_edit_potential` | What it becomes after a realistic edit |
 | `aesthetic_potential` | Whether the result is worth looking at |
+| `content` | The moment, the composition, the subject |
 | `stock_potential` | Sellable and findable |
 | `portfolio_potential` | Represents the photographer's best work |
 | `uniqueness` | Against the rest of *this* collection |
 | `confidence` | How much of the above is actually evidenced |
 | `routing_score` | The single permitted blend, from the calibration profile |
 
-On a real 45-frame RAW sample the split looks like this — current quality has a
-median of 56, and editing realistically gains a median of 12 points and up to 53:
-
-```
-current    min  17.2   p50  56.3   max  74.5
-potential  min  49.4   p50  68.4   max  87.4
-gain       min   0.0   p50  12.0   max  53.1
-```
+The two spread apart in practice, which is the whole reason they are separate
+numbers: a flat, dark, tilted RAW and a clean JPEG of nothing land in opposite
+places once the second column is computed.
 
 ### How potential is estimated
 

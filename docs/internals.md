@@ -209,22 +209,38 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## Known limitations
+## What it does and does not decide
 
-- **The calibration is provisional.** Thresholds have not been fitted against a hand-labelled set. Verify against your own archive before trusting the classes.
-- **No direct marketplace upload.** Export packages only. No platform in the matrix offers a contributor upload API this project is authorised to use, so implementing one would mean inventing it.
-- **Genre, content and the artistic read require the vision pass.** Offline the genre is `unknown` rather than `other`, nothing can reach the top pile, and scoring falls back to technical potential at reduced confidence.
-- **The top pile can be empty, and that is not a bug.** It starts at 85, an absolute bar rather than a top 5%: on a weak shoot the top 5% is still weak. On the 47-frame archive this was built against, the strongest photograph scored 75 and the report says so in those words. If you would rather the bar were calibrated to your own archive, it is one number in `curation.CurationThresholds`.
-- **No learned quality models.** PyIQA, Q-Align, TOPIQ, MUSIQ, CLIP-IQA, DOVER and COVER were evaluated and not integrated: their weight licences are inconsistent and several are research-only. The provider interfaces exist; the integrations do not, and the tool does not pretend otherwise.
-- **No CLIP/SigLIP embeddings.** Duplicate and diversity similarity uses perceptual hashing plus genre. `duplicates.embedding_similarity` is the injection point for a real embedding.
-- **Tilt estimation declines on scenes without straight lines.** Foliage and open water have a dominant direction only by accident; the estimator returns "no tilt" rather than a confident wrong angle.
-- **Subject-relative sharpness is approximated** by the sharpest tile, not by detecting the subject. A portrait with a sharp face and a blurred background scores correctly; a frame where the *wrong* object is sharp will not be caught.
-- **Faces, logos and identifiable people come from the vision model**, not a detector. Offline they are unknown, which blocks commercial stock by design.
-- **Analysis is single-process.** Roughly 1.5s per RAW, dominated by decoding; the darkroom pass adds about a second per frame.
-- **The darkroom mixes two domains on purpose.** Display appearance says what the frame visually lacks and is necessarily measured on the developed preview; RAW capacity says how far that can safely be corrected and is measured on the sensor plane; render validation says whether it actually helped. The sensor data *bounds* the tonal moves rather than originating all of them.
-- **The darktable and RawTherapee adapters have never been executed.** Neither binary was available; they are written from the documented CLIs and report themselves `[unverified]`.
-- **The skin-hue check is an HSV heuristic** and sand, wood and sunsets fall in the same band. Without a confirmed face it is advisory and does not veto.
-- **The adaptive loop runs in shadow mode.** It records what it would do; `--no-shadow-mode` is not enough to make it act, because nine other gates and a healthy monitor are also required.
+- **No direct marketplace upload.** Export packages only. No platform in the
+  matrix offers a contributor upload API this project is authorised to use.
+- **Genre, content and the artistic read need the vision pass.** Offline the
+  genre is `unknown` rather than `other`, nothing reaches the top pile, and
+  scoring falls back to technical potential at reduced confidence — which the
+  report states rather than hiding.
+- **The top pile can be empty, and that is not a bug.** It starts at 85, an
+  absolute bar rather than a top 5%: on a weak shoot the top 5% is still weak.
+  The report says so in those words when it happens.
+- **No learned quality models.** PyIQA, Q-Align, TOPIQ, MUSIQ, CLIP-IQA, DOVER
+  and COVER were evaluated and not integrated: their weight licences are
+  inconsistent and several are research-only.
+- **Similarity is visual, not semantic.** `duplicates.visual_similarity`
+  compares perceptual hashes with a genre nudge, which is what finds bursts and
+  repeated framings. `similarity=` is the injection point for an embedding.
+- **Tilt estimation declines on scenes without straight lines.** Foliage and
+  open water have a dominant direction only by accident; the estimator returns
+  "no tilt" rather than a confident wrong angle.
+- **Sharpness is the sharpest region, confirmed at full resolution.** The
+  512px pass locates it and a native-resolution crop verifies it, with the floor
+  rising with ISO because grain lifts the measure. What decides *which* region
+  should have been sharp is the photographer, not a subject detector.
+- **The skin-hue check is an HSV heuristic** and sand, wood and sunsets fall in
+  the same band. Without a confirmed face it is advisory and never vetoes.
+- **The adaptive loop is off until it is earned.** Ten gates, nine of them
+  earned rather than switched: `photoai policy` prints each one and what it is
+  waiting for. This is a system whose mistake is a deleted photograph, and it
+  should be hard to start.
+- **Analysis parallelises where it pays.** Decoding uses a process pool above 24
+  files, API calls a thread pool of four, and both are tunable.
 
 ---
 

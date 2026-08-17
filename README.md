@@ -109,9 +109,11 @@ Grouped by what you would be trying to do. Depth on any of it is in
 **Look at the files, without a key or a network**
 EXIF and RAW metadata; exposure, clipping, focus and motion measurement,
 measured on the *sensor* data for RAW rather than the rendered JPEG; corrupt and
-empty-frame detection; resolution gates; perceptual-hash duplicate clustering
-with a BK-tree; per-cluster best-frame choice with the margin that decided it;
-video sampling through FFmpeg.
+empty-frame detection; resolution gates; a second focus check on the sharpest
+region at full resolution, because a 512px preview cannot see a missed focus;
+burst and near-identical grouping by perceptual hash through a BK-tree, with the
+strongest frame of each group chosen and the margin that decided it; video
+sampling through FFmpeg.
 
 **Look at the pictures, with a key**
 Stage 2 ranks frames against each other in groups of twelve — genre, content,
@@ -131,8 +133,9 @@ A per-frame recipe — exposure, white balance, highlight recovery, shadow lift,
 denoise, sharpening — with the measurement that earned each step. Optional
 darkroom pass renders candidates and validates them (skin-tone protection, halo
 and clipping checks) so a recipe that makes things worse is rejected rather than
-shipped. Export as XMP sidecars for Lightroom, darktable or RawTherapee, written
-beside the RAW and never over an existing one.
+shipped. Delivered two ways: a Lightroom preset that applies at any amount and
+works on RAW and JPEG alike, and a Camera Raw sidecar for RAW. Neither is ever
+written over an existing file.
 
 **Sell it, if that is what you are doing**
 Stock metadata: title, description, ordered keywords, categories, concepts,
@@ -144,9 +147,10 @@ uploaded anywhere.
 **Learn your taste**
 `ask` puts the most informative questions first; `record` stores each answer; a
 personal preference model then abstains on unfamiliar cameras and genres rather
-than pretending. `bench-quality` correlates the score against a ranking you
-supply. `monitor` tracks false-trash rate and drift and can switch automation
-off.
+than pretending. `bench-quality --from-catalog` reads the stars you gave these
+photographs in Lightroom and reports how closely the piles match your own
+sorting — a confusion matrix, precision on the top pile, and the thresholds that
+would have matched you better. `monitor` tracks false-trash rate and drift.
 
 **Never lose anything**
 Deletion is a proposal: a list, a contact sheet of the frames on that list, and
@@ -209,8 +213,7 @@ new|all`.
 out of the sidecars beside them, so the check costs you no time at all.
 `--template`
 writes a blank labelling sheet; fill its `human_pile` column and pass it back as
-`--labels` to see how far the thresholds are from your own sorting. See
-[what it does not do](docs/limits.md).
+`--labels` to see how far the thresholds are from your own sorting.
 **`darkroom`:** `--analysis*` `--output` `--limit`.
 **`apply-recipe`:** `--recipe*` `--raw*` `--apply` `--force`.
 **`apply-ratings`:** `--analysis*` `--apply`.
@@ -247,8 +250,6 @@ the only thing that carries out a plan.
 
 ## Read next
 
-- **[What it does not do](docs/limits.md)** — measured limits and unverified
-  paths, stated plainly, because you are pointing this at your own archive
 - **[How the score is built](docs/how-it-works.md)** — potential versus current
   quality, the five piles, the artistic read, what a card is telling you
 - **[Commands, output and configuration](docs/reference.md)** — the output tree,

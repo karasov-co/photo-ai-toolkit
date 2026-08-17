@@ -91,9 +91,11 @@ Built-ins: `default-photo`, `default-video`, `stock-first`, `portfolio-first`.
 Photo and video carry separate thresholds because a threshold tuned on stills
 routes clips wrongly.
 
-> **The shipped numbers are provisional.** They are starting points measured
-> against one archive, not fitted against a labelled set, and every profile says
-> so in its version string. Treat them as a beginning.
+> **The shipped numbers are a starting point, and they are meant to move.**
+> `bench-quality --from-catalog` reads the stars you gave a finished run and
+> reports which thresholds would have matched your sorting more closely;
+> `reclassify --profile-file` applies them without spending a token. Every
+> profile carries a version string so a run records which numbers produced it.
 
 ### Manual overrides win, permanently
 
@@ -167,8 +169,8 @@ and one is fine.
 
 In Lightroom Classic: copy the `.xmp` next to the photograph, select it, then
 **Metadata → Read Metadata from File**. The sliders move. Undo works normally.
-`edit_recipes/HOW-TO-USE.txt` covers Camera Raw, Capture One, darktable and
-RawTherapee too.
+`edit_recipes/HOW-TO-USE.txt` covers Camera Raw and Bridge too, and says which
+route works for JPEG and which does not.
 
 They are a **starting point, not a finished edit**: they undo what the camera
 got wrong and stop there. Every creative decision is still yours.
