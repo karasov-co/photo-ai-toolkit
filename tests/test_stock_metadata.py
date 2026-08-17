@@ -4,8 +4,8 @@ import csv
 
 import pytest
 
-import stock_metadata as sm
-from scoring import Semantic
+from photoai import stock_metadata as sm
+from photoai.scoring import Semantic
 
 
 def semantic(**kwargs):

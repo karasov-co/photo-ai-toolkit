@@ -8,9 +8,8 @@ correlation anybody can run, and a flag in the report saying it has not been.
 
 import pytest
 
-import bench_quality
-import edit_recipe
-from reports import AssetRecord
+from photoai import bench_quality, edit_recipe
+from photoai.reports import AssetRecord
 
 
 def record(name, current, potential=None):
@@ -125,7 +124,7 @@ def test_the_report_says_the_gain_compares_frames_rather_than_measuring_them(tmp
     sharper than that: the metric is both the objective the edit search climbs
     and the ruler that reports the climb, so +12 is a comparison between frames
     and cannot be a measurement of a photograph."""
-    import simple_report
+    from photoai import simple_report
 
     page = simple_report.write(
         [record("a.jpg", 50, 70)], tmp_path / "report.html", expert=False
@@ -136,7 +135,7 @@ def test_the_report_says_the_gain_compares_frames_rather_than_measuring_them(tmp
 
 
 def test_a_validated_run_would_drop_the_caveat(tmp_path):
-    import simple_report
+    from photoai import simple_report
 
     validated = record("a.jpg", 50, 70)
     validated.uplift_validated = True

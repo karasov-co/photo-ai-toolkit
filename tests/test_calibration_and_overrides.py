@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from calibration import (
+from photoai.calibration import (
     BUILTIN_PROFILES,
     CalibrationProfile,
     CalibrationSet,
@@ -14,8 +14,8 @@ from calibration import (
     resolve,
     stock_first_profile,
 )
-from overrides import Override, OverrideStore, apply_to, capture
-from reports import AssetRecord
+from photoai.overrides import Override, OverrideStore, apply_to, capture
+from photoai.reports import AssetRecord
 
 # --- profiles ---------------------------------------------------------------
 

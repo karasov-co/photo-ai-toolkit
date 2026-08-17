@@ -3,8 +3,8 @@ import pytest
 from conftest import WITH_EXIF
 from PIL import Image, ImageDraw, ImageFilter
 
-import technical_filter as tf
-from technical_filter import (
+from photoai import technical_filter as tf
+from photoai.technical_filter import (
     analyze,
     group_bursts,
     load_for_analysis,

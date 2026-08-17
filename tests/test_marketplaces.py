@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-import marketplaces
-from provenance import Provenance, ProvenanceRecord, conflicts_for, label_for_submission, warn_for_edit
-from scoring import AssetScores, Route, RouteClass, ScoredAsset, Semantic
+from photoai import marketplaces
+from photoai.provenance import Provenance, ProvenanceRecord, conflicts_for, label_for_submission, warn_for_edit
+from photoai.scoring import AssetScores, Route, RouteClass, ScoredAsset, Semantic
 
 
 @pytest.fixture

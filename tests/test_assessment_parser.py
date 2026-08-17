@@ -10,7 +10,7 @@ The parser survived because it is the one part that runs.
 
 import pytest
 
-from assessment_parser import (
+from photoai.assessment_parser import (
     AssessmentParseError,
     Genre,
     Recover,

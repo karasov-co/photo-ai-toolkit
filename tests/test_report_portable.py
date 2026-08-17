@@ -19,9 +19,8 @@ import sys
 import pytest
 from synthetic import photo_like, write_jpeg
 
-import report_assets
-import simple_report
-from reports import AssetRecord
+from photoai import report_assets, simple_report
+from photoai.reports import AssetRecord
 
 
 def record(name="a.jpg", source=None, **overrides):
@@ -372,7 +371,7 @@ def test_the_header_names_both_bucket_thresholds():
 def test_the_standalone_file_survives_publishing(tmp_path):
     """`--standalone` wrote it into staging and publish left it there: the flag
     reported success and printed a path that held nothing."""
-    import workspace
+    from photoai import workspace
 
     space = workspace.Workspace(tmp_path / "run").create()
     staged = space.internal / "staging-test"

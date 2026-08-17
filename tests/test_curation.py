@@ -14,12 +14,9 @@ piles was a stock threshold and stock is exactly what that photograph is not.
 
 import pytest
 
-import calibration
-import curation
-import scoring
-import stage3
-from curation import PhotoCategory
-from issues import IssueCode, IssueSet
+from photoai import calibration, curation, scoring, stage3
+from photoai.curation import PhotoCategory
+from photoai.issues import IssueCode, IssueSet
 
 
 @pytest.fixture
@@ -597,7 +594,7 @@ def archive(tmp_path):
 
 
 def run(archive, tmp_path, client=None, **options):
-    import pipeline
+    from photoai import pipeline
 
     return pipeline.run(
         pipeline.PipelineOptions(
@@ -615,15 +612,14 @@ def run_cli(archive, tmp_path, client, monkeypatch):
     are written by the CLI, so anything asserting about those has to go through
     it. The client is injected rather than built from a credential.
     """
-    import cli
-    import pipeline
+    from photoai import cli, pipeline
 
     real = pipeline.run
     monkeypatch.setattr(pipeline, "run", lambda o, **kw: real(o, **{**kw, "client": client}))
-    monkeypatch.setattr("bootstrap.has_credentials", lambda: True)
-    monkeypatch.setattr("bootstrap.credential_status", lambda lang="en": "credentials: stubbed")
+    monkeypatch.setattr("photoai.bootstrap.has_credentials", lambda: True)
+    monkeypatch.setattr("photoai.bootstrap.credential_status", lambda lang="en": "credentials: stubbed")
 
-    import preflight
+    from photoai import preflight
 
     monkeypatch.setattr(
         preflight, "run",
@@ -690,7 +686,7 @@ def test_a_local_only_run_still_categorises_but_reaches_no_top(archive, tmp_path
 
 
 def test_the_summary_counts_every_category(archive, tmp_path):
-    import reports
+    from photoai import reports
 
     result = run(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3)))
     summary = reports.summarise(result.records)
@@ -699,7 +695,7 @@ def test_the_summary_counts_every_category(archive, tmp_path):
 
 
 def test_the_console_summary_names_the_categories(archive, tmp_path):
-    import reports
+    from photoai import reports
 
     result = run(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3)))
     text = reports.format_summary(reports.summarise(result.records))
@@ -717,7 +713,7 @@ def test_the_html_has_a_top_photos_section(archive, tmp_path, monkeypatch):
 def test_the_farm_has_a_category_view(archive, tmp_path, monkeypatch):
     run_cli(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3, 95)), monkeypatch)
     out = tmp_path / "out"
-    import workspace
+    from photoai import workspace
 
     # Every folder exists whether or not it has anything in it, so that an empty
     # pile is visibly empty rather than absent.
@@ -739,7 +735,7 @@ def test_analyze_is_always_a_full_analysis():
     A downgrade that keeps the command name is how a run with no content check
     and no artistic read came to be presented as a finished analysis.
     """
-    import cli
+    from photoai import cli
 
     parser = cli.build_parser()
     analyze = parser.parse_args(["analyze", "--input", "i", "--output", "o"])
@@ -749,7 +745,7 @@ def test_analyze_is_always_a_full_analysis():
 
 
 def test_local_only_lives_under_its_own_command():
-    import cli
+    from photoai import cli
 
     args = cli.build_parser().parse_args(["measure", "--input", "i", "--output", "o"])
     assert args.func is cli.cmd_measure
@@ -757,7 +753,7 @@ def test_local_only_lives_under_its_own_command():
 
 def test_the_suite_cannot_reach_the_real_env_file():
     """A guard on the guard. This is how a real key got spent once."""
-    import bootstrap
+    from photoai import bootstrap
 
     assert not bootstrap.PROJECT_ENV.exists()
     assert bootstrap.api_key() is None

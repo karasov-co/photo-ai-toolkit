@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-import prompts
-from batch_runner import (
+from photoai import prompts
+from photoai.batch_runner import (
     RESPONSES_ENDPOINT,
     MixedModelBatch,
     TokenLedger,

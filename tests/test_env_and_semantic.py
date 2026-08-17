@@ -13,13 +13,8 @@ import json
 import pytest
 from synthetic import photo_like, write_jpeg
 
-import bootstrap
-import cli
-import i18n
-import pipeline
-import prompts
-import reports
-from scoring import RouteClass
+from photoai import bootstrap, cli, i18n, pipeline, prompts, reports
+from photoai.scoring import RouteClass
 
 FAKE_KEY = "test-key-placeholder-not-a-real-credential"
 OTHER_KEY = "another-test-placeholder"
@@ -491,8 +486,8 @@ def test_the_default_summary_does_not_mention_releases_or_route_classes(archive,
 
 
 def test_a_short_clip_is_not_grounds_for_deletion():
-    import video_analyzer as va
-    from issues import IssueCode
+    from photoai import video_analyzer as va
+    from photoai.issues import IssueCode
 
     probe = va.parse_probe(
         {
@@ -513,14 +508,14 @@ def test_a_short_clip_is_not_grounds_for_deletion():
 
 
 def test_a_weaker_duplicate_is_never_called_unrecoverable():
-    from issues import FIXABILITY, Fixability, IssueCode
+    from photoai.issues import FIXABILITY, Fixability, IssueCode
 
     assert FIXABILITY[IssueCode.WEAKER_DUPLICATE] is not Fixability.UNRECOVERABLE
     assert FIXABILITY[IssueCode.SHORT_CLIP] is not Fixability.UNRECOVERABLE
 
 
 def test_neither_is_grounds_for_a_permanent_purge():
-    import quarantine
+    from photoai import quarantine
 
     assert not quarantine.is_purgeable_evidence("weaker_duplicate")
     assert not quarantine.is_purgeable_evidence("unusable_duration")
@@ -574,7 +569,7 @@ def test_every_catalogue_entry_has_balanced_spacing():
 
 @pytest.mark.parametrize("language", ["en", "ru"])
 def test_the_plan_block_speaks_the_users_language(language, tmp_path):
-    import quarantine
+    from photoai import quarantine
 
     op = quarantine.FileOperation(
         op_id="o", asset_id="a", source="/x/a.jpg", destination="/q/a.jpg",
@@ -597,7 +592,7 @@ def test_the_russian_summary_has_no_english_left_in_its_labels(archive, tmp_path
 
 
 def test_reasons_render_in_both_languages():
-    from scoring import Reason
+    from photoai.scoring import Reason
 
     reason = Reason("reason.stock_standard", {"value": 55}, "stock potential 55 is usable")
     assert "55" in reason.localise("en")
@@ -606,7 +601,7 @@ def test_reasons_render_in_both_languages():
 
 
 def test_an_unknown_reason_key_falls_back_to_its_english_text():
-    from scoring import Reason
+    from photoai.scoring import Reason
 
     reason = Reason("reason.does_not_exist", {}, "the original English sentence")
     assert reason.localise("ru") == "the original English sentence"
@@ -659,7 +654,7 @@ def test_the_stage2_prompt_version_is_stable():
 
 def test_the_comparison_sheet_pairs_each_candidate_with_the_frame_that_beat_it(tmp_path):
     """A grid says what you would lose; a pair says why the other one won."""
-    import layout
+    from photoai import layout
 
     a = write_jpeg(photo_like(400, 300, seed=1), tmp_path / "a.jpg")
     b = write_jpeg(photo_like(400, 300, seed=2), tmp_path / "b.jpg")
@@ -680,13 +675,13 @@ def test_the_comparison_sheet_pairs_each_candidate_with_the_frame_that_beat_it(t
 
 
 def test_the_sheet_reports_whether_a_content_check_ran(tmp_path):
-    import layout
+    from photoai import layout
 
     assert "НЕ выполнялся" in i18n.t("sheet.semantic_missing", "ru")
     assert layout.load_font(12) is not None
 
 
 def test_no_rows_means_no_sheet(tmp_path):
-    import layout
+    from photoai import layout
 
     assert layout.build_comparison_sheet([], tmp_path / "none.jpg") is None

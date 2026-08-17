@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import pathlib
 
-import cli
+from photoai import cli
 
 README = pathlib.Path(__file__).resolve().parent.parent / "README.md"
 
@@ -85,7 +85,7 @@ def test_the_price_in_the_readme_matches_the_pricing_file():
     becomes a complaint."""
     import re
 
-    import llm_provider
+    from photoai import llm_provider
 
     entry = llm_provider.load_pricing()["models"]["grok-4.6"]
     # Whitespace-normalised: the price is bold and the line wraps between the
@@ -114,12 +114,12 @@ def _module_docstrings():
     import importlib
     import pkgutil
 
-    root = pathlib.Path(__file__).resolve().parent.parent
+    root = pathlib.Path(__file__).resolve().parent.parent / "src" / "photoai"
     for path in sorted(root.glob("*.py")):
-        if path.stem in ("conftest", "setup"):
+        if path.stem in ("conftest", "setup", "__init__"):
             continue
         try:
-            module = importlib.import_module(path.stem)
+            module = importlib.import_module(f"photoai.{path.stem}")
         except Exception:  # pragma: no cover - a module that needs an argument
             continue
         if module.__doc__:
@@ -142,7 +142,7 @@ def test_no_module_docstring_still_describes_the_release_logic():
 
 
 def test_the_scoring_docstring_lists_the_dimensions_that_exist():
-    import scoring
+    from photoai import scoring
 
     doc = scoring.__doc__
     fields = set(scoring.AssetScores().to_dict())

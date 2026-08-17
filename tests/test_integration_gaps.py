@@ -10,13 +10,10 @@ import numpy as np
 import pytest
 from synthetic import photo_like, write_jpeg
 
-import pipeline
-import prompts
-import recipe_validator
-import selective_policy
-from edit_schema import EditRecipe
-from model_monitoring import Monitor, Observation
-from preference_model import PersonalModel, Prediction
+from photoai import pipeline, prompts, recipe_validator, selective_policy
+from photoai.edit_schema import EditRecipe
+from photoai.model_monitoring import Monitor, Observation
+from photoai.preference_model import PersonalModel, Prediction
 
 # --- the measurement domain reaches the prompt -------------------------------
 
@@ -70,7 +67,7 @@ def test_a_raw_measurement_reaches_the_record(tmp_path):
 )
 def test_a_real_raw_measures_on_the_sensor_plane(tmp_path):
     raw = sorted(pipeline.Path("photos").glob("*.RW2"))[0]
-    import media
+    from photoai import media
 
     asset = media.Asset(path=raw, kind=media.MediaKind.PHOTO, checksum="c", size_bytes=1)
     measurement = pipeline.measure_photo(asset, tmp_path / "previews")
@@ -156,7 +153,7 @@ def test_a_healthy_monitor_alone_is_not_enough():
 
 
 def _no_signal():
-    from artistic import ArtisticScores
+    from photoai.artistic import ArtisticScores
 
     return ArtisticScores(curatorial_uncertainty=10)
 
@@ -177,7 +174,7 @@ def test_the_pipeline_records_an_observation_for_every_prediction(tmp_path):
 
 
 def test_an_override_resolves_the_observation(tmp_path):
-    import overrides as overrides_module
+    from photoai import overrides as overrides_module
 
     root = tmp_path / "archive"
     write_jpeg(photo_like(1200, 900, seed=20), root / "a.jpg")
@@ -287,7 +284,7 @@ def test_an_unconfirmed_skin_finding_is_still_reported():
 
 
 def test_the_record_can_carry_the_sidecar_manifest():
-    from reports import AssetRecord
+    from photoai.reports import AssetRecord
 
     record = AssetRecord(
         asset_id="a", source_path="/x/a.RW2", filename="a.RW2", media_type="photo", checksum="c",
@@ -302,8 +299,8 @@ def test_the_record_can_carry_the_sidecar_manifest():
 
 def test_the_html_shows_what_the_darkroom_refused(tmp_path):
     """A rejection says what the tool nearly did to the frame."""
-    import reports
-    from reports import AssetRecord
+    from photoai import reports
+    from photoai.reports import AssetRecord
 
     record = AssetRecord(
         asset_id="a", source_path="/x/a.RW2", filename="a.RW2", media_type="photo", checksum="c",
@@ -327,7 +324,7 @@ def test_a_defocused_frame_fails_the_full_resolution_check(tmp_path):
     import numpy as np
     from PIL import Image, ImageFilter
 
-    import technical_filter
+    from photoai import technical_filter
 
     rng = np.random.default_rng(4)
     detail = rng.integers(0, 255, (1400, 1400, 3), dtype=np.uint8)
@@ -350,7 +347,7 @@ def test_the_focus_check_says_where_it_looked(tmp_path):
     import numpy as np
     from PIL import Image
 
-    import technical_filter
+    from photoai import technical_filter
 
     rng = np.random.default_rng(9)
     Image.fromarray(rng.integers(0, 255, (1200, 1600, 3), dtype=np.uint8)).save(
@@ -367,7 +364,7 @@ def test_the_focus_check_says_where_it_looked(tmp_path):
 
 
 def test_an_unreadable_frame_is_reported_not_crashed(tmp_path):
-    import technical_filter
+    from photoai import technical_filter
 
     report = technical_filter.TechnicalReport(
         sharpness_global=1.0, sharpness_tile=10.0, blur_ratio=5.0,

@@ -16,11 +16,8 @@ import json
 import pytest
 from synthetic import photo_like
 
-import calibration
-import prompts
-import scoring
-import stage3
-from stage3 import ArtisticAssessment, Expression, EyesState, Stage3Status
+from photoai import calibration, prompts, scoring, stage3
+from photoai.stage3 import ArtisticAssessment, Expression, EyesState, Stage3Status
 
 
 def artistic_payload(**overrides) -> dict:
@@ -447,7 +444,7 @@ def test_a_different_model_is_a_different_entry():
 
 
 def test_the_pipeline_cache_stores_stage3_separately(tmp_path):
-    import pipeline
+    from photoai import pipeline
 
     cache = pipeline.AnalysisCache(tmp_path / "c.json")
     cache.put("abc", pipeline.Measurement(quality=50.0).to_dict())
@@ -630,7 +627,7 @@ def archive(tmp_path):
 
 
 def run(archive, tmp_path, client, **options):
-    import pipeline
+    from photoai import pipeline
 
     return pipeline.run(
         pipeline.PipelineOptions(
@@ -642,7 +639,7 @@ def run(archive, tmp_path, client, **options):
 
 @pytest.fixture(autouse=True)
 def no_real_credentials(monkeypatch, tmp_path):
-    import bootstrap
+    from photoai import bootstrap
 
     monkeypatch.delenv(bootstrap.API_KEY_VAR, raising=False)
     monkeypatch.setattr(bootstrap, "PROJECT_ROOT", tmp_path)
@@ -695,7 +692,7 @@ def test_nothing_is_promoted_when_stage3_is_off(archive, tmp_path):
 
 def test_an_unavailable_read_is_skipped_not_declared_unnecessary(archive, tmp_path):
     """`not_required` reads as a judgement about the frame. This wasn't one."""
-    import pipeline
+    from photoai import pipeline
 
     result = pipeline.run(
         pipeline.PipelineOptions(input_dir=archive, output_dir=tmp_path / "out", semantic=False)
@@ -763,7 +760,7 @@ def _stage3_frames(count):
 
 
 def test_a_truncated_reply_splits_the_group_instead_of_repeating_it():
-    import pipeline
+    from photoai import pipeline
 
     responses = _TruncatingResponses(fits=2)
     out = pipeline._stage3_call(
@@ -776,7 +773,7 @@ def test_a_truncated_reply_splits_the_group_instead_of_repeating_it():
 
 
 def test_a_single_frame_that_truncates_gets_a_wider_budget():
-    import pipeline
+    from photoai import pipeline
 
     responses = _TruncatingResponses(fits=0)
     pipeline._stage3_call(
@@ -787,7 +784,7 @@ def test_a_single_frame_that_truncates_gets_a_wider_budget():
 
 
 def test_widening_the_budget_is_bounded():
-    import pipeline
+    from photoai import pipeline
 
     responses = _TruncatingResponses(fits=0)
     out = pipeline._stage3_call(
@@ -808,7 +805,7 @@ def test_the_budget_covers_what_a_frame_actually_costs():
 
 
 def test_truncation_is_told_apart_from_prose():
-    import pipeline
+    from photoai import pipeline
 
     assert pipeline._truncated(_Truncated())
     assert not pipeline._truncated(_Reply("I could not analyse these"))
@@ -830,7 +827,7 @@ def _ranked(values, axis="axis_c"):
 
 
 def test_the_exact_reply_that_cost_eight_photographs_their_genre():
-    import batch_runner
+    from photoai import batch_runner
 
     items = _ranked([1, 2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 12])
     repaired, notes = batch_runner.repair_group_ranks(items, 12)
@@ -839,7 +836,7 @@ def test_the_exact_reply_that_cost_eight_photographs_their_genre():
 
 
 def test_a_repair_keeps_the_order_the_model_expressed():
-    import batch_runner
+    from photoai import batch_runner
 
     items = _ranked([1, 2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 12])
     repaired, _ = batch_runner.repair_group_ranks(items, 12)
@@ -849,7 +846,7 @@ def test_a_repair_keeps_the_order_the_model_expressed():
 
 
 def test_a_clean_ranking_is_left_alone():
-    import batch_runner
+    from photoai import batch_runner
 
     items = _ranked(list(range(1, 13)))
     repaired, notes = batch_runner.repair_group_ranks(items, 12)
@@ -859,7 +856,7 @@ def test_a_clean_ranking_is_left_alone():
 
 def test_a_reply_that_ranked_nothing_is_not_repaired():
     """Half the group tied is not a miscount, and no repair invents an order."""
-    import batch_runner
+    from photoai import batch_runner
 
     items = _ranked([1] * 12)
     _, notes = batch_runner.repair_group_ranks(items, 12)
@@ -868,7 +865,7 @@ def test_a_reply_that_ranked_nothing_is_not_repaired():
 
 
 def test_a_short_reply_is_not_repaired():
-    import batch_runner
+    from photoai import batch_runner
 
     items = _ranked([1, 2, 3])
     _, notes = batch_runner.repair_group_ranks(items, 12)

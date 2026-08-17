@@ -17,8 +17,8 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from edit_schema import EditRecipe
-from exporters import adobe_xmp
+from photoai.edit_schema import EditRecipe
+from photoai.exporters import adobe_xmp
 
 
 def recipe(**overrides):
@@ -117,7 +117,7 @@ def test_an_extreme_measurement_cannot_write_a_slider_off_its_scale():
 
 
 def test_export_writes_a_preset_beside_the_sidecar(tmp_path, monkeypatch):
-    import recipe_export
+    from photoai import recipe_export
 
     written = recipe_export.PRESETS_DIRNAME
     assert written == "presets", "presets live apart so a bulk import cannot grab sidecars"
@@ -146,7 +146,7 @@ def test_nothing_is_ever_rated_one_star_or_zero():
 
 
 def test_every_pile_has_a_star_and_a_colour():
-    from curation import PhotoCategory
+    from photoai.curation import PhotoCategory
 
     for category in PhotoCategory:
         assert category.name in adobe_xmp.STARS, category.name
@@ -161,7 +161,7 @@ def test_an_unknown_category_does_not_invent_a_rating():
 def test_ratings_are_written_for_the_whole_shoot(tmp_path):
     """A two-star frame is a decision too, and the pile is only useful as a sort
     if every photograph carries one."""
-    import recipe_export
+    from photoai import recipe_export
 
     records = [rated("TOP"), rated("WEAK"), rated("GOOD_PERSONAL")]
     for i, record in enumerate(records):
@@ -172,7 +172,7 @@ def test_ratings_are_written_for_the_whole_shoot(tmp_path):
 
 
 def test_a_failed_photograph_gets_no_rating(tmp_path):
-    import recipe_export
+    from photoai import recipe_export
 
     broken = rated("WEAK")
     broken.status = "error"
@@ -242,7 +242,7 @@ def test_the_colours_are_not_hardcoded(monkeypatch):
 
 
 def test_stars_in_a_catalogue_become_human_piles(tmp_path):
-    import bench_quality
+    from photoai import bench_quality
 
     (tmp_path / "a.xmp").write_text('<x><rdf:Description xmp:Rating="5"/></x>')
     (tmp_path / "b.xmp").write_text('<x><rdf:Description xmp:Rating="2"/></x>')
@@ -253,7 +253,7 @@ def test_stars_in_a_catalogue_become_human_piles(tmp_path):
 
 def test_an_unrated_photograph_is_not_read_as_a_rejection(tmp_path):
     """Zero means nobody looked, in every catalogue there is."""
-    import bench_quality
+    from photoai import bench_quality
 
     (tmp_path / "a.xmp").write_text('<x><rdf:Description xmp:Rating="0"/></x>')
     (tmp_path / "b.xmp").write_text("<x><rdf:Description/></x>")

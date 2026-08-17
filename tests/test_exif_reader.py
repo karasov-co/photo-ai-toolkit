@@ -11,8 +11,8 @@ from conftest import (
     WITH_EXIF,
 )
 
-import exif_reader
-from exif_reader import (
+from photoai import exif_reader
+from photoai.exif_reader import (
     EXIF_EMPTY,
     _dms_to_decimal,
     _int_or_none,

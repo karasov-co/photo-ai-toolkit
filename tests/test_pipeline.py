@@ -12,11 +12,10 @@ from concurrent.futures import ProcessPoolExecutor
 import pytest
 from synthetic import blurred, dark_but_recoverable, near_black, photo_like, write_jpeg
 
-import cli
-import pipeline
-from calibration import CalibrationSet, portfolio_first_profile
-from pipeline import AnalysisCache, Measurement, PipelineOptions
-from scoring import RouteClass
+from photoai import cli, pipeline
+from photoai.calibration import CalibrationSet, portfolio_first_profile
+from photoai.pipeline import AnalysisCache, Measurement, PipelineOptions
+from photoai.scoring import RouteClass
 
 
 @pytest.fixture
@@ -407,7 +406,7 @@ def _load(out):
 
 def test_a_hostile_filename_never_reaches_the_shell(tmp_path):
     """The list is data in JSON; Python carries it out."""
-    import layout
+    from photoai import layout
 
     class Record:
         route_class = "trash"
@@ -430,7 +429,7 @@ def test_a_hostile_filename_never_reaches_the_shell(tmp_path):
 
 def test_the_trash_command_is_a_dry_run_by_default(tmp_path, capsys):
     """It moves to the Trash, and only when explicitly told to."""
-    import layout
+    from photoai import layout
 
     victim = tmp_path / "archive" / "doomed.jpg"
     victim.parent.mkdir(parents=True)
@@ -714,8 +713,7 @@ def test_a_run_that_dies_mid_pass_keeps_what_it_already_paid_for(tmp_path, monke
     moment a failing run never reaches. Eighteen paid groups, discarded."""
     import json as _json
 
-    import bootstrap
-    import media
+    from photoai import bootstrap, media
 
     preview = tmp_path / "p.jpg"
     preview.write_bytes(b"x")
@@ -774,7 +772,7 @@ def test_a_run_that_dies_mid_pass_keeps_what_it_already_paid_for(tmp_path, monke
 
 def test_a_fatal_error_in_stage_3_ends_the_run_instead_of_repeating(monkeypatch, tmp_path):
     """Stage 2 has had this check since a wrong key produced 31 identical 401s."""
-    import bootstrap
+    from photoai import bootstrap
 
     calls = {"n": 0}
 

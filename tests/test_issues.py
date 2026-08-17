@@ -2,7 +2,7 @@
 
 import pytest
 
-from issues import (
+from photoai.issues import (
     FIXABILITY,
     Fixability,
     IssueCode,

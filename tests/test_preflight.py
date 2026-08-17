@@ -16,12 +16,7 @@ import pathlib
 import pytest
 from synthetic import photo_like, write_jpeg
 
-import batches
-import bootstrap
-import cli
-import pipeline
-import preflight
-import workspace
+from photoai import batches, bootstrap, cli, pipeline, preflight, workspace
 
 # --- the fakes ----------------------------------------------------------------
 
@@ -83,7 +78,7 @@ def stage2_reply(count: int, **overrides) -> str:
 
 
 def stage3_reply(count: int, value: int = 78) -> str:
-    import stage3
+    from photoai import stage3
 
     return json.dumps(
         [
@@ -398,7 +393,7 @@ def test_the_preflight_block_names_the_model(archive, tmp_path, monkeypatch, cap
 
 
 def records_by_name(out):
-    import reports
+    from photoai import reports
 
     rows, _ = reports.read_json(out / ".internal" / "reports" / "analysis.json")
     return {r["filename"]: r for r in rows}
@@ -502,10 +497,7 @@ def test_h_a_duplicate_changes_metadata_but_not_the_verdict(archive, tmp_path, m
 
 
 def test_h_duplicate_status_alone_never_produces_weak():
-    import calibration
-    import curation
-    import scoring
-    import stage3
+    from photoai import calibration, curation, scoring, stage3
 
     profile = calibration.default_photo_profile()
     art = stage3.parse_assessment(
@@ -556,7 +548,7 @@ def test_i_the_manifest_records_what_each_run_did(archive, tmp_path, monkeypatch
 
 def test_the_input_path_is_never_used_as_context(tmp_path, monkeypatch):
     """A folder called `Japan` is a filesystem location, not evidence."""
-    import prompts
+    from photoai import prompts
 
     for text in (prompts.STAGE2_SYSTEM, prompts.STAGE3_SYSTEM):
         lowered = text.lower()
@@ -650,9 +642,9 @@ def test_k_no_legacy_model_appears_anywhere_in_the_source():
     """Not as a default, not as a fallback, not as a suggestion."""
     from pathlib import Path
 
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent / "src" / "photoai"
     offenders = []
-    for path in root.glob("*.py"):
+    for path in root.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
         for legacy in ("gpt-4o", "gpt-4.1", "gpt-4-", "gpt-3.5"):
             if legacy in text and "LEGACY_MODEL_PREFIXES" not in text:
@@ -775,7 +767,7 @@ def test_every_account_level_failure_ends_the_run(error):
 
 def test_the_insights_scope_line_counts_correctly(tmp_path):
     """It said "the other 281" when 261 of those 281 were the ones in scope."""
-    import insights as insights_module
+    from photoai import insights as insights_module
 
     built = insights_module.Insights(total=261)
     page = insights_module.write(
@@ -891,7 +883,7 @@ def test_a_reused_frame_is_rescored_against_the_new_population(archive, tmp_path
 
 def test_stage2_groups_overlap_so_the_ranking_is_not_islands():
     """Bradley-Terry needs shared frames or every group is its own scale."""
-    import aggregate
+    from photoai import aggregate
 
     names = [f"f{i}.jpg" for i in range(60)]
     groups = aggregate.build_groups(names, size=12)
@@ -902,7 +894,7 @@ def test_stage2_groups_overlap_so_the_ranking_is_not_islands():
 
 
 def test_every_frame_appears_in_at_least_one_group():
-    import aggregate
+    from photoai import aggregate
 
     names = [f"f{i}.jpg" for i in range(101)]
     covered = {n for group in aggregate.build_groups(names, size=12) for n in group}
@@ -1016,7 +1008,7 @@ def test_an_injected_client_is_ignored_when_the_provider_differs(monkeypatch):
     monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
     engine = pipeline._provider("grok-4.6", client=Client(stage2="[]"))
 
-    import llm_provider
+    from photoai import llm_provider
 
     assert isinstance(engine, llm_provider.GrokProvider)
     assert engine.base_url == "https://api.x.ai/v1"
@@ -1027,14 +1019,14 @@ def test_an_injected_client_is_used_when_it_matches(monkeypatch):
     client = Client(stage2="[]")
     engine = pipeline._provider("gpt-x", client=client)
 
-    import llm_provider
+    from photoai import llm_provider
 
     assert isinstance(engine, llm_provider.OpenAIProvider)
     assert engine.client is client
 
 
 def test_with_no_client_the_configuration_decides(monkeypatch):
-    import llm_provider
+    from photoai import llm_provider
 
     monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
     assert isinstance(pipeline._provider("grok-4.6"), llm_provider.GrokProvider)
@@ -1048,7 +1040,7 @@ def test_stage2_and_stage3_agree_with_the_preflight_on_the_endpoint(monkeypatch)
     Both go through the same builder now, so a run cannot check one endpoint
     and then spend on another.
     """
-    import llm_provider
+    from photoai import llm_provider
 
     monkeypatch.setenv("PHOTO_AI_PROVIDER", "grok")
     from_pipeline = pipeline._provider("grok-4.6")
@@ -1121,7 +1113,7 @@ def test_a_revoked_key_is_reported_as_a_key_problem(archive, tmp_path, monkeypat
 
 def test_an_xai_key_never_reaches_a_log(archive, tmp_path):
     """A provider quoted one back inside a 401 body, which went into the log."""
-    import reports
+    from photoai import reports
 
     leaked = "xai-hRss000000000000000000000000000zGxG"
     assert leaked not in reports.redact(f"Incorrect API key provided: {leaked}. See docs")

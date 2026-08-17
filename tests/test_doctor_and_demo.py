@@ -14,7 +14,7 @@ import json
 import pathlib
 import re
 
-import doctor
+from photoai import doctor
 
 
 def test_doctor_never_calls_a_paid_endpoint(monkeypatch):
@@ -23,7 +23,7 @@ def test_doctor_never_calls_a_paid_endpoint(monkeypatch):
     def explode(*args, **kwargs):
         raise AssertionError("doctor must not build a client")
 
-    import bootstrap
+    from photoai import bootstrap
 
     monkeypatch.setattr(bootstrap, "make_client", explode)
     report = doctor.run()
@@ -32,7 +32,7 @@ def test_doctor_never_calls_a_paid_endpoint(monkeypatch):
 
 def test_doctor_reports_a_missing_key_without_failing(monkeypatch):
     """No key is not an error: the local pass runs and writes a full report."""
-    import bootstrap
+    from photoai import bootstrap
 
     monkeypatch.setattr(bootstrap, "api_key", lambda: None)
     key = next(c for c in doctor.run().checks if c.name == "API key")
@@ -76,7 +76,7 @@ def test_the_demo_frames_clear_the_resolution_gate():
     size', which is a poor first thing for a stranger to see."""
     from PIL import Image
 
-    import issues
+    from photoai import issues
 
     for frame in sorted(DEMO.glob("*.jpg")):
         with Image.open(frame) as image:
@@ -86,7 +86,7 @@ def test_the_demo_frames_clear_the_resolution_gate():
 
 def test_the_demo_carries_nobody_s_location():
     """A committed photograph with GPS in it is a coordinate in a public repo."""
-    import exif_reader
+    from photoai import exif_reader
 
     for frame in sorted(DEMO.glob("*.jpg")):
         data = exif_reader.extract_exif(frame, "PHOTO") or {}
@@ -99,7 +99,7 @@ def test_the_demo_carries_nobody_s_location():
 
 def test_no_coordinate_reaches_a_shared_artefact(tmp_path):
     """Somebody shares a report and hands out the coordinates of their home."""
-    import reports
+    from photoai import reports
 
     record = reports.AssetRecord(
         asset_id="a", source_path="/gone/a.jpg", filename="a.jpg",

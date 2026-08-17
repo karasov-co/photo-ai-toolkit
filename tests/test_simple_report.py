@@ -15,12 +15,9 @@ from pathlib import Path
 import pytest
 from synthetic import photo_like, write_jpeg
 
-import curation
-import insights as insights_module
-import recipe_export
-import simple_report
-import workspace
-from reports import AssetRecord
+from photoai import curation, recipe_export, simple_report, workspace
+from photoai import insights as insights_module
+from photoai.reports import AssetRecord
 
 
 def record(**overrides) -> AssetRecord:
@@ -486,7 +483,7 @@ def archive(tmp_path):
 
 
 def test_the_default_run_produces_the_simplified_tree(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     out = tmp_path / "out"
     assert cli.main(["measure", "--input", str(archive), "--output", str(out)]) == 0
@@ -501,7 +498,7 @@ def test_the_default_run_produces_the_simplified_tree(archive, tmp_path):
 
 
 def test_the_default_report_has_no_legal_or_routing_vocabulary(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     out = tmp_path / "out"
     cli.main(["measure", "--input", str(archive), "--output", str(out)])
@@ -513,7 +510,7 @@ def test_the_default_report_has_no_legal_or_routing_vocabulary(archive, tmp_path
 
 
 def test_every_photograph_is_filed_in_exactly_one_category(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     out = tmp_path / "out"
     cli.main(["measure", "--input", str(archive), "--output", str(out)])
@@ -528,7 +525,7 @@ def test_every_photograph_is_filed_in_exactly_one_category(archive, tmp_path):
 
 
 def test_the_run_leaves_the_originals_untouched(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     before = {p.name: p.read_bytes() for p in archive.iterdir()}
     cli.main(["measure", "--input", str(archive), "--output", str(tmp_path / "out")])
@@ -538,11 +535,13 @@ def test_the_run_leaves_the_originals_untouched(archive, tmp_path):
 
 
 def test_the_categories_and_the_report_agree(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     out = tmp_path / "out"
     cli.main(["measure", "--input", str(archive), "--output", str(out)])
-    rows, _ = __import__("reports").read_json(out / ".internal" / "reports" / "analysis.json")
+    rows, _ = __import__("photoai.reports", fromlist=["read_json"]).read_json(
+        out / ".internal" / "reports" / "analysis.json"
+    )
 
     for row in rows:
         folder = workspace.CATEGORY_DIRS[row["category"]]
@@ -550,7 +549,7 @@ def test_the_categories_and_the_report_agree(archive, tmp_path):
 
 
 def test_a_second_run_over_an_old_layout_tidies_it(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     out = tmp_path / "out"
     (out / "reports").mkdir(parents=True)
@@ -563,7 +562,7 @@ def test_a_second_run_over_an_old_layout_tidies_it(archive, tmp_path):
 
 
 def test_no_development_artefacts_in_the_output(archive, tmp_path):
-    import cli
+    from photoai import cli
 
     out = tmp_path / "out"
     cli.main(["measure", "--input", str(archive), "--output", str(out)])

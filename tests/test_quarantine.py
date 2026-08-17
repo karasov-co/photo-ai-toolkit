@@ -8,8 +8,8 @@ import json
 
 import pytest
 
-from media import FileState
-from quarantine import (
+from photoai.media import FileState
+from photoai.quarantine import (
     PURGE_CONFIRMATION,
     Lock,
     Manifest,
@@ -330,7 +330,7 @@ def test_every_move_is_recorded_with_what_it_needs_to_be_undone(
 def test_the_manifest_is_append_only_so_a_crash_cannot_lose_history(tmp_path):
     """A rewritten document interrupted halfway loses every earlier restore path."""
     manifest = Manifest(tmp_path / "m.jsonl")
-    from quarantine import FileOperation
+    from photoai.quarantine import FileOperation
 
     for i in range(3):
         manifest.append(

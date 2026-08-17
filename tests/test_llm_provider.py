@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-import llm_provider
+from photoai import llm_provider
 
 
 class FakeResponse:
@@ -115,7 +115,7 @@ def test_a_truncated_reply_is_its_own_error():
 
 
 def test_the_prompt_builders_convert_without_being_rewritten():
-    import prompts
+    from photoai import prompts
 
     frames = [{"key": "a.jpg", "views": [("full frame", "AA"), ("face", "BB")], "encoded": "AA"}]
     converted = llm_provider.from_openai_content(
@@ -209,7 +209,7 @@ def test_pricing_lives_in_a_file_with_a_date():
 
 
 def test_the_default_model_is_priced():
-    import bootstrap
+    from photoai import bootstrap
 
     assert llm_provider.estimate_cost(bootstrap.DEFAULT_SEMANTIC_MODEL, 100) > 0
 
@@ -540,7 +540,7 @@ def test_the_provider_flag_help_is_built_from_the_registry():
     """The same sentence lived in three places by hand and two went stale."""
     import argparse
 
-    import cli
+    from photoai import cli
 
     parser = cli.build_parser()
     help_text = ""

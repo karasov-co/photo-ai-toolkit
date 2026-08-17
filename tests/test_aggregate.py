@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from aggregate import (
+from photoai.aggregate import (
     aggregate_all_axes,
     aggregate_axis,
     bradley_terry,

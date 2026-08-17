@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 from synthetic import gray_frames, photo_like, shifted
 
-import video_analyzer as va
-from issues import Fixability, IssueCode
+from photoai import video_analyzer as va
+from photoai.issues import Fixability, IssueCode
 
 needs_ffmpeg = pytest.mark.skipif(not va.ffmpeg_available(), reason="ffmpeg is not installed")
 

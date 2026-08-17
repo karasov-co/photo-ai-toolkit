@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 from synthetic import photo_like, write_jpeg
 
-import media
+from photoai import media
 
 # --- type detection ---------------------------------------------------------
 

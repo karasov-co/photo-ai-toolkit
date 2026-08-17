@@ -15,9 +15,9 @@ cannot arise in the first place.
 
 import pytest
 
-import quarantine
-from media import FileState
-from quarantine import PlannedMove, Quarantine, UnsafePath, assert_within
+from photoai import quarantine
+from photoai.media import FileState
+from photoai.quarantine import PlannedMove, Quarantine, UnsafePath, assert_within
 
 
 @pytest.fixture
@@ -254,8 +254,7 @@ def test_dry_run_and_execution_agree_when_nothing_else_changes(q, archive, bin_d
 
 def test_the_farm_and_the_physical_quarantine_are_different_directories(tmp_path):
     """The collision that caused the failure cannot recur."""
-    import layout
-    import pipeline
+    from photoai import layout, pipeline
 
     options = pipeline.PipelineOptions(input_dir=tmp_path / "in", output_dir=tmp_path / "out")
     physical = options.resolved_quarantine()

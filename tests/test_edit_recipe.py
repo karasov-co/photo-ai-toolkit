@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from synthetic import blown, blurred, dark_but_recoverable, flat, near_black, photo_like
 
-import edit_recipe
+from photoai import edit_recipe
 
 
 def array(image):
@@ -279,7 +279,7 @@ def test_the_two_recipe_types_are_named_apart():
     They were both called EditRecipe, in modules one import apart, and the
     only way to tell which you had was to look at its fields.
     """
-    import edit_schema
+    from photoai import edit_schema
 
     assert edit_recipe.SearchResult is not edit_schema.EditRecipe
     assert not hasattr(edit_recipe, "EditRecipe")

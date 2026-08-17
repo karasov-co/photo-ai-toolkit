@@ -9,15 +9,12 @@ import numpy as np
 import pytest
 from synthetic import blurred, dark_but_recoverable, near_black, photo_like, write_jpeg
 
-import artistic
-import pipeline
-import prompts
-import quarantine as quarantine_module
-import scoring
-from artistic import ArtisticScores, ArtRoute, IntentSignal, apply_conservative_art
-from issues import IssueCode, IssueSet
-from media import FileState
-from scoring import RouteClass, ScoreInput
+from photoai import artistic, pipeline, prompts, scoring
+from photoai import quarantine as quarantine_module
+from photoai.artistic import ArtisticScores, ArtRoute, IntentSignal, apply_conservative_art
+from photoai.issues import IssueCode, IssueSet
+from photoai.media import FileState
+from photoai.scoring import RouteClass, ScoreInput
 
 
 def array(image):
@@ -560,7 +557,7 @@ def test_a_rank_of_one_becomes_the_top_of_the_scale_not_the_bottom():
 
 def test_an_unknown_group_size_yields_unknown_axes_rather_than_a_raw_rank():
     """A raw rank of 1 in a 0-100 field turns the best frame into the worst."""
-    import assessment_parser as routing
+    from photoai import assessment_parser as routing
 
     assessment = routing.parse_assessment(
         {
@@ -576,7 +573,7 @@ def test_an_unknown_group_size_yields_unknown_axes_rather_than_a_raw_rank():
 
 
 def test_a_malformed_ranking_is_rejected_rather_than_aggregated():
-    import batch_runner
+    from photoai import batch_runner
 
     repeated = [{"n": 1, "axis_a": 1, "axis_b": 1, "axis_c": 1},
                 {"n": 2, "axis_a": 1, "axis_b": 2, "axis_c": 2}]

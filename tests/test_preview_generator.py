@@ -7,8 +7,8 @@ import pytest
 from conftest import CORRUPT_EXIF, NO_EXIF, TRUNCATED_RAW, WITH_EXIF
 from PIL import Image
 
-import preview_generator
-from preview_generator import (
+from photoai import preview_generator
+from photoai.preview_generator import (
     PREVIEW_MAX_PX,
     PreviewGenerationError,
     generate_preview,

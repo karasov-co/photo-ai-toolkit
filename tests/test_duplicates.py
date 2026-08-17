@@ -2,8 +2,8 @@
 
 import pytest
 
-import duplicates
-from duplicates import (
+from photoai import duplicates
+from photoai.duplicates import (
     Candidate,
     Cluster,
     DupItem,
@@ -328,7 +328,7 @@ def test_the_similarity_function_does_not_claim_to_be_an_embedding():
     believes, and the consequence is real: two different subjects shot with the
     same palette and framing are merged as near-identical.
     """
-    import duplicates
+    from photoai import duplicates
 
     assert not hasattr(duplicates, "embedding_similarity")
     assert "not implemented" in duplicates.visual_similarity.__doc__

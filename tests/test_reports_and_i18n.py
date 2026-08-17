@@ -6,9 +6,8 @@ import logging
 
 import pytest
 
-import i18n
-import reports
-from reports import AssetRecord, RedactingFilter, redact
+from photoai import i18n, reports
+from photoai.reports import AssetRecord, RedactingFilter, redact
 
 
 def record(**kwargs):

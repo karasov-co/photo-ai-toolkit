@@ -12,20 +12,22 @@ import numpy as np
 import pytest
 from synthetic import photo_like, write_jpeg
 
-import active_learning
-import edit_schema
-import model_monitoring
-import preference_model
-import raw_measurements
-import recipe_generator
-import recipe_validator
-import selective_policy
-from artistic import ArtisticScores, IntentSignal
-from edit_schema import Crop, Detail, EditRecipe, GlobalAdjustments, Variant
-from exporters import adobe_xmp, darktable_xmp, rawtherapee_pp3
-from preference_store import Decision, PreferenceStore, Signal
-from renderers import base as renderer_base
-from renderers.builtin import BuiltinRenderer, _inscribed_rect
+from photoai import (
+    active_learning,
+    edit_schema,
+    model_monitoring,
+    preference_model,
+    raw_measurements,
+    recipe_generator,
+    recipe_validator,
+    selective_policy,
+)
+from photoai.artistic import ArtisticScores, IntentSignal
+from photoai.edit_schema import Crop, Detail, EditRecipe, GlobalAdjustments, Variant
+from photoai.exporters import adobe_xmp, darktable_xmp, rawtherapee_pp3
+from photoai.preference_store import Decision, PreferenceStore, Signal
+from photoai.renderers import base as renderer_base
+from photoai.renderers.builtin import BuiltinRenderer, _inscribed_rect
 
 
 def recipe(**kwargs) -> EditRecipe:
@@ -51,7 +53,7 @@ def test_an_existing_sidecar_is_never_overwritten_by_default(tmp_path):
     mine = tmp_path / "P1042675.xmp"
     mine.write_text("<x:xmpmeta>my own edits</x:xmpmeta>", encoding="utf-8")
 
-    import media
+    from photoai import media
 
     plan = adobe_xmp.plan_apply(recipe(), raw, current_checksum=media.checksum_file(raw))
 
@@ -79,7 +81,7 @@ def test_the_diff_shows_what_would_change_before_anything_is_written(tmp_path):
     proposed = recipe()
     proposed.global_adjustments = GlobalAdjustments(exposure_ev=0.8, shadows=30)
 
-    import media
+    from photoai import media
 
     plan = adobe_xmp.plan_apply(proposed, raw, current_checksum=media.checksum_file(raw))
     joined = "\n".join(plan.diff)
@@ -99,7 +101,7 @@ def test_applying_a_stale_recipe_is_refused(tmp_path):
     raw = tmp_path / "shot.RW2"
     raw.write_bytes(b"the file as it is now")
 
-    import media
+    from photoai import media
 
     plan = adobe_xmp.plan_apply(recipe(), raw, current_checksum=media.checksum_file(raw))
     assert plan.stale
@@ -471,7 +473,7 @@ def test_an_artistic_signal_blocks_the_personal_model_entirely():
 
 
 def test_no_policy_bucket_can_reach_a_purge():
-    import quarantine
+    from photoai import quarantine
 
     for bucket in selective_policy.Bucket:
         assert not quarantine.is_purgeable_evidence(bucket.value)
@@ -691,7 +693,7 @@ def test_the_probability_is_measured_against_the_population():
     whatever scale the fit landed on, and "confident" meant something
     different after every refit.
     """
-    import preference_model
+    from photoai import preference_model
 
     model = preference_model.PersonalModel()
     model.strengths = {"a": 1.0, "b": 4.0, "c": 16.0}
@@ -704,7 +706,7 @@ def test_the_probability_is_measured_against_the_population():
 
 
 def test_the_middle_of_the_population_sits_at_a_half():
-    import preference_model
+    from photoai import preference_model
 
     model = preference_model.PersonalModel()
     model.strengths = {"low": 0.25, "middle": 1.0, "high": 4.0}
@@ -712,6 +714,6 @@ def test_the_middle_of_the_population_sits_at_a_half():
 
 
 def test_an_unknown_asset_is_still_a_half():
-    import preference_model
+    from photoai import preference_model
 
     assert preference_model.PersonalModel().probability_kept("nobody") == 0.5

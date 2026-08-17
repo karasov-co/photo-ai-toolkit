@@ -9,7 +9,7 @@ category folders, with no caller. The farm a run actually builds is covered in
 
 from PIL import Image
 
-from layout import build_contact_sheet, report_token_spend
+from photoai.layout import build_contact_sheet, report_token_spend
 
 
 def test_contact_sheet_shows_every_candidate(tmp_path):

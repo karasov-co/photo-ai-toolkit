@@ -103,7 +103,7 @@ def _no_api_key(monkeypatch, tmp_path_factory):
     for the whole suite. Tests that need to exercise credential loading point it
     somewhere of their own.
     """
-    import bootstrap
+    from photoai import bootstrap
 
     for var in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_ORG_ID", "OPENAI_MODEL"):
         monkeypatch.delenv(var, raising=False)
@@ -172,7 +172,7 @@ def passing_preflight(monkeypatch):
     else it is a gate to get through, and stubbing it here keeps that gate from
     being quietly disabled in the code to make tests pass.
     """
-    import preflight
+    from photoai import preflight
 
     def ok(model, **kwargs):
         result = preflight.PreflightResult(ok=True, model=model)

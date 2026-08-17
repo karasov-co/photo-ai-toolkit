@@ -2,9 +2,9 @@
 
 import pytest
 
-from calibration import CalibrationProfile, default_photo_profile, default_video_profile
-from issues import IssueCode, IssueSet
-from scoring import (
+from photoai.calibration import CalibrationProfile, default_photo_profile, default_video_profile
+from photoai.issues import IssueCode, IssueSet
+from photoai.scoring import (
     AssetScores,
     AssetTag,
     Route,
@@ -155,7 +155,7 @@ def test_every_frame_is_commercial_now():
 
 
 def test_the_release_vocabulary_is_gone_from_the_module():
-    import scoring
+    from photoai import scoring
 
     for gone in ("legal_readiness_score", "UNKNOWN_LEGAL_READINESS",
                  "LEGAL_READINESS_NOT_ASSESSED"):
@@ -283,7 +283,7 @@ def test_flagship_requires_being_selected_not_merely_scoring_well(profile):
 
 def completed_artistic(**overrides):
     """A Stage 3 result good enough to raise no objection."""
-    import stage3
+    from photoai import stage3
 
     payload = {**dict.fromkeys(stage3.ARTISTIC_FIELDS, 80),
                "artistic_candidate": True, "artistic_confidence": 80}
