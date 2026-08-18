@@ -196,9 +196,20 @@ def _contains(root: Path, target: Path) -> bool:
     """
     import os
 
+    def normal(value) -> str:
+        text = os.path.realpath(str(value))
+        # Windows readlink hands back the extended-length form, `\\?\C:\...`,
+        # while the root arrives as a plain `C:\...`. realpath leaves the prefix
+        # where it finds it, so a link this tool wrote itself compared unequal
+        # to the directory it was written into.
+        for prefix in ("\\\\?\\UNC\\", "\\\\?\\"):
+            if text.startswith(prefix):
+                text = text[len(prefix):]
+                break
+        return os.path.normcase(text)
+
     try:
-        a = os.path.normcase(os.path.realpath(target))
-        b = os.path.normcase(os.path.realpath(Path(root)))
+        a, b = normal(target), normal(Path(root))
     except OSError:  # pragma: no cover - an unreadable root is not containment
         return False
     return a == b or a.startswith(b + os.sep)

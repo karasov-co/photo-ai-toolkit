@@ -100,7 +100,28 @@ def test_the_move_does_not_write_through_the_stale_link(q, archive, bin_dir):
     assert (bin_dir / "P1019374_1.MP4").read_bytes() == b"video bytes"
 
 
-def test_the_link_is_recognised_as_a_generated_artifact(archive, bin_dir):
+@pytest.fixture
+def real_symlinks(tmp_path):
+    """Skip where the OS will not give us a genuine symlink.
+
+    Windows creates one only for a process with the privilege, and without it
+    `symlink_to` either raises or leaves something `is_symlink()` does not
+    recognise. Asserting on a link the platform declined to make tests the
+    runner's permissions, not this code -- the containment logic itself is
+    covered by `_contains` directly, which needs no link at all.
+    """
+    probe, target = tmp_path / "probe.link", tmp_path / "probe.txt"
+    target.write_text("x", encoding="utf-8")
+    try:
+        probe.symlink_to(target)
+    except (OSError, NotImplementedError) as e:
+        pytest.skip(f"this platform will not create a symlink: {e}")
+    if not probe.is_symlink():
+        pytest.skip("this platform made something that is not a symlink")
+    return True
+
+
+def test_the_link_is_recognised_as_a_generated_artifact(archive, bin_dir, real_symlinks):
     source = clip(archive)
     bin_dir.mkdir(parents=True)
     link = bin_dir / "P1019374.MP4"
