@@ -58,6 +58,7 @@ def run(*, input_dir: Path | None = None, output_dir: Path | None = None) -> Rep
     report.checks.append(_pillow())
     report.checks.append(_rawpy())
     report.checks.append(_ffmpeg())
+    report.checks.append(_embeddings())
     report.checks.append(_key())
     if input_dir:
         report.checks.append(_readable(input_dir))
@@ -116,6 +117,32 @@ def _ffmpeg() -> Check:
         fix="" if binary else (
             "Video is skipped without it. macOS: brew install ffmpeg. "
             "Debian/Ubuntu: apt-get install ffmpeg. Windows: choco install ffmpeg."
+        ),
+    )
+
+
+def _embeddings() -> Check:
+    """The semantic similarity encoder: installed, downloaded, verified, or not.
+
+    Never fatal and never a download. An unticked line here means the diversity
+    pass groups by palette and framing instead of by subject -- a real
+    difference in what reaches the top pile, and one worth seeing before the run
+    rather than deducing from the report afterwards.
+    """
+    from photoai import embeddings
+
+    state = embeddings.status()
+    if state.ok:
+        return Check(
+            "Semantic similarity", True,
+            f"{state.model_id} ({embeddings.MODEL.licence}), verified at {state.path}",
+        )
+    return Check(
+        "Semantic similarity", False, state.reason,
+        fix=(
+            f"Optional. Without it, near-duplicates are grouped by perceptual hash, "
+            f"which merges two different subjects that share a palette. "
+            f"{state.fix}"
         ),
     )
 

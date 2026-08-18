@@ -111,9 +111,13 @@ EXIF and RAW metadata; exposure, clipping, focus and motion measurement,
 measured on the *sensor* data for RAW rather than the rendered JPEG; corrupt and
 empty-frame detection; resolution gates; a second focus check on the sharpest
 region at full resolution, because a 512px preview cannot see a missed focus;
-burst and near-identical grouping by perceptual hash through a BK-tree, with the
-strongest frame of each group chosen and the margin that decided it; video
-sampling through FFmpeg.
+burst and near-identical grouping through a BK-tree, with the strongest frame of
+each group chosen and the margin that decided it; video sampling through FFmpeg.
+Grouping compares perceptual hashes by default and image embeddings when the
+optional encoder is installed (`pip install -e ".[embeddings]"` then `photoai
+models --download`) — the hash alone treats two different subjects shot with the
+same palette and framing as one photograph, and the run says which of the two it
+used.
 
 **Look at the pictures, with a key**
 Stage 2 ranks frames against each other in groups of twelve — genre, content,
@@ -173,6 +177,7 @@ run keeps everything it already paid for.
 | `reclassify` | Redo routing at different thresholds — no re-analysis, no tokens |
 | `demo` | Twelve committed photographs, offline, a real report in a minute |
 | `doctor` | Key, binaries, permissions and space — before a cent is spent |
+| `models` | The optional semantic-similarity encoder: show or download it |
 | `bench-quality` | Check the piles against your own sorting, or your catalogue |
 | `darkroom` | Render the edit suggestions from a stored run |
 | `apply-recipe` | Write a recipe beside the RAW (dry run; refuses to clobber) |
@@ -208,6 +213,7 @@ new|all`.
 **`reclassify`:** `--analysis*` `--profile` `--profile-file` `--limit`.
 **`demo`:** `--output` `--fresh`.
 **`doctor`:** `--input` `--output` `--json`.
+**`models`:** `--download`.
 **`bench-quality`:** `--analysis*` `--from-catalog` `--trust-later` `--template` `--labels`
 `--json`. `--from-catalog` reads the stars you already gave these photographs
 out of the sidecars beside them, so the check costs you no time at all.

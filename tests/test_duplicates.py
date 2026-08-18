@@ -321,14 +321,156 @@ def test_two_thousand_files_cluster_quickly():
     assert time.perf_counter() - started < 5.0
 
 
-def test_the_similarity_function_does_not_claim_to_be_an_embedding():
-    """It was called `embedding_similarity` and does a hash comparison.
+def test_each_similarity_function_names_what_it_actually_does():
+    """The rule this test has always enforced, now that there are two of them.
 
-    A name that promises a semantic comparison is the kind of thing a reader
-    believes, and the consequence is real: two different subjects shot with the
-    same palette and framing are merged as near-identical.
+    It used to assert that no `embedding_similarity` existed at all, because the
+    only function here compared perceptual hashes and had once carried that
+    name. There is one now, and it really does compare vectors -- so the
+    assertion becomes the honest version of the same rule: `visual_similarity`
+    must still refuse to claim it embeds, and `embedding_similarity` must
+    actually take the embeddings into account rather than being a second name
+    for the hash comparison.
     """
     from photoai import duplicates
 
-    assert not hasattr(duplicates, "embedding_similarity")
-    assert "not implemented" in duplicates.visual_similarity.__doc__
+    # The hash function still says, in its own docstring, what it cannot do.
+    doc = duplicates.visual_similarity.__doc__.lower()
+    assert "not an embedding" in doc
+    assert "perceptual hash" in doc
+    assert "same palette and framing" in doc
+
+    # And the embedding function is not the hash function wearing a better name.
+    same_look = item("a", H0, genre="landscape")
+    other_look = item("b", H0, genre="landscape")
+    assert visual_similarity(same_look, other_look) == 1.0
+
+    same_look.embedding = (1.0, 0.0, 0.0)
+    other_look.embedding = (0.0, 1.0, 0.0)
+    assert duplicates.embedding_similarity(same_look, other_look) < 0.5
+
+
+# --- the semantic vector ------------------------------------------------------
+#
+# `embedding_similarity` compares two unit vectors; where those vectors come
+# from is `photoai.embeddings`, and nothing below loads or downloads a model.
+# The maths is checked directly, and the plumbing is checked with a stub
+# encoder, which is the only way this can stay hermetic.
+
+
+def test_cosine_of_a_vector_with_itself_is_one():
+    v = (0.6, 0.8)
+    assert duplicates.cosine(v, v) == pytest.approx(1.0)
+
+
+def test_cosine_of_perpendicular_vectors_is_zero():
+    assert duplicates.cosine((1.0, 0.0), (0.0, 1.0)) == pytest.approx(0.0)
+
+
+def test_cosine_of_opposite_vectors_is_minus_one():
+    assert duplicates.cosine((1.0, 0.0), (-1.0, 0.0)) == pytest.approx(-1.0)
+
+
+def test_cosine_ignores_length():
+    """It is the angle, so scaling either vector must change nothing."""
+    assert duplicates.cosine((1.0, 1.0), (3.0, 3.0)) == pytest.approx(1.0)
+
+
+def test_cosine_of_a_missing_or_mismatched_vector_is_zero():
+    """Never let a missing vector read as 'identical' -- see the hash version."""
+    assert duplicates.cosine((), (1.0, 0.0)) == 0.0
+    assert duplicates.cosine((1.0, 0.0), (1.0, 0.0, 0.0)) == 0.0
+    assert duplicates.cosine((0.0, 0.0), (1.0, 0.0)) == 0.0
+
+
+def test_the_encoder_returns_unit_vectors():
+    """Normalisation is what makes a dot product a cosine at all."""
+    from photoai import embeddings
+
+    out = embeddings.normalise([3.0, 4.0])
+    assert len(out) == 2
+    assert sum(v * v for v in out) == pytest.approx(1.0)
+    assert out[0] == pytest.approx(0.6)
+
+
+def test_a_zero_vector_normalises_to_nothing_rather_than_to_nan():
+    from photoai import embeddings
+
+    assert embeddings.normalise([0.0, 0.0, 0.0]) == ()
+
+
+def test_an_identical_pair_of_vectors_is_maximally_similar():
+    a = item("a", H0, genre="landscape")
+    b = item("b", FAR, genre="landscape")
+    a.embedding = b.embedding = (0.6, 0.8)
+    assert duplicates.embedding_similarity(a, b) == 1.0
+
+
+def test_embedding_similarity_never_leaves_the_unit_interval():
+    """Including for the opposite vectors, where the raw cosine is -1."""
+    a = item("a", H0, genre="landscape")
+    b = item("b", H0, genre="street")
+    a.embedding, b.embedding = (1.0, 0.0), (-1.0, 0.0)
+    assert 0.0 <= duplicates.embedding_similarity(a, b) <= 1.0
+    assert duplicates.embedding_similarity(a, b) == 0.0
+
+
+def test_the_genre_nudge_survives_the_switch_to_vectors():
+    """So that `lambda_` means the same thing under either measurement."""
+    a = item("a", H0, genre="landscape")
+    same = item("b", H0, genre="landscape")
+    other = item("c", H0, genre="street")
+    a.embedding = same.embedding = other.embedding = (0.7071, 0.7071)
+    a.embedding = (1.0, 0.0)
+    assert duplicates.embedding_similarity(a, same) > duplicates.embedding_similarity(a, other)
+
+
+# --- choosing between the two -------------------------------------------------
+
+
+def test_the_default_uses_vectors_when_both_frames_have_one():
+    a = item("a", H0, genre="landscape")
+    b = item("b", H0, genre="landscape")
+    assert duplicates.default_similarity(a, b) == 1.0  # identical hashes
+
+    a.embedding, b.embedding = (1.0, 0.0), (0.0, 1.0)
+    assert duplicates.default_similarity(a, b) < 0.5
+
+
+def test_the_default_falls_back_to_the_hash_when_a_vector_is_missing():
+    """One unreadable preview costs that frame its vector, not the whole run."""
+    a = item("a", H0, genre="landscape")
+    b = item("b", H0, genre="landscape")
+    a.embedding = (1.0, 0.0)
+    b.embedding = None
+    assert duplicates.default_similarity(a, b) == visual_similarity(a, b) == 1.0
+
+    b.embedding = ()
+    assert duplicates.default_similarity(a, b) == 1.0
+
+
+def test_select_diverse_uses_the_default_and_therefore_the_vectors():
+    """No `similarity=` passed: the caller gets the better one for free."""
+    beige_wall = candidate("wall", 90, H0)
+    beige_beach = candidate("beach", 88, H0)
+    beige_wall.item.embedding = (1.0, 0.0, 0.0)
+    beige_beach.item.embedding = (0.0, 1.0, 0.0)
+    other = candidate("street", 40, FAR, genre="street")
+
+    picks = select_diverse([beige_wall, beige_beach, other], limit=2, lambda_=0.6)
+    assert picks == ["wall", "beach"]
+
+
+def test_the_same_two_frames_are_merged_when_only_the_hash_is_available():
+    """The other half of the test above: this is what the fallback costs.
+
+    Not a bug being asserted -- a limit being pinned. With no encoder these two
+    frames are one photograph as far as the tool can tell, and the weaker one
+    loses its place to a frame fifty points worse.
+    """
+    beige_wall = candidate("wall", 90, H0)
+    beige_beach = candidate("beach", 88, H0)
+    other = candidate("street", 40, FAR, genre="street")
+
+    picks = select_diverse([beige_wall, beige_beach, other], limit=2, lambda_=0.6)
+    assert picks == ["wall", "street"]

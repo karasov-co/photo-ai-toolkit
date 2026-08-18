@@ -119,6 +119,27 @@ def _no_api_key(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _no_model_downloads(monkeypatch, tmp_path_factory):
+    """Pin the optional encoder off, and point its cache somewhere empty.
+
+    Third guard, same principle as the two above. `embeddings.available()` is a
+    probe over the developer's own machine: with onnxruntime installed and the
+    weights already fetched it answers True, and half the suite would then take
+    a different path here than it takes in CI. So the suite fixes the answer
+    rather than inheriting it.
+
+    The cache redirect is the belt to that braces. Nothing here can download --
+    the socket guard would catch it -- but a test that reached for the real
+    `~/.cache` would hash 335 MB of somebody's disk to find that out.
+    """
+    from photoai import embeddings
+
+    monkeypatch.setenv(embeddings.ENABLE_VAR, "0")
+    monkeypatch.setenv(embeddings.CACHE_VAR, str(tmp_path_factory.mktemp("no_models")))
+    embeddings.reset()
+
+
+@pytest.fixture(autouse=True)
 def _fakes_speak_the_openai_dialect(monkeypatch):
     """Pin the provider to openai for the suite, because the doubles are openai.
 

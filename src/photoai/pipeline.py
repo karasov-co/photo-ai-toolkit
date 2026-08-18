@@ -1460,6 +1460,8 @@ def run(
         record.semantic_requested = result.semantic_requested
         record.semantic_completed = result.semantic_completed
         record.semantic_error = result.semantic_error
+        record.similarity_mode = result.similarity_mode
+        record.similarity_detail = result.similarity_detail
 
     # Drained here rather than per pass: one file, appended once, whatever
     # combination of stages ran. An empty list writes nothing.

@@ -15,6 +15,15 @@ dependencies = [
     "numpy>=1.26",
 ]
 
+[project.optional-dependencies]
+# Semantic near-duplicate and diversity similarity: a CLIP image tower run
+# locally through ONNX Runtime. An extra rather than a dependency on purpose --
+# without it the tool groups by perceptual hash, which is what it always did,
+# and says so in the run summary. See `photoai models` and src/photoai/embeddings.py.
+embeddings = [
+    "onnxruntime>=1.17",
+]
+
 [project.scripts]
 photoai = "photoai.cli:main"
 

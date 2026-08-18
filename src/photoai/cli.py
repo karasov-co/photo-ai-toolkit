@@ -1241,6 +1241,48 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def cmd_models(args: argparse.Namespace) -> int:
+    """Show, fetch or verify the optional encoder. The only place that downloads.
+
+    Deliberately its own command rather than a flag on `analyze`: 335 MB is not
+    something a run should decide to fetch on a photographer's behalf halfway
+    through, and a person who has not asked for it should never wait for it.
+    """
+    from photoai import embeddings
+
+    spec = embeddings.MODEL
+    state = embeddings.status()
+
+    if args.download and not state.ok:
+        if state.reason == "onnxruntime is not installed":
+            print(f"Error: {state.reason}. Run: {embeddings.INSTALL_HINT}", file=sys.stderr)
+            return 1
+        print(f"Fetching {spec.model_id} -- {spec.size_bytes / 1e6:.0f} MB, {spec.licence}")
+        print(f"  from {spec.url}")
+        try:
+            embeddings.download(spec)
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        state = embeddings.status()
+
+    print(f"  model      {spec.model_id}")
+    print(f"  source     {spec.source}")
+    print(f"  licence    {spec.licence} -- {spec.licence_url}")
+    print(f"  sha256     {spec.sha256}")
+    print(f"  size       {spec.size_bytes / 1e6:.0f} MB, {spec.dimensions} dimensions")
+    print(f"  cached at  {embeddings.model_path(spec)}")
+    if state.ok:
+        print("  status     ready -- similarity is semantic")
+        return 0
+    print(f"  status     unavailable -- {state.reason}")
+    if state.fix:
+        print(f"  fix        {state.fix}")
+    print("  Without it the tool groups near-duplicates by perceptual hash, which is")
+    print("  what it has always done. Nothing else changes.")
+    return 0
+
+
 # --- override ---------------------------------------------------------------
 
 
@@ -1529,6 +1571,15 @@ def build_parser() -> argparse.ArgumentParser:
     doc.add_argument("--output", help="where you plan to write")
     doc.add_argument("--json", help="write the result as JSON, for a bug report")
     doc.set_defaults(func=cmd_doctor)
+
+    models = sub.add_parser(
+        "models", help="the optional semantic-similarity encoder: show or download it"
+    )
+    models.add_argument(
+        "--download", action="store_true",
+        help="fetch the ONNX CLIP image encoder and verify its checksum",
+    )
+    models.set_defaults(func=cmd_models)
 
     report = sub.add_parser("report", help="filter, sort and re-render a stored run")
     report.add_argument("--analysis", required=True)

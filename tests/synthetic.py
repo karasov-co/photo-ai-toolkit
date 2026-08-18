@@ -113,6 +113,45 @@ def shifted(image: Image.Image, dx: int, dy: int) -> Image.Image:
     return Image.fromarray(np.roll(np.roll(array, dy, axis=0), dx, axis=1))
 
 
+def palette_twins() -> tuple[Image.Image, Image.Image]:
+    """Two frames a perceptual hash cannot tell apart and a human can.
+
+    The failure mode `duplicates.visual_similarity` documents, built rather than
+    described: one gradient, one framing, one palette, one tonal range -- and
+    two different subjects drawn on top. A perceptual hash reduces both to the
+    same 8x8 DCT (the pair below lands two bits apart, well inside the merge
+    distance of eight), so the diversity pass sees one photograph twice.
+
+    Deliberately not `photo_like` with two seeds: that varies composition, which
+    is exactly what a hash *can* see, and would prove nothing. Everything a hash
+    looks at is held constant here and only the content changes.
+
+    Returns (vertical bars, a lattice). Same ink, same coverage, same edges --
+    a different thing depicted.
+    """
+    width, height = 640, 480
+    rows = np.mgrid[0:height, 0:width][0] / height
+    sky = 96 + 118 * (1.0 - rows)
+    base = np.dstack([sky * 1.05, sky * 0.97, sky * 0.83])
+
+    def canvas():
+        return Image.fromarray(np.clip(base, 0, 255).astype(np.uint8))
+
+    bars = canvas()
+    draw = ImageDraw.Draw(bars)
+    for x in range(24, width, 24):
+        draw.line([(x, 90), (x, 430)], fill=(64, 58, 50), width=6)
+
+    lattice = canvas()
+    draw = ImageDraw.Draw(lattice)
+    for x in range(24, width, 24):
+        draw.line([(x, 90), (x, 430)], fill=(64, 58, 50), width=3)
+    for y in range(96, 431, 24):
+        draw.line([(20, y), (width - 20, y)], fill=(64, 58, 50), width=3)
+
+    return bars, lattice
+
+
 def write_jpeg(image: Image.Image, path, quality: int = 92):
     path.parent.mkdir(parents=True, exist_ok=True)
     image.convert("RGB").save(path, "JPEG", quality=quality)

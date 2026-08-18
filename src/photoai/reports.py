@@ -186,6 +186,13 @@ class AssetRecord:
     # never produce a flagship, because the selection needs to compare frames
     # against each other rather than against a threshold.
     phash: str = ""
+    # Which measurement the diversity pass compared this frame with:
+    # "embedding" (a CLIP vector) or "perceptual_hash". Stored on the record
+    # because the difference is visible in the result -- two frames that share a
+    # palette are one entry under a hash and two under a vector -- and a reader
+    # of the JSON should not have to guess which one produced it.
+    similarity_mode: str = "perceptual_hash"
+    similarity_detail: str = ""
     semantic_present: bool = False
     analysis_mode: str = "local_only"
     semantic_requested: bool = False
@@ -474,6 +481,10 @@ def summarise(records: list[AssetRecord], *, recoverable_bytes: int = 0) -> dict
         "semantic_partial": any(r.semantic_present for r in ok)
         and not all(r.semantic_present for r in ok),
         "analysis_mode": next((r.analysis_mode for r in records if r.analysis_mode), "local_only"),
+        "similarity_mode": next(
+            (r.similarity_mode for r in records if r.similarity_mode), "perceptual_hash"
+        ),
+        "similarity_detail": next((r.similarity_detail for r in records if r.similarity_detail), ""),
         "strongest": [
             {
                 "filename": r.filename,
@@ -516,6 +527,14 @@ def format_summary(summary: dict, language: str = "en", *, expert: bool = False)
 
     mode = summary.get("analysis_mode", "local_only")
     lines.append(_row(t("mode.title", language), t(f"mode.{mode}", language)))
+    # One line, always, whichever way it went. The fallback is the common case
+    # and it is not a warning -- but a run that grouped by palette rather than
+    # by subject should say which it did, in the place the result is read.
+    similarity = summary.get("similarity_mode", "perceptual_hash")
+    if similarity in ("embedding", "perceptual_hash"):
+        lines.append(
+            _row(t("similarity.title", language), t(f"similarity.{similarity}", language))
+        )
     if mode != "local_and_semantic":
         lines.append("")
         lines.append(f"  *** {t('mode.banner', language)} ***")

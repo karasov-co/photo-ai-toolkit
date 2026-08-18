@@ -253,6 +253,11 @@ STRINGS: dict[str, dict[str, str]] = {
             "nothing can be ranked as a top photograph and the subject of each frame "
             "is unknown rather than 'other'."
         ),
+        # Which measurement decided that two frames were the same photograph.
+        # Printed on every run: the answer changes what the gallery contains.
+        "similarity.title": "Similarity",
+        "similarity.embedding": "semantic (CLIP)",
+        "similarity.perceptual_hash": "perceptual hash",
         "summary.technically_usable": "Technically usable, needs checking",
         "summary.fully_checked": "Fully checked and ready to export",
         "summary.not_semantically_checked": "Not checked by semantic analysis",
@@ -530,6 +535,9 @@ STRINGS: dict[str, dict[str, str]] = {
             "ни один кадр не может попасть в лучшие, а сюжет каждого кадра "
             "неизвестен, а не «other»."
         ),
+        "similarity.title": "Похожесть",
+        "similarity.embedding": "смысловая (CLIP)",
+        "similarity.perceptual_hash": "перцептивный хеш",
         "summary.technically_usable": "Технически пригодно, нужна проверка",
         "summary.fully_checked": "Полностью проверено и готово к экспорту",
         "summary.not_semantically_checked": "Не проверено semantic-анализом",

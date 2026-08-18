@@ -243,22 +243,24 @@ def download(
     digest = hashlib.sha256()
     read = 0
     try:
-        with urllib.request.urlopen(spec.url, timeout=DOWNLOAD_TIMEOUT) as response:
-            with open(partial, "wb") as handle:
-                while True:
-                    block = response.read(_CHUNK)
-                    if not block:
-                        break
-                    read += len(block)
-                    if read > spec.size_bytes * 2:
-                        raise ChecksumMismatch(
-                            f"{spec.model_id}: the server sent more than twice the "
-                            f"expected {spec.size_bytes} bytes"
-                        )
-                    digest.update(block)
-                    handle.write(block)
-                    if progress:
-                        progress(read, spec.size_bytes)
+        with (
+            urllib.request.urlopen(spec.url, timeout=DOWNLOAD_TIMEOUT) as response,
+            open(partial, "wb") as handle,
+        ):
+            while True:
+                block = response.read(_CHUNK)
+                if not block:
+                    break
+                read += len(block)
+                if read > spec.size_bytes * 2:
+                    raise ChecksumMismatch(
+                        f"{spec.model_id}: the server sent more than twice the "
+                        f"expected {spec.size_bytes} bytes"
+                    )
+                digest.update(block)
+                handle.write(block)
+                if progress:
+                    progress(read, spec.size_bytes)
     except (urllib.error.URLError, OSError, ChecksumMismatch):
         partial.unlink(missing_ok=True)
         raise

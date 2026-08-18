@@ -161,7 +161,7 @@ def cosine(a: Sequence[float], b: Sequence[float]) -> float:
     if not a or not b or len(a) != len(b):
         return 0.0
     dot = norm_a = norm_b = 0.0
-    for x, y in zip(a, b):
+    for x, y in zip(a, b, strict=True):
         dot += x * y
         norm_a += x * x
         norm_b += y * y
