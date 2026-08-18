@@ -128,7 +128,7 @@ def test_the_report_says_the_gain_compares_frames_rather_than_measuring_them(tmp
 
     page = simple_report.write(
         [record("a.jpg", 50, 70)], tmp_path / "report.html", expert=False
-    ).read_text()
+    ).read_text(encoding="utf-8")
     assert "compares frames" in page
     assert "does not measure photographs" in page
     assert "bench-quality" in page
@@ -139,7 +139,7 @@ def test_a_validated_run_would_drop_the_caveat(tmp_path):
 
     validated = record("a.jpg", 50, 70)
     validated.uplift_validated = True
-    page = simple_report.write([validated], tmp_path / "report.html", expert=False).read_text()
+    page = simple_report.write([validated], tmp_path / "report.html", expert=False).read_text(encoding="utf-8")
     assert "not been checked against a labelled set" not in page
 
 
@@ -229,7 +229,7 @@ def test_the_template_is_shuffled_and_carries_no_verdict(tmp_path):
     out = tmp_path / "sheet.csv"
     assert bench_quality.write_template(records, out) == 60
 
-    lines = out.read_text().splitlines()
+    lines = out.read_text(encoding="utf-8").splitlines()
     assert lines[0] == "filename,human_pile"
     assert all(line.endswith(",") for line in lines[1:]), "no verdict may leak in"
     names = [line.split(",")[0] for line in lines[1:]]

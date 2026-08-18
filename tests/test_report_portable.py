@@ -65,7 +65,7 @@ def sources_in(page: str) -> list[str]:
 
 def test_the_page_contains_no_absolute_path(built):
     report_dir, _, _ = built
-    page = (report_dir / "index.html").read_text()
+    page = (report_dir / "index.html").read_text(encoding="utf-8")
 
     for src in sources_in(page):
         assert not src.startswith("/"), src
@@ -76,7 +76,7 @@ def test_the_page_contains_no_absolute_path(built):
 
 def test_every_src_lives_under_assets(built):
     report_dir, _, _ = built
-    for src in sources_in((report_dir / "index.html").read_text()):
+    for src in sources_in((report_dir / "index.html").read_text(encoding="utf-8")):
         assert src.startswith("assets/"), src
 
 
@@ -99,7 +99,7 @@ def test_every_asset_resolves_after_the_folder_is_moved(built, tmp_path):
     moved.parent.mkdir(parents=True)
     shutil.copytree(report_dir, moved)
 
-    page = (moved / "index.html").read_text()
+    page = (moved / "index.html").read_text(encoding="utf-8")
     referenced = sources_in(page)
     assert referenced
     for src in referenced:
@@ -115,7 +115,7 @@ def test_it_opens_from_a_different_working_directory(built, tmp_path):
     script = (
         "import re,sys;from pathlib import Path;"
         "p=Path(sys.argv[1]);"
-        "srcs=re.findall(r'src=\"([^\"]+)\"',p.read_text());"
+        "srcs=re.findall(r'src=\"([^\"]+)\"',p.read_text(encoding='utf-8'));"
         "missing=[s for s in srcs if not (p.parent/s).is_file()];"
         "print('MISSING' if missing else 'OK')"
     )
@@ -128,7 +128,7 @@ def test_it_opens_from_a_different_working_directory(built, tmp_path):
 
 def test_nothing_is_fetched_from_the_network(built):
     report_dir, _, _ = built
-    page = (report_dir / "index.html").read_text()
+    page = (report_dir / "index.html").read_text(encoding="utf-8")
     for marker in ("http://", "https://", "//cdn", "<script src", "<link rel=\"stylesheet\""):
         assert marker not in page, marker
 
@@ -142,7 +142,7 @@ def test_standalone_is_one_file_with_everything_inside(tmp_path, photos):
     path = tmp_path / "run" / "report_standalone.html"
     simple_report.write_standalone(records, path)
 
-    page = path.read_text()
+    page = path.read_text(encoding="utf-8")
     assert sources_in(page), "no images at all"
     assert all(src.startswith("data:image/jpeg;base64,") for src in sources_in(page))
     assert "http://" not in page and "https://" not in page
@@ -156,7 +156,7 @@ def test_standalone_still_opens_after_being_moved(tmp_path, photos):
     moved = tmp_path / "far" / "away.html"
     moved.parent.mkdir(parents=True)
     shutil.copyfile(path, moved)
-    page = moved.read_text()
+    page = moved.read_text(encoding="utf-8")
 
     assert "data:image/jpeg;base64," in page
     assert not [s for s in sources_in(page) if not s.startswith("data:")]
@@ -167,7 +167,7 @@ def test_the_lightbox_reuses_the_inlined_image(tmp_path, photos):
     records = [record("p0.jpg", source=photos / "p0.jpg", asset_key="p0.jpg")]
     path = tmp_path / "standalone.html"
     simple_report.write_standalone(records, path)
-    page = path.read_text()
+    page = path.read_text(encoding="utf-8")
 
     srcs = re.findall(r'src="(data:[^"]+)"', page)
     fulls = re.findall(r'data-full="(data:[^"]+)"', page)
@@ -260,7 +260,7 @@ def test_a_frame_with_no_file_gets_a_visible_placeholder(tmp_path):
     result = report_assets.build([missing], tmp_path / "r", tmp_path / "c")
     simple_report.write([missing], tmp_path / "r" / "index.html", assets=result)
 
-    page = (tmp_path / "r" / "index.html").read_text()
+    page = (tmp_path / "r" / "index.html").read_text(encoding="utf-8")
     assert "no longer where it was analysed" in page
     assert "<img" not in page.split("<details")[0]
 
@@ -273,14 +273,14 @@ def test_the_page_counts_the_cards_it_could_not_show(tmp_path, photos):
     result = report_assets.build(records, tmp_path / "r", tmp_path / "c")
     simple_report.write(records, tmp_path / "r" / "index.html", assets=result)
 
-    page = (tmp_path / "r" / "index.html").read_text()
+    page = (tmp_path / "r" / "index.html").read_text(encoding="utf-8")
     assert "1 photograph(s) could not be shown" in page
     assert result.counts == {"with_image": 1, "without_image": 1}
 
 
 def test_a_report_built_with_no_assets_shows_placeholders_not_blanks(tmp_path):
     simple_report.write([record()], tmp_path / "index.html")
-    page = (tmp_path / "index.html").read_text()
+    page = (tmp_path / "index.html").read_text(encoding="utf-8")
     assert "noimg" in page
 
 
@@ -289,7 +289,7 @@ def test_a_report_built_with_no_assets_shows_placeholders_not_blanks(tmp_path):
 
 def test_images_are_lazy_and_the_grid_is_responsive(built):
     report_dir, _, _ = built
-    page = (report_dir / "index.html").read_text()
+    page = (report_dir / "index.html").read_text(encoding="utf-8")
     assert 'loading="lazy"' in page
     assert "@media (max-width:640px)" in page
     assert "grid-template-columns" in page
@@ -297,7 +297,7 @@ def test_images_are_lazy_and_the_grid_is_responsive(built):
 
 def test_the_filter_bar_is_sticky_and_counts_each_bucket(built):
     report_dir, _, _ = built
-    page = (report_dir / "index.html").read_text()
+    page = (report_dir / "index.html").read_text(encoding="utf-8")
     assert "position:sticky" in page
     for bucket, _ in simple_report.SECTIONS:
         assert f'data-bucket="{bucket}"' in page
@@ -305,7 +305,7 @@ def test_the_filter_bar_is_sticky_and_counts_each_bucket(built):
 
 def test_the_script_is_inline_vanilla_javascript(built):
     report_dir, _, _ = built
-    page = (report_dir / "index.html").read_text()
+    page = (report_dir / "index.html").read_text(encoding="utf-8")
     assert "<script>" in page
     assert "<script src" not in page
     for library in ("jquery", "react", "lodash", "bootstrap"):
@@ -314,7 +314,7 @@ def test_the_script_is_inline_vanilla_javascript(built):
 
 def test_the_header_explains_the_scale_and_the_thresholds(built):
     report_dir, _, _ = built
-    page = (report_dir / "index.html").read_text()
+    page = (report_dir / "index.html").read_text(encoding="utf-8")
     assert "after a normal edit" in page
     assert str(simple_report.TOP_THRESHOLD) in page
 
@@ -329,7 +329,7 @@ def rendered(*records):
     with tempfile.TemporaryDirectory() as d:
         path = pathlib.Path(d) / "r.html"
         simple_report.write(list(records), path)
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     return "\n".join(re.findall(r'<div class="now">.*?</div>', text)) + "\n" + "\n".join(
         re.findall(r'<span class="score".*?</span>', text, re.S)
     )
@@ -341,7 +341,7 @@ def header(*records):
     with tempfile.TemporaryDirectory() as d:
         path = pathlib.Path(d) / "r.html"
         simple_report.write(list(records), path)
-        return re.search(r'<p class="scale">(.*?)</p>', path.read_text()).group(1)
+        return re.search(r'<p class="scale">(.*?)</p>', path.read_text(encoding="utf-8")).group(1)
 
 
 def test_the_score_caption_says_what_the_number_is():
@@ -383,4 +383,4 @@ def test_the_standalone_file_survives_publishing(tmp_path):
 
     workspace.publish(space, staged)
     assert space.standalone.is_file(), "the one shareable file was left in staging"
-    assert space.standalone.read_text() == "<html>one file</html>"
+    assert space.standalone.read_text(encoding="utf-8") == "<html>one file</html>"

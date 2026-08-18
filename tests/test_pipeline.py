@@ -761,7 +761,7 @@ def test_a_run_that_dies_mid_pass_keeps_what_it_already_paid_for(tmp_path, monke
 
     # The file exists and holds the three groups that were paid for, written
     # before the exception left the function.
-    stored = _json.loads((tmp_path / "c.json").read_text())["entries"]
+    stored = _json.loads((tmp_path / "c.json").read_text(encoding="utf-8"))["entries"]
     kept = sum(1 for k in stored if k.startswith("stage2:"))
     # Fewer than 3 x 12: the groups overlap, so the same frame appears in more
     # than one of them. What matters is that three groups' worth of answers are

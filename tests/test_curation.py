@@ -639,10 +639,10 @@ def test_the_category_survives_into_the_json_and_csv(archive, tmp_path, monkeypa
 
     run_cli(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3)), monkeypatch)
     reports_dir = tmp_path / "out" / ".internal" / "reports"
-    data = json.loads((reports_dir / "analysis.json").read_text())
+    data = json.loads((reports_dir / "analysis.json").read_text(encoding="utf-8"))
     assets = data["assets"] if isinstance(data, dict) else data
     assert all(a["category"] for a in assets)
-    assert "category" in (reports_dir / "analysis.csv").read_text().splitlines()[0]
+    assert "category" in (reports_dir / "analysis.csv").read_text(encoding="utf-8").splitlines()[0]
 
 
 def test_a_blinking_portrait_is_weak_end_to_end(archive, tmp_path):
@@ -707,7 +707,7 @@ def test_the_html_has_a_top_photos_section(archive, tmp_path, monkeypatch):
     run_cli(archive, tmp_path, _Client(stage2_reply(3), stage3_reply(3, 95)), monkeypatch)
     assert "Top photos" in (
         tmp_path / "out" / ".internal" / "reports" / "full_report.html"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
 
 def test_the_farm_has_a_category_view(archive, tmp_path, monkeypatch):

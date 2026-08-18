@@ -188,7 +188,7 @@ def test_the_cli_runs_locally_and_says_exactly_what_is_missing(archive, tmp_path
 def test_the_report_written_without_a_key_does_not_pretend(archive, tmp_path):
     out = tmp_path / "out"
     cli.main(["analyze", "--input", str(archive), "--output", str(out)])
-    payload = json.loads((out / ".internal" / "reports" / "analysis.json").read_text())
+    payload = json.loads((out / ".internal" / "reports" / "analysis.json").read_text(encoding="utf-8"))
     assert payload["assets"]
     assert all(not a.get("semantic_present") for a in payload["assets"])
     assert all(not a.get("semantic_requested") for a in payload["assets"])

@@ -80,7 +80,7 @@ def test_a_dark_file_that_recovers_outranks_a_bright_one_that_does_not():
 
 
 def test_current_quality_is_shown_but_never_ranks(collection, tmp_path):
-    page = simple_report.write(collection, tmp_path / "report.html").read_text()
+    page = simple_report.write(collection, tmp_path / "report.html").read_text(encoding="utf-8")
     assert "technical quality" in page
     assert "technical quality now" not in page  # "now" implied it would change
     assert "51" in page  # top.jpg's current quality is still visible
@@ -90,13 +90,13 @@ def test_the_two_numbers_are_labelled_as_different_axes(collection, tmp_path):
     """A pristine picture of nothing shows a high technical number and a low
     photographic one. Labelling that pair "as shot" and "after editing" reads
     as "editing made it worse", which is not what either number means."""
-    page = simple_report.write(collection, tmp_path / "report.html").read_text()
+    page = simple_report.write(collection, tmp_path / "report.html").read_text(encoding="utf-8")
     assert "as shot" not in page
     assert "final score after editing" in page
 
 
 def test_every_category_gets_a_section_even_when_empty(collection, tmp_path):
-    page = simple_report.write(collection, tmp_path / "report.html").read_text()
+    page = simple_report.write(collection, tmp_path / "report.html").read_text(encoding="utf-8")
     for name, _ in simple_report.SECTIONS:
         assert simple_report.t(f"category.{name}", "en") in page
 
@@ -116,7 +116,7 @@ def test_recommendations_are_capped_at_three():
 
 @pytest.mark.parametrize("phrase", simple_report.FORBIDDEN_IN_DEFAULT_UI)
 def test_no_internal_or_legal_vocabulary_reaches_the_default_report(collection, tmp_path, phrase):
-    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text()
+    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text(encoding="utf-8")
     assert phrase not in page.lower()
 
 
@@ -136,7 +136,7 @@ def test_a_reason_carrying_legal_language_is_dropped_rather_than_shown():
 
 def test_the_expert_block_is_where_the_hidden_numbers_live(collection, tmp_path):
     """Hidden is not discarded: somebody who wants the detail can still get it."""
-    page = simple_report.write(collection, tmp_path / "report.html", expert=True).read_text()
+    page = simple_report.write(collection, tmp_path / "report.html", expert=True).read_text(encoding="utf-8")
     assert "Expert details" in page
     assert "stock_standard" in page  # the route class, in the expert table only
     body, expert = page.split("<details", 1)
@@ -145,7 +145,7 @@ def test_the_expert_block_is_where_the_hidden_numbers_live(collection, tmp_path)
 
 
 def test_the_score_shown_is_the_potential_not_the_routing_score(collection, tmp_path):
-    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text()
+    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text(encoding="utf-8")
     assert ">88" in page.replace("\n", "")
     assert "61" not in page.replace("\n", "")  # routing_score never appears
 
@@ -199,8 +199,8 @@ def test_migration_never_destroys_a_file_it_cannot_place(tmp_path):
 
     workspace.migrate(out)
 
-    assert (out / ".internal" / "reports" / "analysis.json").read_text() == "the newer one"
-    assert (out / ".internal" / "reports-1" / "analysis.json").read_text() == "the older one"
+    assert (out / ".internal" / "reports" / "analysis.json").read_text(encoding="utf-8") == "the newer one"
+    assert (out / ".internal" / "reports-1" / "analysis.json").read_text(encoding="utf-8") == "the older one"
 
 
 def test_migrating_a_directory_that_does_not_exist_is_harmless(tmp_path):
@@ -278,7 +278,7 @@ def test_the_sidecar_is_camera_raw_and_names_itself_a_suggestion(tmp_path):
         {"a.jpg": FakeMeasurement()},
         tmp_path / "r",
     )
-    xmp = (tmp_path / "r" / "a.xmp").read_text()
+    xmp = (tmp_path / "r" / "a.xmp").read_text(encoding="utf-8")
     assert "crs:Exposure2012" in xmp
     assert "photo-ai-toolkit" in xmp
 
@@ -303,7 +303,7 @@ def test_the_folder_explains_how_to_use_it(tmp_path):
         {"a.jpg": FakeMeasurement()},
         tmp_path / "r",
     )
-    text = (tmp_path / "r" / recipe_export.README_NAME).read_text()
+    text = (tmp_path / "r" / recipe_export.README_NAME).read_text(encoding="utf-8")
     assert "STARTING POINT" in text
     assert "Read Metadata from File" in text
     assert "Lightroom Classic" in text
@@ -458,7 +458,7 @@ def test_an_empty_collection_produces_an_empty_page(tmp_path):
 
 def test_the_insights_page_renders_every_section(tmp_path):
     built = insights_module.build(sample())
-    page = insights_module.write(built, tmp_path / "insights.html").read_text()
+    page = insights_module.write(built, tmp_path / "insights.html").read_text(encoding="utf-8")
     assert "What you shoot best" in page
     assert "The three things worth changing next" in page
     assert "Worth looking at" in page
@@ -502,7 +502,7 @@ def test_the_default_report_has_no_legal_or_routing_vocabulary(archive, tmp_path
 
     out = tmp_path / "out"
     cli.main(["measure", "--input", str(archive), "--output", str(out)])
-    page = (out / "report" / "index.html").read_text().lower()
+    page = (out / "report" / "index.html").read_text(encoding="utf-8").lower()
 
     body = page.split("<details", 1)[0]
     for phrase in simple_report.FORBIDDEN_IN_DEFAULT_UI:
@@ -581,7 +581,7 @@ def test_the_curation_categories_are_the_only_piles_shown():
 def test_the_report_links_to_the_insights(tmp_path, collection):
     page = simple_report.write(
         collection, tmp_path / "report.html", insights_link=workspace.INSIGHTS_NAME
-    ).read_text()
+    ).read_text(encoding="utf-8")
     assert workspace.INSIGHTS_NAME in page
 
 
@@ -600,20 +600,20 @@ def test_no_card_points_outside_the_report_folder(tmp_path):
     simple_report.write_folder(
         [subject], tmp_path / "out" / "report", cache_dir=tmp_path / "cache"
     )
-    page = (tmp_path / "out" / "report" / "index.html").read_text()
+    page = (tmp_path / "out" / "report" / "index.html").read_text(encoding="utf-8")
 
     for src in re.findall(r'src="([^"]+)"', page):
         assert src.startswith("assets/"), src
 
 
 def test_a_record_with_no_preview_renders_without_one(tmp_path):
-    page = simple_report.write([record(preview_path="")], tmp_path / "report.html").read_text()
+    page = simple_report.write([record(preview_path="")], tmp_path / "report.html").read_text(encoding="utf-8")
     assert "<img" not in page.split("<details", 1)[0]
 
 
 def test_the_report_is_written_atomically_enough_to_be_readable(tmp_path, collection):
     path = simple_report.write(collection, tmp_path / "report.html")
-    assert path.read_text().rstrip().endswith("</html>")
+    assert path.read_text(encoding="utf-8").rstrip().endswith("</html>")
 
 
 def test_no_absolute_path_reaches_the_page(tmp_path, collection):
@@ -624,7 +624,7 @@ def test_no_absolute_path_reaches_the_page(tmp_path, collection):
     simple_report.write_folder(
         collection, tmp_path / "out" / "report", cache_dir=tmp_path / "cache"
     )
-    page = (tmp_path / "out" / "report" / "index.html").read_text()
+    page = (tmp_path / "out" / "report" / "index.html").read_text(encoding="utf-8")
 
     assert str(tmp_path) not in page
     assert "/Users/" not in page
@@ -641,7 +641,7 @@ def test_an_empty_top_section_explains_itself(tmp_path):
     """"Nothing here" cannot tell a strict threshold from a broken one."""
     modest = [record(filename=f"m{i}.jpg", category="GOOD_STOCK", final_score=70 + i)
               for i in range(3)]
-    page = simple_report.write(modest, tmp_path / "report.html", expert=False).read_text()
+    page = simple_report.write(modest, tmp_path / "report.html", expert=False).read_text(encoding="utf-8")
     assert "72" in page  # the best score
     assert str(simple_report.TOP_THRESHOLD) in page
     assert "normal result" in page
@@ -652,7 +652,7 @@ def test_the_page_quotes_the_threshold_the_decision_used():
 
 
 def test_a_populated_top_section_says_nothing_about_thresholds(collection, tmp_path):
-    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text()
+    page = simple_report.write(collection, tmp_path / "report.html", expert=False).read_text(encoding="utf-8")
     assert "normal result" not in page
 
 

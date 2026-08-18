@@ -252,7 +252,7 @@ def test_the_verification_receipt_saves_rehashing(tmp_path):
     path = _fake_model(tmp_path, spec, body)
     assert embeddings.verify(path, spec)
 
-    receipt = json.loads((tmp_path / "test.onnx.verified.json").read_text())
+    receipt = json.loads((tmp_path / "test.onnx.verified.json").read_text(encoding="utf-8"))
     assert receipt["sha256"] == spec.sha256
     assert receipt["size"] == len(body)
 

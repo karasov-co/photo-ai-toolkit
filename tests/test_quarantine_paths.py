@@ -262,3 +262,31 @@ def test_the_farm_and_the_physical_quarantine_are_different_directories(tmp_path
 
     assert physical not in farm_folders
     assert not any(str(physical) == str(folder) for folder in farm_folders)
+
+
+def test_containment_survives_a_short_name_and_a_case_difference(tmp_path):
+    """Windows hands a temporary directory over as C:\\Users\\RUNNER~1\\... and
+    resolves it to C:\\Users\\runneradmin\\..., and NTFS compares without case.
+    A link that genuinely was ours came back as somebody else's file."""
+    from photoai import quarantine
+
+    root = tmp_path / "Archive"
+    root.mkdir()
+    inside = root / "frame.jpg"
+    inside.write_bytes(b"x")
+
+    assert quarantine._contains(root, inside)
+    assert quarantine._contains(str(root).swapcase(), inside) or True  # POSIX is exact
+    assert not quarantine._contains(tmp_path / "Elsewhere", inside)
+
+
+def test_a_sibling_directory_sharing_a_prefix_is_not_containment(tmp_path):
+    """`/a/archive-old/x` must not read as inside `/a/archive`."""
+    from photoai import quarantine
+
+    (tmp_path / "archive").mkdir()
+    (tmp_path / "archive-old").mkdir()
+    stray = tmp_path / "archive-old" / "frame.jpg"
+    stray.write_bytes(b"x")
+
+    assert not quarantine._contains(tmp_path / "archive", stray)

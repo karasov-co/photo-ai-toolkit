@@ -213,10 +213,10 @@ def test_a_sidecar_without_a_rating_gains_one_and_its_namespace():
 def test_planning_a_rating_never_writes(tmp_path):
     target = tmp_path / "P1.xmp"
     target.write_text('<x><rdf:Description crs:Exposure2012="+1.00"/></x>')
-    before = target.read_text()
+    before = target.read_text(encoding="utf-8")
     plan = adobe_xmp.plan_rating(rated("TOP"), target)
     assert plan.exists
-    assert target.read_text() == before
+    assert target.read_text(encoding="utf-8") == before
     assert plan.diff
 
 
@@ -226,7 +226,7 @@ def test_writing_a_rating_keeps_a_copy_of_what_was_there(tmp_path):
     adobe_xmp.plan_rating(rated("TOP"), target).write()
     spare = target.with_suffix(".xmp.before-photoai")
     assert spare.is_file()
-    assert "crs:Exposure2012" in spare.read_text()
+    assert "crs:Exposure2012" in spare.read_text(encoding="utf-8")
 
 
 def test_the_colours_are_not_hardcoded(monkeypatch):

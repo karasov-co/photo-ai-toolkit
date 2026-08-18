@@ -109,7 +109,7 @@ def test_no_coordinate_reaches_a_shared_artefact(tmp_path):
     )
     payload = tmp_path / "analysis.json"
     reports.write_json([record], payload)
-    text = payload.read_text()
+    text = payload.read_text(encoding="utf-8")
     assert "gps_lat" not in text
     assert "gps_lon" not in text
     assert not re.search(r"\b\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b", text)

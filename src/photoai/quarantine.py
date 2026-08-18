@@ -182,7 +182,26 @@ def is_generated_link(path: Path, source_roots: list[Path] | None = None) -> boo
         return True
     if not source_roots:
         return True
-    return any(target.is_relative_to(Path(root).resolve()) for root in source_roots)
+    return any(_contains(root, target) for root in source_roots)
+
+
+def _contains(root: Path, target: Path) -> bool:
+    """Whether `target` sits under `root`, on a filesystem of either persuasion.
+
+    `is_relative_to` on resolved paths is not enough on Windows. A temporary
+    directory reaches this function as `C:\\Users\\RUNNER~1\\...` and resolves to
+    `C:\\Users\\runneradmin\\...`, and NTFS compares case-insensitively besides,
+    so a link that genuinely was ours came back as somebody else's file. Both
+    sides go through realpath and normcase before they are compared.
+    """
+    import os
+
+    try:
+        a = os.path.normcase(os.path.realpath(target))
+        b = os.path.normcase(os.path.realpath(Path(root)))
+    except OSError:  # pragma: no cover - an unreadable root is not containment
+        return False
+    return a == b or a.startswith(b + os.sep)
 
 
 class Manifest:

@@ -160,7 +160,7 @@ def test_no_key_runs_the_local_pass_and_still_produces_a_report(archive, tmp_pat
     assert code == 0
     report = out / "report" / "index.html"
     assert report.is_file()
-    assert '<img' in report.read_text()
+    assert '<img' in report.read_text(encoding="utf-8")
 
     said = capsys.readouterr().out
     assert "local pass" in said
@@ -171,7 +171,7 @@ def test_no_key_runs_the_local_pass_and_still_produces_a_report(archive, tmp_pat
 def test_no_key_never_claims_a_content_check_happened(archive, tmp_path):
     out = tmp_path / "run"
     analyze(archive, out)
-    payload = json.loads((out / ".internal" / "reports" / "analysis.json").read_text())
+    payload = json.loads((out / ".internal" / "reports" / "analysis.json").read_text(encoding="utf-8"))
     assert all(not a.get("semantic_present") for a in payload["assets"])
     assert all(a["category"] != "TOP" for a in payload["assets"])
 
@@ -205,7 +205,7 @@ def test_a_rejected_key_leaves_an_existing_run_exactly_as_it_was(
 
     assert analyze(archive, out) != 0
 
-    assert space.report.read_text() == "the previous report"
+    assert space.report.read_text(encoding="utf-8") == "the previous report"
     assert (space.root / "top" / "keep.jpg").exists()
     assert watchful["photos"] == 0
 
@@ -265,8 +265,8 @@ def test_an_unavailable_model_preserves_the_previous_report(archive, tmp_path, m
 
     assert analyze(archive, out) != 0
 
-    assert space.report.read_text() == "the previous report"
-    assert space.insights.read_text() == "the previous insights"
+    assert space.report.read_text(encoding="utf-8") == "the previous report"
+    assert space.insights.read_text(encoding="utf-8") == "the previous insights"
 
 
 def test_an_unavailable_model_never_falls_back_to_an_older_one(archive, tmp_path, monkeypatch, capsys):
@@ -522,14 +522,14 @@ def test_h_duplicate_status_alone_never_produces_weak():
 
 def test_i_the_second_run_describes_only_the_new_photographs(archive, tmp_path, monkeypatch):
     _, _, _ = run_twice(archive, tmp_path, monkeypatch, photo_like(1200, 900, seed=3))
-    page = (tmp_path / "run" / "photographer_insights.html").read_text()
+    page = (tmp_path / "run" / "photographer_insights.html").read_text(encoding="utf-8")
     assert "newly analyzed" in page
     assert "1 newly analyzed" in page or "Insights based on 1" in page
 
 
 def test_i_scope_all_uses_the_whole_archive(archive, tmp_path, monkeypatch):
     run_twice(archive, tmp_path, monkeypatch, photo_like(1200, 900, seed=3), "--insights-scope", "all")
-    page = (tmp_path / "run" / "photographer_insights.html").read_text()
+    page = (tmp_path / "run" / "photographer_insights.html").read_text(encoding="utf-8")
     assert "3 photographs" in page or "all 3" in page
 
 
@@ -564,7 +564,7 @@ def test_j_a_stage2_failure_preserves_the_previous_run(archive, tmp_path, monkey
     out = tmp_path / "run"
     client = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
     assert analyze(archive, out) == 0
-    good_report = (out / "report" / "index.html").read_text()
+    good_report = (out / "report" / "index.html").read_text(encoding="utf-8")
     good_top = sorted(p.name for p in (out / "top").iterdir())
 
     # A second run whose content pass returns nothing usable at all.
@@ -572,7 +572,7 @@ def test_j_a_stage2_failure_preserves_the_previous_run(archive, tmp_path, monkey
     client.responses.stage2_text = "the model declined"
     assert analyze(archive, out) != 0
 
-    assert (out / "report" / "index.html").read_text() == good_report
+    assert (out / "report" / "index.html").read_text(encoding="utf-8") == good_report
     assert sorted(p.name for p in (out / "top").iterdir()) == good_top
 
 
@@ -586,7 +586,7 @@ def test_j_an_incomplete_staging_directory_is_refused(tmp_path):
 
     with pytest.raises(workspace.PublishError):
         workspace.publish(space, staged)
-    assert space.report.read_text() == "the previous report"
+    assert space.report.read_text(encoding="utf-8") == "the previous report"
 
 
 def test_j_publication_replaces_everything_or_nothing(tmp_path):
@@ -602,8 +602,8 @@ def test_j_publication_replaces_everything_or_nothing(tmp_path):
 
     workspace.publish(space, staged)
 
-    assert space.report.read_text() == "new report"
-    assert space.insights.read_text() == "new insights"
+    assert space.report.read_text(encoding="utf-8") == "new report"
+    assert space.insights.read_text(encoding="utf-8") == "new insights"
     assert not staged.exists()
 
 
@@ -738,7 +738,7 @@ def test_an_exhausted_balance_ends_the_run_instead_of_half_analysing(
     out = tmp_path / "run"
     good = with_client(monkeypatch, Client(stage2=stage2_reply(2), stage3=stage3_reply(2)))
     assert analyze(archive, out) == 0
-    previous = (out / "report" / "index.html").read_text()
+    previous = (out / "report" / "index.html").read_text(encoding="utf-8")
 
     write_jpeg(photo_like(1200, 900, seed=8), archive / "d.jpg")
     broke = Client(stage2=stage2_reply(1), stage3=stage3_reply(1))
@@ -746,7 +746,7 @@ def test_an_exhausted_balance_ends_the_run_instead_of_half_analysing(
     with_client(monkeypatch, broke)
 
     assert analyze(archive, out) != 0
-    assert (out / "report" / "index.html").read_text() == previous, "the good report was replaced"
+    assert (out / "report" / "index.html").read_text(encoding="utf-8") == previous, "the good report was replaced"
     assert good is not broke
 
 
@@ -772,7 +772,7 @@ def test_the_insights_scope_line_counts_correctly(tmp_path):
     built = insights_module.Insights(total=261)
     page = insights_module.write(
         built, tmp_path / "insights.html", scope="new", total_stored=281
-    ).read_text()
+    ).read_text(encoding="utf-8")
     assert "261 newly analyzed photographs, out of 281" in page
 
 

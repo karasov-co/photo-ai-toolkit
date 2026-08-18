@@ -339,7 +339,7 @@ def test_the_manifest_is_append_only_so_a_crash_cannot_lose_history(tmp_path):
                 checksum="c", size_bytes=1, timestamp="t", reason="r",
             )
         )
-    assert len(manifest.path.read_text().strip().split("\n")) == 3
+    assert len(manifest.path.read_text(encoding="utf-8").strip().split("\n")) == 3
     assert len(manifest.load()) == 3
 
 
