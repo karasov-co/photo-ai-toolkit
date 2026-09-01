@@ -1,4 +1,4 @@
-openai==2.53.0
+openai==3.6.0
 # Explicit, not transitive. Every deterministic metric in this project is
 # NumPy -- Laplacian variance, structure tensors, phase correlation -- and it
 # was arriving only because rawpy happens to depend on it.
