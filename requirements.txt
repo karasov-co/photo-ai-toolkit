@@ -8,7 +8,7 @@ rawpy==0.27.0
 exifread==3.5.1
 imagehash==4.3.2
 python-dotenv==1.2.2
-tqdm==4.70.0
+tqdm==4.70.1
 pillow-heif==1.5.0
 
 # Not here on purpose: onnxruntime. Semantic similarity is an optional extra --
