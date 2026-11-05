@@ -36,7 +36,7 @@ open ./run/report/index.html
 
 No API key needed. That run gives you every technical measurement, the duplicate
 groups, the edit recipes and the full report. What it cannot do is look at the
-picture — no content check, no artistic read, and nothing can be ranked as a top
+picture: no content check, no artistic read, and nothing can be ranked as a top
 photograph, because nothing looked at it.
 
 For that, add a key and run the same command:
@@ -47,12 +47,12 @@ python3 cli.py analyze --input ./photos --output ./run
 ```
 
 It prints the estimated cost and waits for you to type `yes`. About **$1.90 per
-100 photographs** on grok-4.6 — measured from a real run's token usage,
+100 photographs** on grok-4.6, measured from a real run's token usage,
 reasoning tokens included. Every call is logged to `run/.internal/usage.jsonl`
 and the real total is printed at the end, so the estimate is checkable rather
 than trusted. `--reasoning low|medium|high` is the dial; low is the default.
 
-Do not `source .env` or `export` anything — the application loads the file
+Do not `source .env` or `export` anything; the application loads the file
 itself, from the project root, whichever directory you run from. `.env` is
 gitignored and never committed.
 
@@ -61,19 +61,19 @@ gitignored and never committed.
 ## What you get
 
 `run/report/index.html` is a folder you can copy, zip or email. It has no
-external requests — no CDN, no web fonts, no JavaScript libraries — so it opens
+external requests (no CDN, no web fonts, no JavaScript libraries), so it opens
 on a plane, behind a firewall, and in five years. `--standalone` produces a
 single `report_standalone.html` with every thumbnail inlined, for sending to one
 person.
 
 The decision also arrives where you actually cull. `edit_recipes/ratings/` holds
-one XMP per photograph with a star rating and a colour label — five stars for
-top, two for weak — that Bridge and Photo Mechanic read straight from the
+one XMP per photograph with a star rating and a colour label (five stars for
+top, two for weak) that Bridge and Photo Mechanic read straight from the
 folder. For Lightroom Classic, `photoai apply-ratings` merges them into the
 sidecars beside your originals: it changes the rating and the label and nothing
 else, keeps a `.before-photoai` copy, and shows the diff before writing. Then
 Metadata > Read Metadata from File. Colours are yours to set with
-`PHOTO_AI_LABELS` — red already means something in most catalogues.
+`PHOTO_AI_LABELS`; red already means something in most catalogues.
 
 And the loop closes. After a week of working in Lightroom, your own stars are in
 those same sidecars, so `bench-quality --from-catalog` measures the tool against
@@ -91,9 +91,9 @@ Five piles, with the count of each at the top of the page:
 
 Each card carries three numbers, and they measure different things:
 
-- **final score after editing** — the big one, what the photograph becomes
-- **technical quality** — how clean the file is right now
-- **content** — the moment, the composition, the subject (present only when the
+- **final score after editing**: the big one, what the photograph becomes
+- **technical quality**: how clean the file is right now
+- **content**: the moment, the composition, the subject (present only when the
   content check ran)
 
 A pristine picture of nothing scores high on the second and low on the third.
@@ -115,13 +115,13 @@ burst and near-identical grouping through a BK-tree, with the strongest frame of
 each group chosen and the margin that decided it; video sampling through FFmpeg.
 Grouping compares perceptual hashes by default and image embeddings when the
 optional encoder is installed (`pip install -e ".[embeddings]"` then `photoai
-models --download`) — the hash alone treats two different subjects shot with the
+models --download`): the hash alone treats two different subjects shot with the
 same palette and framing as one photograph, and the run says which of the two it
 used.
 
 **Look at the pictures, with a key**
-Stage 2 ranks frames against each other in groups of twelve — genre, content,
-unrepeatability, documentary value, recoverability — and stitches the group
+Stage 2 ranks frames against each other in groups of twelve (genre, content,
+unrepeatability, documentary value, recoverability) and stitches the group
 ranks into one order with Bradley–Terry, so a frame keeps the population it was
 ranked against. Stage 3 is the artistic read: intent, resonance, whether an odd
 frame is a mistake or a decision, with face crops when the frame calls for them.
@@ -133,8 +133,8 @@ touching code. Confidence is reported, and a low-confidence frame goes to
 *needs decision* rather than being guessed at.
 
 **Suggest the edit**
-A per-frame recipe — exposure, white balance, highlight recovery, shadow lift,
-denoise, sharpening — with the measurement that earned each step. Optional
+A per-frame recipe (exposure, white balance, highlight recovery, shadow lift,
+denoise, sharpening) with the measurement that earned each step. Optional
 darkroom pass renders candidates and validates them (skin-tone protection, halo
 and clipping checks) so a recipe that makes things worse is rejected rather than
 shipped. Delivered two ways: a Lightroom preset that applies at any amount and
@@ -143,7 +143,7 @@ written over an existing file.
 
 **Sell it, if that is what you are doing**
 Stock metadata: title, description, ordered keywords, categories, concepts,
-location (only from something actually recorded — coordinates are not a place
+location (only from something actually recorded; coordinates are not a place
 name), AI-provenance label. Marketplace fit per platform from a rules file, with
 technical blockers named. Submission CSV and XMP sidecars. Nothing is ever
 uploaded anywhere.
@@ -153,7 +153,7 @@ uploaded anywhere.
 personal preference model then abstains on unfamiliar cameras and genres rather
 than pretending. `bench-quality --from-catalog` reads the stars you gave these
 photographs in Lightroom and reports how closely the piles match your own
-sorting — a confusion matrix, precision on the top pile, and the thresholds that
+sorting: a confusion matrix, precision on the top pile, and the thresholds that
 would have matched you better. `monitor` tracks false-trash rate and drift.
 
 **Never lose anything**
@@ -173,10 +173,10 @@ run keeps everything it already paid for.
 |---|---|
 | `analyze` | **The command.** Preflight, measure, content check, artistic read, report |
 | `measure` | Local measurement only, explicitly not an analysis |
-| `report` | Filter, sort and re-render a stored run — no re-analysis, no tokens |
-| `reclassify` | Redo routing at different thresholds — no re-analysis, no tokens |
+| `report` | Filter, sort and re-render a stored run; no re-analysis, no tokens |
+| `reclassify` | Redo routing at different thresholds; no re-analysis, no tokens |
 | `demo` | Twelve committed photographs, offline, a real report in a minute |
-| `doctor` | Key, binaries, permissions and space — before a cent is spent |
+| `doctor` | Key, binaries, permissions and space, checked before a cent is spent |
 | `models` | The optional semantic-similarity encoder: show or download it |
 | `bench-quality` | Check the piles against your own sorting, or your catalogue |
 | `darkroom` | Render the edit suggestions from a stored run |
@@ -257,11 +257,11 @@ the only thing that carries out a plan.
 
 ## Read next
 
-- **[How the score is built](docs/how-it-works.md)** — potential versus current
+- **[How the score is built](docs/how-it-works.md)**: potential versus current
   quality, the five piles, the artistic read, what a card is telling you
-- **[Commands, output and configuration](docs/reference.md)** — the output tree,
+- **[Commands, output and configuration](docs/reference.md)**: the output tree,
   calibration profiles, marketplaces, metadata, every flag in prose
-- **[Internals, safety and limits](docs/internals.md)** — architecture, the
+- **[Internals, safety and limits](docs/internals.md)**: architecture, the
   model and why there is no fallback, quarantine, development, known limits
 
 ---
@@ -291,7 +291,7 @@ because most people already have one of those sitting in a file somewhere.
 A score is one opinion about a photograph, produced by measurements and a
 language model, and both are wrong sometimes. Nothing here is a verdict. The
 tool is built so that every suggestion is reversible and every original file is
-untouched — look at the pictures before you act on any of it.
+untouched. Look at the pictures before you act on any of it.
 
 ## Contributing
 
@@ -300,3 +300,9 @@ Issues and pull requests welcome. `ruff check . && pytest -q` must pass.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Author
+
+**Vitalii Karasov** designs and ships AI systems for document-heavy operations, and measures them before they go live. Client work: [drawing intake, New York](https://karasov.co/case-studies/architectural-drawing-intake-new-york) (54 of 56 sheets filed with no person; [how it was measured](https://karasov.co/case-studies/drawing-intake-evaluation)) and [ATAMAN Studio, Los Angeles](https://karasov.co/case-studies/ataman-studio) (10,000+ production runs).
+
+[karasov.co](https://karasov.co) · [LinkedIn](https://www.linkedin.com/in/vitaliikarasov/) · [Telegram](https://t.me/karvitalii)
