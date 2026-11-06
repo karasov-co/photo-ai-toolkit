@@ -135,8 +135,8 @@ stripped. Undeclared provenance is reported as undeclared.
 ### Export, not upload
 
 Nothing is ever submitted anywhere. `export` builds a package with a submission
-CSV, per-file XMP sidecars and manual upload instructions.
-Direct upload adapters are **not implemented** — see *Known limitations*.
+CSV, per-file XMP sidecars and manual upload instructions. You stay in control of
+what goes to each platform and when.
 
 ---
 
